@@ -27,9 +27,51 @@ export type VisualizerPosition = 'center' | 'top' | 'bottom';
 export interface VisualizerConfig {
   style: VisualizerStyle;
   position: VisualizerPosition;
-  barCount: number; // Maps to FFT Size (e.g., 64, 128, 256)
-  sensitivity: number; // 0.5 to 3.0
-  fillOpacity: number; // 0 to 1
+  barCount: number;
+  sensitivity: number;
+  fillOpacity: number;
   strokeEnabled: boolean;
-  strokeOpacity: number; // 0 to 1
+  strokeOpacity: number;
+  normalize: boolean;
+  minFrequency: number;
+  maxFrequency: number;
+  barGap: number;
+  mirror: boolean;
+}
+
+export interface DvdConfig {
+  size: number;
+  speed: number;
+  opacity: number;
+}
+
+export interface MarqueeConfig {
+  enabled: boolean;
+  speed: number;
+  opacity: number;
+}
+
+export interface EffectsConfig {
+  fps: number;
+  pixelation: number;
+  noise: number;
+  vhsJitter: number;
+  scanlineEnabled: boolean;
+  scanlineIntensity: number;
+  scanlineThickness: number;
+  glitch: {
+    enabled: boolean;
+    intensity: number;
+    speed: number;
+    opacity: number;
+    variant: 'v1' | 'v2';
+  };
+  cyberHack: {
+    enabled: boolean;
+    speed: number;
+    opacity: number;
+    density: number;
+    scale: number;
+    backgroundOpacity: number;
+  };
 }

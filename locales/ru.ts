@@ -1,0 +1,65 @@
+
+export const ru = {
+  system: "СИСТЕМА",
+  modules: "МОДУЛИ",
+  waveform: "ОСЦИЛЛОГРАФ",
+  dvd_saver: "DVD ЗАСТАВКА",
+  top_marquee: "БЕГУЩАЯ СТРОКА",
+  scanlines: "СКАНЛАЙНЫ",
+  cyber_hack: "КИБЕР ВЗЛОМ",
+  digital_glitch: "ЦИФРОВОЙ ГЛИТЧ",
+  waveform_config: "НАСТРОЙКИ ВОЛНЫ",
+  dvd_config: "НАСТРОЙКИ DVD",
+  scanline_config: "НАСТРОЙКИ ЭЛТ",
+  cyber_config: "КОНСОЛЬ ВЗЛОМА",
+  glitch_config: "ГЛИТЧ ЭФФЕКТЫ",
+  signal_processor: "ОБРАБОТКА СИГНАЛА",
+  background: "ФОНОВЫЙ РЕЖИМ",
+  load_img: "ЗАГРУЗИТЬ ФОН",
+  export_config: "ЭКСПОРТ КОНФИГА",
+  
+  // Controls
+  size: "РАЗМЕР",
+  speed: "СКОРОСТЬ",
+  opacity: "ПРОЗРАЧНОСТЬ",
+  intensity: "ИНТЕНСИВНОСТЬ",
+  thickness: "ТОЛЩИНА",
+  print_speed: "СКОР. ПЕЧАТИ",
+  scale: "МАСШТАБ",
+  bg_opacity: "ПРОЗР. ФОНА",
+  fps_limit: "ЛИМИТ FPS",
+  pixelation: "ПИКСЕЛИЗАЦИЯ",
+  static_noise: "БЕЛЫЙ ШУМ",
+  vhs_jitter: "VHS ДРОЖАНИЕ",
+  
+  // Visualizer Specific
+  position: "ПОЗИЦИЯ",
+  visual_style: "ВИЗУАЛЬНЫЙ СТИЛЬ",
+  processing: "ОБРАБОТКА",
+  fine_tuning: "ТОНКАЯ НАСТРОЙКА",
+  normalize: "НОРМАЛИЗАЦИЯ",
+  mirror: "ЗЕРКАЛО",
+  stroke: "ОБВОДКА",
+  bar_count: "КОЛ-ВО ПОЛОС",
+  bar_gap: "ОТСТУП (GAP)",
+  min_freq: "СРЕЗ НИЗКИХ (CUT OFF)",
+  max_freq: "СРЕЗ ВЫСОКИХ (CUT OFF)",
+  amplitude: "АМПЛИТУДА",
+  fill_opacity: "ПРОЗР. ЗАЛИВКИ",
+  stroke_opacity: "ПРОЗР. ОБВОДКИ",
+  
+  // Glitch Variants
+  glitch_variant: "ВАРИАНТ ГЛИТЧА",
+  variant_v1: "V1 (ЧАСТИЦЫ)",
+  variant_v2: "V2 (БЛОКИ)",
+  
+  // Options
+  style_retro: "РЕТРО (МУЛЬТИ)",
+  style_blue: "НЕОН СИНИЙ",
+  style_pink: "НЕОН РОЗОВЫЙ",
+  style_matrix: "МАТРИЦА",
+  style_inferno: "ИНФЕРНО",
+  pos_top: "СВЕРХУ",
+  pos_center: "ПО ЦЕНТРУ",
+  pos_bottom: "СНИЗУ"
+};

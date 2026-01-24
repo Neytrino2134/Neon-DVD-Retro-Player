@@ -1,0 +1,65 @@
+
+export const en = {
+  system: "SYSTEM",
+  modules: "MODULES",
+  waveform: "WAVEFORM",
+  dvd_saver: "DVD SAVER",
+  top_marquee: "TOP MARQUEE",
+  scanlines: "SCANLINES",
+  cyber_hack: "CYBER HACK",
+  digital_glitch: "DIGITAL GLITCH",
+  waveform_config: "WAVEFORM CONFIG",
+  dvd_config: "DVD CONFIG",
+  scanline_config: "SCANLINE CONFIG",
+  cyber_config: "CYBER CONFIG",
+  glitch_config: "GLITCH CONFIG",
+  signal_processor: "SIGNAL PROCESSOR",
+  background: "BACKGROUND",
+  load_img: "LOAD IMG/VIDEO",
+  export_config: "EXPORT NRP CONFIG",
+  
+  // Controls
+  size: "SIZE",
+  speed: "SPEED",
+  opacity: "OPACITY",
+  intensity: "INTENSITY",
+  thickness: "THICKNESS",
+  print_speed: "PRINT SPEED",
+  scale: "SCALE",
+  bg_opacity: "BG OPACITY",
+  fps_limit: "FPS LIMIT",
+  pixelation: "PIXELATION",
+  static_noise: "STATIC NOISE",
+  vhs_jitter: "VHS JITTER",
+  
+  // Visualizer Specific
+  position: "POSITION",
+  visual_style: "VISUAL STYLE",
+  processing: "PROCESSING",
+  fine_tuning: "FINE TUNING",
+  normalize: "NORMALIZE",
+  mirror: "MIRROR",
+  stroke: "STROKE",
+  bar_count: "BAR COUNT",
+  bar_gap: "BAR GAP",
+  min_freq: "LOW CUTOFF",
+  max_freq: "HIGH CUTOFF",
+  amplitude: "AMPLITUDE",
+  fill_opacity: "FILL OPACITY",
+  stroke_opacity: "STROKE OPACITY",
+  
+  // Glitch Variants
+  glitch_variant: "GLITCH VARIANT",
+  variant_v1: "V1 (PARTICLES)",
+  variant_v2: "V2 (BLOCKS)",
+  
+  // Options
+  style_retro: "RETRO (MULTI)",
+  style_blue: "NEON BLUE",
+  style_pink: "NEON PINK",
+  style_matrix: "MATRIX",
+  style_inferno: "INFERNO",
+  pos_top: "TOP",
+  pos_center: "CENTER",
+  pos_bottom: "BOTTOM"
+};

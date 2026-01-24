@@ -1,17 +1,16 @@
 
-import React, { useRef } from 'react';
-import { Play, Pause, Square, SkipBack, SkipForward, FolderOpen, Music, Volume2, VolumeX } from 'lucide-react';
+import React, { useRef, useState } from 'react';
+import { Play, Pause, Square, SkipBack, SkipForward, FolderOpen, Music, Volume2, VolumeX, HardDrive } from 'lucide-react';
 import { AudioTrack } from '../types';
+import FileExplorer from './FileExplorer';
+import { CatalogItem } from '../data/catalog';
 
 interface ControlsProps {
   tracks: AudioTrack[];
   currentTrackIndex: number;
   isPlaying: boolean;
   volume: number;
-  currentTime: number;
-  duration: number;
   onVolumeChange: (vol: number) => void;
-  onSeek: (time: number) => void;
   onPlay: () => void;
   onPause: () => void;
   onStop: () => void;
@@ -19,7 +18,7 @@ interface ControlsProps {
   onPrev: () => void;
   onTrackSelect: (index: number) => void;
   onFilesSelected: (files: FileList) => void;
-  onToggleCinema: () => void;
+  onLibraryTracksSelected: (items: CatalogItem[]) => void;
 }
 
 interface NeonButtonProps {
@@ -37,22 +36,12 @@ const NeonButton: React.FC<NeonButtonProps> = ({ onClick, children, className = 
   </button>
 );
 
-const formatTime = (seconds: number) => {
-  if (!seconds || isNaN(seconds)) return "00:00";
-  const mins = Math.floor(seconds / 60);
-  const secs = Math.floor(seconds % 60);
-  return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
-};
-
 const Controls: React.FC<ControlsProps> = ({
   tracks,
   currentTrackIndex,
   isPlaying,
   volume,
-  currentTime,
-  duration,
   onVolumeChange,
-  onSeek,
   onPlay,
   onPause,
   onStop,
@@ -60,36 +49,44 @@ const Controls: React.FC<ControlsProps> = ({
   onPrev,
   onTrackSelect,
   onFilesSelected,
-  onToggleCinema,
+  onLibraryTracksSelected
 }) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [isExplorerOpen, setIsExplorerOpen] = useState(false);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files.length > 0) {
       onFilesSelected(e.target.files);
-      // Reset input value to allow re-uploading same file
-      e.target.value = '';
     }
   };
 
   return (
     <div className="w-full h-full flex flex-col bg-gray-900 border-l-4 border-gray-800 p-4 shadow-inner">
       {/* Header */}
-      <div className="mb-6 flex items-center justify-between gap-2">
-        <h2 className="text-xl md:text-2xl font-mono text-white drop-shadow-[0_0_5px_rgba(255,255,255,0.3)] animate-pulse hidden sm:block">
+      <div className="mb-6 flex items-center justify-between">
+        <h2 className="text-2xl font-mono text-neon-pink shadow-neon-pink drop-shadow-lg animate-pulse">
           CONTROLS
         </h2>
         
-        <div className="flex items-center gap-2 ml-auto">
-          <button
-            onClick={() => fileInputRef.current?.click()}
-            className="flex items-center gap-2 px-3 py-2 bg-gray-800 border border-neon-green text-neon-green rounded hover:bg-neon-green hover:text-black transition-colors shadow-neon-green"
-          >
-            <FolderOpen size={18} />
-            <span className="font-mono text-sm hidden lg:inline">LOAD</span>
-          </button>
+        <div className="flex gap-2">
+           <button
+             onClick={() => setIsExplorerOpen(true)}
+             className="flex items-center gap-2 px-3 py-2 bg-gray-800 border border-neon-green text-neon-green rounded hover:bg-neon-green hover:text-black transition-colors shadow-neon-green"
+             title="Open Library"
+           >
+             <HardDrive size={18} />
+             <span className="font-mono text-sm hidden sm:inline">LIB</span>
+           </button>
+           <button
+             onClick={() => fileInputRef.current?.click()}
+             className="flex items-center gap-2 px-3 py-2 bg-gray-800 border border-neon-blue text-neon-blue rounded hover:bg-neon-blue hover:text-black transition-colors shadow-neon-blue"
+             title="Load from Disk"
+           >
+             <FolderOpen size={18} />
+             <span className="font-mono text-sm hidden sm:inline">DISK</span>
+           </button>
         </div>
-
+        
         <input
           type="file"
           ref={fileInputRef}
@@ -98,22 +95,6 @@ const Controls: React.FC<ControlsProps> = ({
           accept="audio/*"
           className="hidden"
           style={{ display: 'none' }} 
-        />
-      </div>
-
-      {/* Progress Bar (Scrubber) */}
-      <div className="mb-4">
-        <div className="flex justify-between text-xs font-mono text-neon-blue mb-1">
-          <span>{formatTime(currentTime)}</span>
-          <span>{formatTime(duration)}</span>
-        </div>
-        <input
-          type="range"
-          min="0"
-          max={duration || 100}
-          value={currentTime}
-          onChange={(e) => onSeek(parseFloat(e.target.value))}
-          className="w-full"
         />
       </div>
 
@@ -146,7 +127,7 @@ const Controls: React.FC<ControlsProps> = ({
 
       {/* Volume Control */}
       <div className="mb-6 bg-gray-800 p-3 rounded border border-gray-700">
-        <div className="flex items-center gap-3 text-white mb-1 opacity-80">
+        <div className="flex items-center gap-3 text-neon-blue mb-1">
             {volume === 0 ? <VolumeX size={18} /> : <Volume2 size={18} />}
             <span className="text-xs font-mono">VOL</span>
         </div>
@@ -181,7 +162,7 @@ const Controls: React.FC<ControlsProps> = ({
 
       {/* Playlist */}
       <div className="flex-1 overflow-hidden flex flex-col">
-        <h3 className="text-white font-mono mb-2 border-b border-gray-700 pb-1 opacity-80">PLAYLIST [{tracks.length}]</h3>
+        <h3 className="text-neon-blue font-mono mb-2 border-b border-gray-700 pb-1">PLAYLIST [{tracks.length}]</h3>
         <div className="flex-1 overflow-y-auto pr-2 space-y-1">
           {tracks.map((track, index) => (
             <div
@@ -214,6 +195,13 @@ const Controls: React.FC<ControlsProps> = ({
           )}
         </div>
       </div>
+
+      <FileExplorer 
+        isOpen={isExplorerOpen}
+        onClose={() => setIsExplorerOpen(false)}
+        mode="music"
+        onSelect={onLibraryTracksSelected}
+      />
     </div>
   );
 };

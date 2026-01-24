@@ -1,263 +1,301 @@
-import React, { useRef } from 'react';
-import { Settings, Eye, Disc, Image as ImageIcon, Trash2, Activity, Sliders, Layers } from 'lucide-react';
-import { VisualizerConfig, VisualizerStyle, VisualizerPosition } from '../types';
+
+import React, { useRef, useState, useEffect } from 'react';
+import { Settings, Eye, Disc, Image as ImageIcon, Activity, Zap, Layers, Terminal, AlertTriangle, Tv, ChevronUp, ChevronDown, Download, Type } from 'lucide-react';
+import { VisualizerConfig, EffectsConfig, DvdConfig, MarqueeConfig } from '../types';
+import RangeControl from './settings/RangeControl';
+import VisualizerSettings from './settings/VisualizerSettings';
+import CustomSelect from './settings/CustomSelect';
+import { useLanguage } from '../contexts/LanguageContext';
 
 interface SettingsPanelProps {
   showVisualizer: boolean;
   setShowVisualizer: (v: boolean) => void;
   showDvd: boolean;
   setShowDvd: (v: boolean) => void;
+  marqueeConfig: MarqueeConfig;
+  setMarqueeConfig: (c: MarqueeConfig) => void;
   visualizerConfig: VisualizerConfig;
   setVisualizerConfig: (config: VisualizerConfig) => void;
+  dvdConfig: DvdConfig;
+  setDvdConfig: (config: DvdConfig) => void;
+  effectsConfig: EffectsConfig;
+  setEffectsConfig: (config: EffectsConfig) => void;
   bgColor: string;
   setBgColor: (color: string) => void;
   onBgMediaUpload: (file: File) => void;
   bgMedia: { type: 'image' | 'video', url: string } | null;
   onClearBgMedia: () => void;
+  onExportConfig: () => void;
 }
 
-const BG_PALETTE = [
-  '#0f172a', // Slate 900
-  '#000000', // Pitch Black
-  '#1a0505', // Dark Red
-  '#051a05', // Dark Green
-  '#05051a', // Dark Blue
-  '#1a051a', // Dark Purple
+const BG_PALETTE = ['#0f172a', '#000000', '#1a0505', '#051a05', '#05051a', '#1a051a'];
+
+const FPS_OPTIONS = [
+  { value: 60, label: '60 FPS (OFF)' },
+  { value: 30, label: '30 FPS' },
+  { value: 25, label: '25 FPS (PAL)' },
+  { value: 24, label: '24 FPS (CINEMA)' },
+  { value: 12, label: '12 FPS (RETRO)' },
 ];
 
-const ToggleSwitch = ({ label, icon: Icon, value, onChange }: { label: string, icon: any, value: boolean, onChange: (v: boolean) => void }) => (
-  <div className="flex items-center justify-between p-3 bg-gray-800 border border-gray-700 rounded mb-4 hover:border-gray-500 transition-colors">
-    <div className="flex items-center gap-2 text-neon-yellow">
-      <Icon size={18} />
-      <span className="font-mono text-sm tracking-wider">{label}</span>
-    </div>
-    <button
-      onClick={() => onChange(!value)}
-      className={`relative w-12 h-6 rounded-full transition-all duration-300 shadow-inner
-        ${value ? 'bg-neon-green shadow-[0_0_10px_#00ff00]' : 'bg-gray-700'}
-      `}
-    >
-      <div className={`absolute top-1 left-1 w-4 h-4 bg-white rounded-full shadow-md transition-transform duration-300
-        ${value ? 'translate-x-6' : 'translate-x-0'}
-      `}></div>
-    </button>
-  </div>
-);
-
-const RangeControl = ({ label, value, min, max, step, onChange }: { label: string, value: number, min: number, max: number, step: number, onChange: (v: number) => void }) => (
-  <div className="mb-4">
-    <div className="flex justify-between text-gray-400 font-mono text-xs mb-1">
-      <span>{label}</span>
-      <span>{value}</span>
-    </div>
-    <input 
-      type="range"
-      min={min}
-      max={max}
-      step={step}
-      value={value}
-      onChange={(e) => onChange(parseFloat(e.target.value))}
-      className="w-full h-1 bg-gray-700 rounded-lg appearance-none cursor-pointer"
-    />
-  </div>
-);
-
 const SettingsPanel: React.FC<SettingsPanelProps> = ({
-  showVisualizer,
-  setShowVisualizer,
-  showDvd,
-  setShowDvd,
-  visualizerConfig,
-  setVisualizerConfig,
-  bgColor,
-  setBgColor,
-  onBgMediaUpload,
-  bgMedia,
-  onClearBgMedia
+  showVisualizer, setShowVisualizer, showDvd, setShowDvd, marqueeConfig, setMarqueeConfig,
+  visualizerConfig, setVisualizerConfig, dvdConfig, setDvdConfig,
+  effectsConfig, setEffectsConfig, bgColor, setBgColor,
+  onBgMediaUpload, bgMedia, onClearBgMedia, onExportConfig
 }) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
+  // Track expansion state separately from enabled state
+  const [expandedState, setExpandedState] = useState<Record<string, boolean>>({});
+  const { language, setLanguage, t } = useLanguage();
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files[0]) {
-      onBgMediaUpload(e.target.files[0]);
+  // Helper to toggle expansion
+  const toggleExpand = (id: string) => {
+    setExpandedState(prev => ({ ...prev, [id]: !prev[id] }));
+  };
+
+  // Helper to ensure a section is expanded when turned on
+  const handleToggleModule = (id: string, currentVal: boolean, setter: (v: boolean) => void) => {
+    const newVal = !currentVal;
+    setter(newVal);
+  };
+
+  const updateVisualizer = (k: keyof VisualizerConfig, v: any) => setVisualizerConfig({ ...visualizerConfig, [k]: v });
+  const updateDvd = (k: keyof DvdConfig, v: any) => setDvdConfig({ ...dvdConfig, [k]: v });
+  const updateEffect = (k: keyof EffectsConfig, v: any) => setEffectsConfig({ ...effectsConfig, [k]: v });
+  const updateMarquee = (k: keyof MarqueeConfig, v: any) => setMarqueeConfig({ ...marqueeConfig, [k]: v });
+
+  // Define the module blocks
+  const modules = [
+    {
+      id: 'wave',
+      label: t('waveform'),
+      icon: Activity,
+      isEnabled: showVisualizer,
+      onToggle: () => handleToggleModule('wave', showVisualizer, setShowVisualizer),
+      content: <VisualizerSettings config={visualizerConfig} update={updateVisualizer} />
+    },
+    {
+      id: 'dvd',
+      label: t('dvd_saver'),
+      icon: Disc,
+      isEnabled: showDvd,
+      onToggle: () => handleToggleModule('dvd', showDvd, setShowDvd),
+      content: (
+        <div className="pt-2">
+          <RangeControl label={t('size')} value={dvdConfig.size} min={60} max={300} step={10} onChange={v => updateDvd('size', v)} />
+          <RangeControl label={t('speed')} value={dvdConfig.speed} min={1} max={15} step={1} onChange={v => updateDvd('speed', v)} />
+          <RangeControl label={t('opacity')} value={dvdConfig.opacity} min={0} max={1} step={0.1} onChange={v => updateDvd('opacity', v)} />
+        </div>
+      )
+    },
+    {
+      id: 'marquee',
+      label: t('top_marquee'),
+      icon: Type,
+      isEnabled: marqueeConfig.enabled,
+      onToggle: () => updateMarquee('enabled', !marqueeConfig.enabled),
+      content: (
+        <div className="pt-2">
+            <RangeControl label={t('speed')} value={marqueeConfig.speed} min={1} max={10} step={0.5} onChange={v => updateMarquee('speed', v)} />
+            <RangeControl label={t('opacity')} value={marqueeConfig.opacity} min={0} max={1} step={0.1} onChange={v => updateMarquee('opacity', v)} />
+        </div>
+      )
+    },
+    {
+      id: 'scan',
+      label: t('scanlines'),
+      icon: Tv,
+      isEnabled: effectsConfig.scanlineEnabled,
+      onToggle: () => handleToggleModule('scan', effectsConfig.scanlineEnabled, v => updateEffect('scanlineEnabled', v)),
+      content: (
+        <div className="pt-2">
+          <RangeControl label={t('intensity')} value={effectsConfig.scanlineIntensity} min={0} max={0.8} step={0.05} onChange={v => updateEffect('scanlineIntensity', v)} />
+          <RangeControl label={t('thickness')} value={effectsConfig.scanlineThickness} min={2} max={16} step={1} onChange={v => updateEffect('scanlineThickness', v)} />
+        </div>
+      )
+    },
+    {
+      id: 'cyber',
+      label: t('cyber_hack'),
+      icon: Terminal,
+      isEnabled: effectsConfig.cyberHack.enabled,
+      onToggle: () => handleToggleModule('cyber', effectsConfig.cyberHack.enabled, v => updateEffect('cyberHack', { ...effectsConfig.cyberHack, enabled: v })),
+      content: (
+        <div className="pt-2">
+           <RangeControl label={t('print_speed')} value={effectsConfig.cyberHack.speed} min={1} max={10} step={1} onChange={v => updateEffect('cyberHack', { ...effectsConfig.cyberHack, speed: v })} />
+           <RangeControl label={t('scale')} value={effectsConfig.cyberHack.scale} min={0.5} max={3.0} step={0.1} onChange={v => updateEffect('cyberHack', { ...effectsConfig.cyberHack, scale: v })} />
+           <RangeControl label={t('bg_opacity')} value={effectsConfig.cyberHack.backgroundOpacity} min={0} max={1} step={0.05} onChange={v => updateEffect('cyberHack', { ...effectsConfig.cyberHack, backgroundOpacity: v })} />
+        </div>
+      )
+    },
+    {
+      id: 'glitch',
+      label: t('digital_glitch'),
+      icon: AlertTriangle,
+      isEnabled: effectsConfig.glitch.enabled,
+      onToggle: () => handleToggleModule('glitch', effectsConfig.glitch.enabled, v => updateEffect('glitch', { ...effectsConfig.glitch, enabled: v })),
+      content: (
+        <div className="pt-2">
+           <CustomSelect 
+              label={t('glitch_variant')}
+              value={effectsConfig.glitch.variant}
+              options={[
+                { value: 'v1', label: t('variant_v1') },
+                { value: 'v2', label: t('variant_v2') }
+              ]}
+              onChange={v => updateEffect('glitch', { ...effectsConfig.glitch, variant: v })}
+           />
+           <RangeControl label={t('intensity')} value={effectsConfig.glitch.intensity} min={0.05} max={1.0} step={0.05} onChange={v => updateEffect('glitch', { ...effectsConfig.glitch, intensity: v })} />
+           <RangeControl label={t('speed')} value={effectsConfig.glitch.speed} min={0.05} max={1.0} step={0.05} onChange={v => updateEffect('glitch', { ...effectsConfig.glitch, speed: v })} />
+           <RangeControl label={t('opacity')} value={effectsConfig.glitch.opacity ?? 1.0} min={0} max={1} step={0.05} onChange={v => updateEffect('glitch', { ...effectsConfig.glitch, opacity: v })} />
+        </div>
+      )
+    },
+    {
+      id: 'signal',
+      label: t('signal_processor'),
+      icon: Zap,
+      isEnabled: true, // Always on
+      isAlwaysOn: true,
+      onToggle: () => {}, // No toggle
+      content: (
+        <div className="pt-2">
+            <CustomSelect 
+              label={t('fps_limit')} 
+              value={effectsConfig.fps} 
+              options={FPS_OPTIONS} 
+              onChange={(v) => updateEffect('fps', v)} 
+            />
+            <RangeControl label={t('pixelation')} value={effectsConfig.pixelation} min={1} max={20} step={1} onChange={v => updateEffect('pixelation', v)} />
+            <RangeControl label={t('static_noise')} value={effectsConfig.noise} min={0} max={0.5} step={0.01} onChange={v => updateEffect('noise', v)} />
+            <RangeControl label={t('vhs_jitter')} value={effectsConfig.vhsJitter} min={0} max={10} step={0.5} onChange={v => updateEffect('vhsJitter', v)} />
+        </div>
+      )
     }
-  };
-
-  const updateConfig = (key: keyof VisualizerConfig, value: any) => {
-    setVisualizerConfig({ ...visualizerConfig, [key]: value });
-  };
+  ];
 
   return (
-    <div className="w-full h-full flex flex-col bg-gray-900 border-r-4 border-gray-800 p-4 shadow-inner">
-      <div className="mb-6 flex items-center gap-2 text-neon-yellow border-b border-gray-700 pb-2">
-        <Settings className="animate-spin-slow" />
-        <h2 className="text-xl font-mono shadow-neon-yellow">SYSTEM</h2>
-      </div>
-
-      <div className="flex-1 overflow-y-auto pr-2 custom-scrollbar">
-        {/* Modules Toggles */}
-        <div className="mb-6">
-          <h3 className="text-xs font-mono text-gray-500 mb-2">MODULES</h3>
-          <ToggleSwitch label="WAVEFORM" icon={Eye} value={showVisualizer} onChange={setShowVisualizer} />
-          <ToggleSwitch label="DVD SAVER" icon={Disc} value={showDvd} onChange={setShowDvd} />
-        </div>
-
-        {/* Visualizer Configuration */}
-        {showVisualizer && (
-          <div className="mb-6 p-3 bg-gray-800/50 rounded border border-gray-700">
-            <h3 className="flex items-center gap-2 text-xs font-mono text-neon-blue mb-4">
-              <Activity size={14} /> WAVEFORM CONFIG
-            </h3>
-
-            {/* Position */}
-            <div className="mb-3">
-               <label className="text-gray-400 font-mono text-xs block mb-1">POSITION</label>
-               <div className="grid grid-cols-3 gap-1">
-                  {(['top', 'center', 'bottom'] as VisualizerPosition[]).map((pos) => (
-                    <button
-                      key={pos}
-                      onClick={() => updateConfig('position', pos)}
-                      className={`px-2 py-1 text-xs font-mono border rounded capitalize ${
-                        visualizerConfig.position === pos 
-                        ? 'border-neon-blue text-neon-blue bg-neon-blue/10' 
-                        : 'border-gray-600 text-gray-500 hover:text-white'
-                      }`}
-                    >
-                      {pos}
-                    </button>
-                  ))}
-               </div>
-            </div>
-
-            {/* Style */}
-            <div className="mb-4">
-               <label className="text-gray-400 font-mono text-xs block mb-1">STYLE</label>
-               <select 
-                  value={visualizerConfig.style}
-                  onChange={(e) => updateConfig('style', e.target.value)}
-                  className="w-full bg-black border border-gray-600 text-white font-mono text-xs p-2 rounded outline-none focus:border-neon-pink"
-               >
-                 <option value="retro">RETRO (MULTI)</option>
-                 <option value="blue">NEON BLUE</option>
-                 <option value="pink">NEON PINK</option>
-                 <option value="matrix">MATRIX</option>
-                 <option value="inferno">INFERNO</option>
-               </select>
-            </div>
-
-            {/* Bar Density - Using Select to ensure Power of 2 */}
-            <div className="mb-4">
-               <label className="text-gray-400 font-mono text-xs block mb-1">BAR DENSITY</label>
-               <select 
-                  value={visualizerConfig.barCount}
-                  onChange={(e) => updateConfig('barCount', parseInt(e.target.value))}
-                  className="w-full bg-black border border-gray-600 text-white font-mono text-xs p-2 rounded outline-none focus:border-neon-pink"
-               >
-                 <option value="32">LOW (32)</option>
-                 <option value="64">MEDIUM (64)</option>
-                 <option value="128">HIGH (128)</option>
-                 <option value="256">ULTRA (256)</option>
-                 <option value="512">EXTREME (512)</option>
-               </select>
-            </div>
-
-            {/* Sliders */}
-            <RangeControl 
-              label="AMPLITUDE" 
-              value={visualizerConfig.sensitivity} 
-              min={0.1} max={3.0} step={0.1} 
-              onChange={(v) => updateConfig('sensitivity', v)} 
-            />
-
-            <RangeControl 
-              label="FILL OPACITY" 
-              value={visualizerConfig.fillOpacity} 
-              min={0} max={1} step={0.1} 
-              onChange={(v) => updateConfig('fillOpacity', v)} 
-            />
-
-            {/* Stroke Controls */}
-            <div className="pt-2 border-t border-gray-700 mt-2">
-                <div className="flex items-center justify-between mb-2">
-                    <span className="text-gray-400 font-mono text-xs">OUTLINE</span>
-                    <button 
-                       onClick={() => updateConfig('strokeEnabled', !visualizerConfig.strokeEnabled)}
-                       className={`w-8 h-4 rounded-full relative transition-colors ${visualizerConfig.strokeEnabled ? 'bg-neon-pink' : 'bg-gray-600'}`}
-                    >
-                       <div className={`absolute top-0.5 left-0.5 w-3 h-3 bg-white rounded-full transition-transform ${visualizerConfig.strokeEnabled ? 'translate-x-4' : 'translate-x-0'}`}></div>
-                    </button>
-                </div>
-                {visualizerConfig.strokeEnabled && (
-                  <RangeControl 
-                    label="OUTLINE OPACITY" 
-                    value={visualizerConfig.strokeOpacity} 
-                    min={0} max={1} step={0.1} 
-                    onChange={(v) => updateConfig('strokeOpacity', v)} 
-                  />
-                )}
-            </div>
+    <div className="w-full h-full flex flex-col bg-gray-900 border-r-4 border-gray-800 shadow-inner overflow-hidden">
+      {/* Header */}
+      <div className="p-4 pb-0 border-b border-gray-700 mb-4 bg-gray-900 z-10">
+        <div className="flex items-center justify-between pb-2">
+          <div className="flex items-center gap-2">
+            <Settings className="animate-spin-slow text-neon-yellow" size={24} />
+            <h2 className="text-xl font-mono text-white">{t('system')}</h2>
           </div>
-        )}
-
-        {/* Background Settings */}
-        <div className="mb-6">
-          <h3 className="flex items-center gap-2 text-xs font-mono text-gray-500 mb-2">
-             <Layers size={14} /> BACKGROUND
-          </h3>
           
-          {/* Color Palette */}
-          <div className="grid grid-cols-3 gap-2 mb-4">
-            {BG_PALETTE.map((color) => (
-              <button
-                key={color}
-                onClick={() => {
-                   setBgColor(color);
-                   onClearBgMedia();
-                }}
-                className={`h-8 rounded border-2 transition-all ${
-                  bgColor === color && !bgMedia
-                    ? 'border-neon-blue shadow-[0_0_10px_#00f3ff] scale-105' 
-                    : 'border-gray-600 hover:border-gray-400'
-                }`}
-                style={{ backgroundColor: color }}
-              />
-            ))}
-          </div>
-
-          {/* Media Upload */}
-          <div className="space-y-2">
-            <button
-              onClick={() => fileInputRef.current?.click()}
-              className="w-full flex items-center justify-center gap-2 p-2 bg-gray-800 border border-gray-600 rounded text-gray-300 hover:text-white hover:border-neon-purple hover:bg-gray-700 transition-colors"
+          <div className="flex items-center gap-1 bg-black rounded p-1 border border-gray-700">
+            <button 
+              onClick={() => setLanguage('en')}
+              className={`px-2 py-0.5 text-xs font-mono font-bold rounded transition-colors ${language === 'en' ? 'bg-neon-blue text-black shadow-[0_0_5px_#00f3ff]' : 'text-gray-500 hover:text-white'}`}
             >
-              <ImageIcon size={16} />
-              <span className="font-mono text-xs">LOAD IMG/VIDEO</span>
+              EN
             </button>
-            <input
-              type="file"
-              ref={fileInputRef}
-              onChange={handleFileChange}
-              accept="image/*,video/*"
-              className="hidden"
-              style={{ display: 'none' }}
-            />
-
-            {bgMedia && (
-              <button
-                onClick={onClearBgMedia}
-                className="w-full flex items-center justify-center gap-2 p-2 bg-red-900/30 border border-red-800 rounded text-red-400 hover:text-red-200 hover:border-red-500 transition-colors"
-              >
-                <Trash2 size={16} />
-                <span className="font-mono text-xs">RESET TO COLOR</span>
-              </button>
-            )}
+            <div className="w-px h-3 bg-gray-700"></div>
+            <button 
+              onClick={() => setLanguage('ru')}
+              className={`px-2 py-0.5 text-xs font-mono font-bold rounded transition-colors ${language === 'ru' ? 'bg-neon-blue text-black shadow-[0_0_5px_#00f3ff]' : 'text-gray-500 hover:text-white'}`}
+            >
+              RU
+            </button>
           </div>
         </div>
       </div>
 
-      <div className="mt-auto opacity-50 text-xs font-mono text-center text-gray-500 pt-4 border-t border-gray-800">
-        VER 1.2.0<br/>
-        RETRO-OS
+      {/* Main Content Area */}
+      <div className="flex-1 overflow-y-auto px-4 custom-scrollbar pb-4 space-y-3">
+        <h3 className="text-xs font-mono text-white mb-2 opacity-80 sticky top-0 bg-gray-900 pb-2 z-10 border-b border-gray-800">{t('modules')}</h3>
+        
+        {modules.map((m) => {
+          const isExpanded = expandedState[m.id];
+          const activeStyle = m.isEnabled 
+             ? "border-neon-blue/50 bg-gray-800/80 shadow-[inset_0_0_10px_rgba(0,243,255,0.05)]" 
+             : "border-gray-700 bg-gray-900/50 opacity-80";
+
+          return (
+            <div 
+              key={m.id} 
+              className={`rounded border transition-all duration-300 overflow-hidden flex flex-col ${activeStyle}`}
+            >
+              {/* Card Header: Label + Toggle */}
+              <div className="flex items-center justify-between p-3 min-h-[50px]">
+                <div 
+                  className="flex items-center gap-3 cursor-pointer select-none flex-1"
+                  onClick={() => {
+                     // Clicking label toggles expand if enabled, or toggles enable if disabled
+                     if (m.isEnabled) toggleExpand(m.id);
+                     else if (!m.isAlwaysOn) m.onToggle(); 
+                  }}
+                >
+                  <m.icon size={18} className={`transition-colors ${m.isEnabled ? "text-neon-yellow" : "text-gray-500"}`} />
+                  <span className={`font-mono text-xs font-bold tracking-widest uppercase transition-colors ${m.isEnabled ? "text-white" : "text-gray-400"}`}>
+                    {m.label}
+                  </span>
+                  
+                  {/* Expand Chevron */}
+                  {m.isEnabled && (
+                     <div className={`transition-transform duration-300 ${isExpanded ? 'rotate-180' : 'rotate-0'}`}>
+                        <ChevronDown size={14} className="text-neon-blue opacity-70" />
+                     </div>
+                  )}
+                </div>
+
+                {/* Switch */}
+                {!m.isAlwaysOn && (
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      m.onToggle();
+                    }}
+                    className={`relative w-10 h-5 rounded-full transition-all duration-300 shadow-inner ml-3 shrink-0
+                      ${m.isEnabled ? 'bg-neon-purple shadow-[0_0_8px_rgba(188,19,254,0.5)]' : 'bg-gray-700'}
+                    `}
+                  >
+                    <div className={`absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full shadow-md transition-transform duration-300
+                      ${m.isEnabled ? 'translate-x-5' : 'translate-x-0'}
+                    `}></div>
+                  </button>
+                )}
+              </div>
+
+              {/* Card Body: Settings (Collapsible) */}
+              <div 
+                className={`transition-[max-height,opacity] duration-300 ease-in-out overflow-hidden
+                  ${isExpanded && m.isEnabled ? 'max-h-[1200px] opacity-100' : 'max-h-0 opacity-0'}
+                `}
+              >
+                <div className="p-3 pt-0 border-t border-gray-700/50">
+                  {m.content}
+                </div>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Footer / Background */}
+      <div className="p-4 bg-gray-900 border-t border-gray-800 z-10 shrink-0 space-y-3">
+        <div>
+          <h3 className="flex items-center gap-2 text-xs font-mono text-white mb-2 opacity-80"><Layers size={14} className="text-neon-yellow" /> {t('background')}</h3>
+          <div className="grid grid-cols-6 gap-2 mb-4">
+            {BG_PALETTE.map(c => <button key={c} onClick={() => { setBgColor(c); onClearBgMedia(); }} className={`h-6 rounded border-2 ${bgColor === c && !bgMedia ? 'border-neon-purple shadow-[0_0_10px_#bc13fe]' : 'border-gray-600'}`} style={{ backgroundColor: c }} />)}
+          </div>
+          <button onClick={() => fileInputRef.current?.click()} className="w-full flex items-center justify-center gap-2 p-2 bg-gray-800 border border-gray-600 rounded text-gray-300 hover:text-white hover:border-neon-yellow transition-colors">
+            <ImageIcon size={16} className="text-neon-yellow" /> <span className="font-mono text-xs">{t('load_img')}</span>
+          </button>
+          <input type="file" ref={fileInputRef} onChange={e => e.target.files?.[0] && (onBgMediaUpload(e.target.files[0]), e.target.value='')} accept="image/*,video/*" className="hidden" />
+        </div>
+
+        <div className="pt-2 border-t border-gray-800">
+           <button 
+             onClick={onExportConfig}
+             className="w-full flex items-center justify-center gap-2 p-2 bg-gray-800 border border-neon-purple text-neon-purple rounded hover:bg-neon-purple hover:text-black hover:shadow-[0_0_15px_#bc13fe] transition-all active:scale-95"
+           >
+              <Download size={16} />
+              <span className="font-mono text-xs font-bold uppercase tracking-widest">{t('export_config')}</span>
+           </button>
+        </div>
       </div>
     </div>
   );
