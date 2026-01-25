@@ -1,5 +1,6 @@
 
-import { useState, useRef, useEffect, useCallback } from 'react';
+
+import { useState, useRef, useEffect, useCallback, SyntheticEvent } from 'react';
 import { AudioTrack } from '../types';
 import { getAllTracks, saveTrack, clearTracks } from '../lib/db';
 
@@ -36,6 +37,7 @@ export const useAudioPlayer = () => {
   const activeDeckRef = useRef<Deck>('A');
   const isCrossfadingRef = useRef(false);
   const hasTriggeredAutoMixRef = useRef(false); // Prevents double triggers near end
+  const crossfadeTimeoutRef = useRef<number | null>(null); // To clear cleanup timeouts on rapid switching
   
   // Refs for Web Audio API
   const audioContextRef = useRef<AudioContext | null>(null);
@@ -53,8 +55,9 @@ export const useAudioPlayer = () => {
         const activeGain = activeDeckRef.current === 'A' ? gainARef.current : gainBRef.current;
         const inactiveGain = activeDeckRef.current === 'A' ? gainBRef.current : gainARef.current;
         
-        activeGain.gain.setTargetAtTime(volume, now, 0.1);
-        inactiveGain.gain.setTargetAtTime(0, now, 0.1);
+        // Immediate update if not fading
+        activeGain.gain.setTargetAtTime(volume, now, 0.05);
+        inactiveGain.gain.setTargetAtTime(0, now, 0.05);
     }
   }, [volume]);
   
@@ -100,7 +103,8 @@ export const useAudioPlayer = () => {
       audioContextRef.current = context;
       
       const analyserNode = context.createAnalyser();
-      analyserNode.smoothingTimeConstant = 0.8;
+      // CHANGED: Lower smoothing for punchier visuals
+      analyserNode.smoothingTimeConstant = 0.6; 
       setAnalyser(analyserNode);
 
       // Create Gain Nodes for Fading
@@ -132,7 +136,7 @@ export const useAudioPlayer = () => {
         } catch(e) { console.warn("Source B attach error", e); }
       }
       
-      // Initial State: Deck A full volume, Deck B silent
+      // Initial State
       gainA.gain.value = volume;
       gainB.gain.value = 0;
     }
@@ -144,9 +148,17 @@ export const useAudioPlayer = () => {
 
   // --- CROSSFADE LOGIC ---
   const performCrossfade = useCallback((toTrackIndex: number) => {
-      // Safety checks
+      // Init audio if context is missing or suspended
+      initAudio();
+
       if (!tracks[toTrackIndex] || !audioContextRef.current || !gainARef.current || !gainBRef.current) return;
-      if (isCrossfadingRef.current) return; // Prevent double fade
+
+      // --- CRITICAL FIX FOR RAPID SWITCHING ---
+      // If a crossfade cleanup is pending, cancel it so we don't stop the wrong track mid-play
+      if (crossfadeTimeoutRef.current) {
+        clearTimeout(crossfadeTimeoutRef.current);
+        crossfadeTimeoutRef.current = null;
+      }
 
       const currentDeck = activeDeckRef.current;
       const nextDeck = currentDeck === 'A' ? 'B' : 'A';
@@ -159,61 +171,95 @@ export const useAudioPlayer = () => {
 
       if (!activeAudio || !nextAudio) return;
 
-      isCrossfadingRef.current = true;
-      hasTriggeredAutoMixRef.current = true; // Mark as handled for this track
-      
       // 1. Prepare Next Deck
       nextAudio.src = tracks[toTrackIndex].url;
       nextAudio.currentTime = 0;
-      
-      // 2. Play Next Deck (Silent initially)
-      nextAudio.play().then(() => {
-          // 3. Perform Constant Power Crossfade
-          const now = audioContextRef.current!.currentTime;
-          const fadeTime = crossfadeDuration; // seconds
 
-          // Cancel any scheduled values
+      // Mark as crossfading (prevents pause events from triggering UI changes)
+      isCrossfadingRef.current = true;
+      hasTriggeredAutoMixRef.current = true;
+
+      // --- ZERO CROSSFADE: HARD CUT ---
+      // This solves the bug where clicking rapidly or having 0 duration causes toggling/pausing
+      if (crossfadeDuration === 0) {
+         const now = audioContextRef.current.currentTime;
+         
+         // Instant Gain Switch
+         activeGain.gain.cancelScheduledValues(now);
+         nextGain.gain.cancelScheduledValues(now);
+         activeGain.gain.setValueAtTime(0, now);
+         nextGain.gain.setValueAtTime(volume, now);
+
+         // Sync Switch
+         nextAudio.play()
+            .then(() => setIsPlaying(true))
+            .catch(e => console.error("Hard play failed", e));
+            
+         activeAudio.pause();
+         activeAudio.currentTime = 0;
+         
+         // Update State Instantly
+         activeDeckRef.current = nextDeck;
+         setCurrentTrackIndex(toTrackIndex);
+         
+         isCrossfadingRef.current = false;
+         hasTriggeredAutoMixRef.current = false;
+         return; 
+      }
+
+      // --- NORMAL CROSSFADE ---
+      
+      // 2. Play Next Deck
+      nextAudio.play().then(() => {
+          // Force state to playing immediately
+          setIsPlaying(true);
+
+          const now = audioContextRef.current!.currentTime;
+          const fadeTime = crossfadeDuration; 
+
+          // Cancel any scheduled automation (STOP previous fades)
           activeGain.gain.cancelScheduledValues(now);
           nextGain.gain.cancelScheduledValues(now);
 
-          // Simple Equal Power Crossfade using Cosine/Sine
-          // We manually set curve values because setValueCurveAtTime is robust
-          const steps = 20;
-          const curveA = new Float32Array(steps);
-          const curveB = new Float32Array(steps);
-          
-          for (let i = 0; i < steps; i++) {
-              const x = i / (steps - 1);
-              // Cosine for fading out, Sine for fading in = Constant Power
-              curveA[i] = Math.cos(x * 0.5 * Math.PI) * volume;
-              curveB[i] = Math.sin(x * 0.5 * Math.PI) * volume;
-          }
+          // 3. Perform Fade
+          // Fade OUT active
+          activeGain.gain.setValueAtTime(activeGain.gain.value, now);
+          activeGain.gain.linearRampToValueAtTime(0, now + fadeTime);
 
-          activeGain.gain.setValueCurveAtTime(curveA, now, fadeTime);
-          nextGain.gain.setValueCurveAtTime(curveB, now, fadeTime);
+          // Fade IN next
+          nextGain.gain.setValueAtTime(nextGain.gain.value, now);
+          nextGain.gain.linearRampToValueAtTime(volume, now + fadeTime);
 
-          // Update State Logic immediately so UI reflects new track
+          // Update pointers immediately so UI updates
           activeDeckRef.current = nextDeck;
           setCurrentTrackIndex(toTrackIndex);
-          // Reset trigger for the new track (it hasn't finished yet)
-          // We set it to false AFTER a small delay to ensure we don't trigger immediately if duration is buggy
+          
+          // Reset trigger lock after a delay
           setTimeout(() => { 
              hasTriggeredAutoMixRef.current = false; 
           }, 1000);
 
-          // Cleanup OLD deck after fade completes
-          setTimeout(() => {
+          // Cleanup Timer
+          crossfadeTimeoutRef.current = window.setTimeout(() => {
+             // Stop the old deck to save CPU
              activeAudio.pause();
              activeAudio.currentTime = 0;
              isCrossfadingRef.current = false;
-          }, fadeTime * 1000 + 100); // Small buffer
+             crossfadeTimeoutRef.current = null;
+             
+             // Ensure volumes are clean (snapped) at end
+             const finalNow = audioContextRef.current?.currentTime || 0;
+             activeGain.gain.setValueAtTime(0, finalNow);
+             nextGain.gain.setValueAtTime(volume, finalNow);
+
+          }, fadeTime * 1000 + 100); 
 
       }).catch(e => {
           console.error("Crossfade play failed", e);
           isCrossfadingRef.current = false;
       });
 
-  }, [tracks, volume, crossfadeDuration]);
+  }, [tracks, volume, crossfadeDuration, initAudio]);
 
   // Standard Play/Pause
   const togglePlay = useCallback(() => {
@@ -227,16 +273,17 @@ export const useAudioPlayer = () => {
       activeAudio?.play().catch(console.warn);
       setIsPlaying(true);
       
-      // Restore volume if we paused mid-fade (reset to deck volume)
-      if (gainARef.current && gainBRef.current && !isCrossfadingRef.current) {
+      // Restore volume if we paused mid-fade
+      if (gainARef.current && gainBRef.current) {
          const now = audioContextRef.current?.currentTime || 0;
-         if (activeDeckRef.current === 'A') {
-             gainARef.current.gain.setValueAtTime(volume, now);
-             gainBRef.current.gain.setValueAtTime(0, now);
-         } else {
-             gainARef.current.gain.setValueAtTime(0, now);
-             gainBRef.current.gain.setValueAtTime(volume, now);
-         }
+         const activeGain = activeDeckRef.current === 'A' ? gainARef.current : gainBRef.current;
+         const inactiveGain = activeDeckRef.current === 'A' ? gainBRef.current : gainARef.current;
+         
+         // Snap to correct volumes
+         activeGain.gain.cancelScheduledValues(now);
+         inactiveGain.gain.cancelScheduledValues(now);
+         activeGain.gain.setValueAtTime(volume, now);
+         inactiveGain.gain.setValueAtTime(0, now);
       }
     }
   }, [isPlaying, initAudio, volume]);
@@ -245,17 +292,18 @@ export const useAudioPlayer = () => {
     if (tracks.length === 0) return;
     const nextIndex = (currentTrackIndex + 1) % tracks.length;
     
+    // Always perform crossfade/switch logic, even if paused, to load next track
     if (isPlaying) {
         performCrossfade(nextIndex);
     } else {
-        // Instant switch if paused
-        const nextDeck = activeDeckRef.current; // Keep same deck if paused
+        // Simple swap without fade
+        setCurrentTrackIndex(nextIndex);
+        const nextDeck = activeDeckRef.current; // Reuse same deck if paused
         const audio = nextDeck === 'A' ? audioRefA.current : audioRefB.current;
         if (audio) {
             audio.src = tracks[nextIndex].url;
             audio.currentTime = 0;
         }
-        setCurrentTrackIndex(nextIndex);
         hasTriggeredAutoMixRef.current = false;
     }
   }, [tracks, currentTrackIndex, isPlaying, performCrossfade]);
@@ -267,12 +315,13 @@ export const useAudioPlayer = () => {
     if (isPlaying) {
         performCrossfade(prevIndex);
     } else {
-        const audio = activeDeckRef.current === 'A' ? audioRefA.current : audioRefB.current;
+        setCurrentTrackIndex(prevIndex);
+        const nextDeck = activeDeckRef.current;
+        const audio = nextDeck === 'A' ? audioRefA.current : audioRefB.current;
         if (audio) {
             audio.src = tracks[prevIndex].url;
             audio.currentTime = 0;
         }
-        setCurrentTrackIndex(prevIndex);
         hasTriggeredAutoMixRef.current = false;
     }
   }, [tracks, currentTrackIndex, isPlaying, performCrossfade]);
@@ -283,7 +332,9 @@ export const useAudioPlayer = () => {
       if (isPlaying) {
           performCrossfade(index);
       } else {
-          const audio = activeDeckRef.current === 'A' ? audioRefA.current : audioRefB.current;
+          // If paused, we switch AND play
+          const nextDeck = activeDeckRef.current;
+          const audio = nextDeck === 'A' ? audioRefA.current : audioRefB.current;
           if (audio) {
               audio.src = tracks[index].url;
               audio.currentTime = 0;
@@ -309,6 +360,7 @@ export const useAudioPlayer = () => {
   }, [crossfadeDuration]);
 
   const stop = useCallback(() => {
+      if (crossfadeTimeoutRef.current) clearTimeout(crossfadeTimeoutRef.current);
       [audioRefA.current, audioRefB.current].forEach(a => {
           if (a) {
               a.pause();
@@ -316,6 +368,7 @@ export const useAudioPlayer = () => {
           }
       });
       setIsPlaying(false);
+      isCrossfadingRef.current = false;
   }, []);
   
   // File processing
@@ -377,7 +430,8 @@ export const useAudioPlayer = () => {
 
   // --- AUTOMATION LOOP ---
   // We use handleTimeUpdate to detect when to crossfade
-  const handleTimeUpdate = () => {
+  // Added preventAutoMix flag to support reboot logic
+  const handleTimeUpdate = (e: any, preventAutoMix = false) => {
       const active = activeDeckRef.current === 'A' ? audioRefA.current : audioRefB.current;
       if (active) {
           const ct = active.currentTime;
@@ -388,7 +442,8 @@ export const useAudioPlayer = () => {
 
           // AUTO-MIX LOGIC
           // If we are near end AND playing AND haven't triggered yet AND crossfade is enabled
-          if (isPlaying && dur > 0 && crossfadeDuration > 0) {
+          // AND we are NOT preventing auto mix (e.g. waiting for scheduled reboot)
+          if (!preventAutoMix && isPlaying && dur > 0 && crossfadeDuration > 0) {
               if (ct >= dur - crossfadeDuration && !hasTriggeredAutoMixRef.current && !isCrossfadingRef.current) {
                    // Calculate next index
                    const nextIndex = (currentTrackIndex + 1) % tracks.length;
@@ -400,6 +455,61 @@ export const useAudioPlayer = () => {
           }
       }
   };
+
+  // --- MEDIA SESSION API INTEGRATION ---
+  useEffect(() => {
+    if ('mediaSession' in navigator && currentTrackIndex >= 0 && tracks[currentTrackIndex]) {
+      const track = tracks[currentTrackIndex];
+      navigator.mediaSession.metadata = new MediaMetadata({
+        title: track.name,
+        artist: 'Neon Retro Player',
+        album: 'Retro Mix',
+        // You can add artwork here if you extract cover art
+        artwork: [
+            { src: 'https://cdn-icons-png.flaticon.com/512/3204/3204362.png', sizes: '512x512', type: 'image/png' }
+        ]
+      });
+
+      // Update handlers
+      navigator.mediaSession.setActionHandler('play', () => {
+         togglePlay();
+      });
+      navigator.mediaSession.setActionHandler('pause', () => {
+         togglePlay();
+      });
+      navigator.mediaSession.setActionHandler('previoustrack', () => {
+         prevTrack();
+      });
+      navigator.mediaSession.setActionHandler('nexttrack', () => {
+         nextTrack();
+      });
+    }
+  }, [currentTrackIndex, tracks, togglePlay, prevTrack, nextTrack]);
+
+  // --- SYNC UI STATE WITH AUDIO EVENT ---
+  // If the browser (global media key) plays the audio natively without invoking our React handlers,
+  // we need to listen to the DOM event to update UI state (Visualizer, Pause button, etc.)
+  const onAudioPlay = useCallback(() => {
+      if (!isPlaying) setIsPlaying(true);
+      initAudio(); // Ensure context is running
+  }, [isPlaying, initAudio]);
+
+  const onAudioPause = useCallback((e: SyntheticEvent<HTMLAudioElement>) => {
+      // Determine which deck caused the pause event
+      // If it's the inactive deck (e.g. from crossfade cleanup), ignore it
+      const activeElement = activeDeckRef.current === 'A' ? audioRefA.current : audioRefB.current;
+      
+      // If we can determine the source event target, compare it.
+      // If e.target is not the active deck's audio element, we return early.
+      if (activeElement && e.target !== activeElement) {
+         return;
+      }
+
+      // Only set to false if we are not in the middle of a crossfade operation
+      // The old deck pausing during a fade shouldn't trigger global pause state
+      if (isPlaying && !isCrossfadingRef.current) setIsPlaying(false);
+  }, [isPlaying]);
+
 
   return {
     audioRefA,
@@ -429,6 +539,8 @@ export const useAudioPlayer = () => {
     sortTracks,
     shuffleTracks,
     handleTimeUpdate,
-    activeDeck: activeDeckRef.current
+    activeDeck: activeDeckRef.current,
+    onAudioPlay,
+    onAudioPause
   };
 };

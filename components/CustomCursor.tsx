@@ -1,4 +1,5 @@
 
+
 import React, { useEffect, useRef } from 'react';
 
 // Restricted palette: Blue, Purple, White
@@ -34,6 +35,7 @@ const CustomCursor: React.FC = () => {
     mouseY: -100,
     isClicked: false,
     isHovering: false,
+    hideCrosshair: false, // New state to toggle crosshair visibility
     particles: [] as Particle[],
     frame: 0
   });
@@ -66,6 +68,8 @@ const CustomCursor: React.FC = () => {
 
     const onMouseOver = (e: MouseEvent) => {
       const target = e.target as HTMLElement;
+      
+      // Determine if clicking something interactive
       const isInteractive = 
         target.tagName === 'BUTTON' || 
         target.tagName === 'A' || 
@@ -76,6 +80,11 @@ const CustomCursor: React.FC = () => {
         target.closest('a');
       
       stateRef.current.isHovering = !!isInteractive;
+
+      // Determine if we should hide the center crosshair (e.g., inside the TV screen)
+      // We look for a parent with class 'cursor-hide-center'
+      const hideZone = target.closest('.cursor-hide-center');
+      stateRef.current.hideCrosshair = !!hideZone;
     };
 
     // Hide cursor when leaving window
@@ -123,7 +132,7 @@ const CustomCursor: React.FC = () => {
     };
 
     const render = () => {
-      const { mouseX, mouseY, isClicked, isHovering, particles } = stateRef.current;
+      const { mouseX, mouseY, isClicked, isHovering, hideCrosshair, particles } = stateRef.current;
       stateRef.current.frame++;
 
       // 1. Clear Screen
@@ -201,7 +210,8 @@ const CustomCursor: React.FC = () => {
       }
 
       // 4. Draw Cursor (Hacker Crosshair)
-      if (mouseX > 0) {
+      // Only draw if we have valid coordinates AND we are not in a hidden zone
+      if (mouseX > 0 && !hideCrosshair) {
           ctx.globalAlpha = 0.8;
           ctx.strokeStyle = isClicked ? '#bc13fe' : '#00f3ff'; // Purple click, Blue hover
           ctx.lineWidth = 2;

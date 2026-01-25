@@ -1,4 +1,5 @@
 
+
 import React, { useEffect, useRef } from 'react';
 import { NEON_COLORS, VisualizerConfig } from '../types';
 
@@ -13,19 +14,21 @@ const Visualizer: React.FC<VisualizerProps> = ({ analyser, isPlaying, config, fp
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const animationRef = useRef<number>(0);
   const lastDrawTimeRef = useRef<number>(0);
+  
+  // Храним предыдущие значения высоты столбцов для реализации плавного падения ("гравитации")
+  const prevBarsRef = useRef<Float32Array | null>(null);
+  // Храним высоту "верхушек" (tips)
+  const tipBarsRef = useRef<Float32Array | null>(null);
 
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
 
-    const ctx = canvas.getContext('2d');
+    // alpha: true для прозрачного фона
+    const ctx = canvas.getContext('2d', { alpha: true });
     if (!ctx) return;
 
-    // Initialize data array logic
-    let bufferLength = 0;
     let dataArray: Uint8Array | null = null;
-    
-    // Reset draw time
     lastDrawTimeRef.current = 0;
 
     const render = (timestamp: number) => {
@@ -34,10 +37,7 @@ const Visualizer: React.FC<VisualizerProps> = ({ analyser, isPlaying, config, fp
       // FPS Throttling
       const interval = 1000 / fps;
       const elapsed = timestamp - lastDrawTimeRef.current;
-      
       if (elapsed < interval) return;
-
-      // Adjust for drift
       lastDrawTimeRef.current = timestamp - (elapsed % interval);
 
       if (!canvas) return;
@@ -54,138 +54,192 @@ const Visualizer: React.FC<VisualizerProps> = ({ analyser, isPlaying, config, fp
       // CLEAR SCREEN
       ctx.clearRect(0, 0, WIDTH, HEIGHT);
 
-      // Check if we have audio context ready
+      // Инициализация массивов при первом запуске или изменении количества баров
+      if (!prevBarsRef.current || prevBarsRef.current.length !== config.barCount) {
+         prevBarsRef.current = new Float32Array(config.barCount).fill(0);
+         tipBarsRef.current = new Float32Array(config.barCount).fill(0);
+      }
+      const prevBars = prevBarsRef.current;
+      const tipBars = tipBarsRef.current!;
+
+      // 1. DATA ACQUISITION
+      // Мы инициализируем и обновляем данные всегда, если есть анализатор.
       if (analyser) {
          try {
-             // We need high resolution FFT to allow zooming/cropping
-             const requiredSize = 2048; 
-             if (analyser.fftSize !== requiredSize) {
-                 analyser.fftSize = requiredSize;
-             }
-         } catch (e) {
-             console.warn("Error setting FFT size:", e);
+             if (analyser.fftSize !== 4096) analyser.fftSize = 4096;
+         } catch (e) { console.warn(e); }
+
+         const bufferLength = analyser.frequencyBinCount;
+         if (!dataArray || dataArray.length !== bufferLength) {
+             dataArray = new Uint8Array(bufferLength);
          }
 
-         if (!dataArray || dataArray.length !== analyser.frequencyBinCount) {
-             bufferLength = analyser.frequencyBinCount;
-             dataArray = new Uint8Array(bufferLength);
+         if (isPlaying) {
+            // Если играет музыка - берем данные с частот
+            analyser.getByteFrequencyData(dataArray);
+         } else {
+            // Если пауза - заполняем нулями, но продолжаем цикл анимации, чтобы столбики упали
+            dataArray.fill(0);
          }
       }
 
-      if (isPlaying && analyser && dataArray) {
-        analyser.getByteFrequencyData(dataArray);
+      // Переменная для отслеживания, есть ли еще "энергия" в визуализации (не упали ли столбики)
+      let maxActivity = 0;
 
-        // --- NEW LOGIC: FREQUENCY SLICING (CUTOFFS) ---
-        // Calculate start and end indices based on percentage sliders
-        const totalBins = bufferLength;
+      // 2. PHYSICS & DRAWING LOOP
+      // Запускаем цикл, если есть массив данных (даже если он пустой/нулевой)
+      if (analyser && dataArray) {
+        const bufferLength = dataArray.length;
+        const sampleRate = analyser.context.sampleRate;
+        const binSize = sampleRate / 2 / bufferLength;
         
-        // Removed arbitrary 50% clamp. Now allows full range selection.
-        const minP = Math.max(0, Math.min(99, config.minFrequency));
-        // Ensure max is always at least 1% higher than min
-        const maxP = Math.max(minP + 1, Math.min(100, config.maxFrequency));
-
-        // Start index (Bass Cutoff)
-        const startIndex = Math.floor(totalBins * (minP / 100));
-        // End index (Treble Cutoff)
-        const endIndex = Math.floor(totalBins * (maxP / 100));
+        // --- PHYSICS NORMALIZATION ---
+        const fpsRatio = 60 / fps; 
         
-        const effectiveLength = endIndex - startIndex;
-        const binSize = effectiveLength / config.barCount;
+        // --- МЯГКАЯ НОРМАЛИЗАЦИЯ (Soft Auto-Gain) ---
+        let maxBass = 0;
+        let maxMid = 0;
+        let maxTreb = 0;
 
-        // Processed values array (sized to our desired Bar Count)
-        const processedValues = new Float32Array(config.barCount);
+        const bassEnd = Math.floor(250 / binSize);   
+        const midEnd = Math.floor(2000 / binSize);   
 
-        // --- MAPPING DATA TO BARS ---
-        // We iterate through our target number of bars, and pull the max value 
-        // from the corresponding chunk of frequency data.
-        for (let i = 0; i < config.barCount; i++) {
-            let maxInChunk = 0;
-            const chunkStart = Math.floor(startIndex + (i * binSize));
-            const chunkEnd = Math.floor(startIndex + ((i + 1) * binSize));
+        // Вычисляем максимумы только если играет музыка, иначе скейлинг не важен (вход 0)
+        if (isPlaying) {
+            for (let i = 0; i < bufferLength; i++) {
+                const val = dataArray[i];
+                if (i < bassEnd) maxBass = Math.max(maxBass, val);
+                else if (i < midEnd) maxMid = Math.max(maxMid, val);
+                else maxTreb = Math.max(maxTreb, val);
+            }
+        } else {
+            // Чтобы при паузе скейлинг не прыгал, ставим дефолтные значения
+            maxBass = 150; maxMid = 100; maxTreb = 80;
+        }
+
+        const bassScale = 255 / Math.max(150, maxBass); 
+        const midScale = 255 / Math.max(100, maxMid);    
+        const trebScale = 255 / Math.max(80, maxTreb);
+
+        const barCount = config.barCount;
+        
+        // --- FREQUENCY MAPPING ---
+        const minHz = 20 + (config.minFrequency * 40); 
+        const maxHz = minHz + 500 + (config.maxFrequency * 180);
+
+        const logMin = Math.log10(minHz);
+        const logMax = Math.log10(maxHz);
+
+        for (let i = 0; i < barCount; i++) {
+            // --- MAPPING LOGIC ---
+            const t = i / (barCount - 1);
+            const adjustedT = Math.pow(t, 0.6);
+            const freq = Math.pow(10, logMin + (adjustedT * (logMax - logMin)));
+            const rawIndex = freq / binSize;
+            let index = Math.floor(rawIndex);
+            index = Math.max(0, Math.min(bufferLength - 1, index));
+
+            // Получение значения
+            let rawValue = dataArray[index];
             
-            for (let j = chunkStart; j < chunkEnd && j < totalBins; j++) {
-                if (dataArray[j] > maxInChunk) {
-                    maxInChunk = dataArray[j];
+            // Сглаживание пиков (Peak Sampling)
+            if (index > bassEnd) {
+                const nextT = Math.pow((i + 1) / (barCount - 1), 0.6);
+                const nextFreq = Math.pow(10, logMin + (nextT * (logMax - logMin)));
+                const nextIndex = Math.floor(nextFreq / binSize);
+                const range = nextIndex - index;
+                if (range > 1) {
+                    let maxInRange = 0;
+                    // Берем среднее значение для сглаживания "дерганья", или макс для резкости
+                    // Для динамики лучше Max
+                    for (let k = 0; k < range && (index + k) < bufferLength; k++) {
+                        maxInRange = Math.max(maxInRange, dataArray[index + k]);
+                    }
+                    rawValue = maxInRange;
                 }
             }
-            
-            // If binSize < 1 (zoomed way in), we might just sample indices
-            if (binSize < 1) {
-                const idx = Math.floor(startIndex + i * binSize);
-                if (idx < totalBins) maxInChunk = dataArray[idx];
+
+            // Применение нормализации (Auto-Gain)
+            let scaledValue = rawValue;
+            if (config.normalize) {
+                if (index < bassEnd) scaledValue *= bassScale;
+                else if (index < midEnd) scaledValue *= midScale;
+                else scaledValue *= trebScale;
             }
+            
+            // --- DYNAMIC RANGE EXPANSION (FIX FOR "COMPRESSED" LOOK) ---
+            // 1. Нормализуем значение от 0 до 1
+            let ratio = scaledValue / 255;
 
-            processedValues[i] = maxInChunk;
-        }
+            // 2. Применяем экспоненциальную кривую. 
+            // Это "прижимает" тихие звуки (шум) к низу, а громкие оставляет наверху.
+            // Power 2.5: Вход 0.5 (середина) -> Выход 0.17 (низ). Вход 1.0 -> Выход 1.0.
+            const powerCurve = 2.5; 
+            ratio = Math.pow(ratio, powerCurve);
 
-        // --- NORMALIZE & EQUALIZE LOGIC ---
-        if (config.normalize) {
-            let maxVal = 0;
+            // 3. Восстанавливаем амплитуду и применяем Sensitivity
+            // Так как мы "прижали" сигнал, нужно немного компенсировать общую высоту (x1.2)
+            ratio *= (config.sensitivity * 1.2);
 
-            // Step 1: Frequency Compensation 
-            for (let i = 0; i < config.barCount; i++) {
-                // Approximate freq boost based on position in displayed range
-                const eqBoost = 1.0 + (i / config.barCount) * 2.0;
-                let boostedVal = processedValues[i] * eqBoost;
+            // 4. Легкий буст высоких частот, чтобы правая часть не проваливалась совсем,
+            // но гораздо меньше чем раньше (0.8 -> 0.3), чтобы не было "стены".
+            ratio *= (1 + (i / barCount) * 0.3);
+
+            // 5. Вычисляем финальную высоту с мягким клиппингом (tanh)
+            // tanh позволяет сигналу "насыщаться" у верха экрана, не обрезаясь жестко
+            let barHeight = HEIGHT * Math.tanh(ratio);
+            
+            if (barHeight < 2 && config.strokeEnabled && scaledValue > 5) barHeight = 2; // Min height for visibility
+            if (scaledValue < 5) barHeight = 0; // Noise gate
+
+            // 4. ФИЗИКА БАРА (Attack / Decay)
+            // Делаем падение чуть быстрее (0.82 -> 0.75), чтобы визуалайзер "дышал" между битами
+            const baseDecay = 0.75; 
+            const decay = Math.pow(baseDecay, fpsRatio);
+
+            let finalValue = prevBars[i] * decay; 
+            if (barHeight > finalValue) {
+                finalValue = barHeight;
+            }
+            prevBars[i] = finalValue;
+            
+            // Используем сглаженное значение для отрисовки
+            barHeight = finalValue;
+
+            // --- ФИЗИКА ВЕРХУШКИ ---
+            if (config.showTips) {
+                let tipH = tipBars[i];
+                if (barHeight > tipH) {
+                    tipH = barHeight;
+                } else {
+                    const gravityBase = (config.tipSpeed || 15) / 1000;
+                    const gravity = (HEIGHT * gravityBase) * fpsRatio; 
+                    tipH -= gravity;
+                }
+                if (tipH < 0) tipH = 0;
+                tipBars[i] = tipH;
                 
-                processedValues[i] = boostedVal;
-                if (boostedVal > maxVal) maxVal = boostedVal;
-            }
-
-            // Step 2: Dynamic Scaling
-            const floor = 50; 
-            if (maxVal < floor) maxVal = floor;
-            const normalizeScale = 255 / maxVal;
-
-            for (let i = 0; i < config.barCount; i++) {
-                processedValues[i] = processedValues[i] * normalizeScale;
-            }
-        }
-
-        // --- DRAWING ---
-        // Calculate Bar Width based on Gap
-        let barWidth = 0;
-        let startX = 0;
-
-        if (config.mirror) {
-            // Mirror Mode: Bars radiate from center
-            // Width needs to fit barCount bars in HALF the screen width
-            barWidth = (WIDTH / 2) / config.barCount;
-            startX = WIDTH / 2;
-        } else {
-            // Normal Mode
-            barWidth = WIDTH / config.barCount;
-            startX = 0;
-        }
-
-        for (let i = 0; i < config.barCount; i++) {
-            const val = processedValues[i];
-            
-            // Calculate Height
-            let barHeight = (val / 255) * (HEIGHT * 0.5) * config.sensitivity;
-            if (barHeight > HEIGHT) barHeight = HEIGHT;
-            if (barHeight < 2 && config.strokeEnabled) barHeight = 2; 
-
-            // Calculate Y
-            let y = 0;
-            switch (config.position) {
-              case 'top': y = 0; break;
-              case 'bottom': y = HEIGHT - barHeight; break;
-              case 'center':
-              default: y = (HEIGHT / 2) - (barHeight / 2); break;
+                maxActivity = Math.max(maxActivity, tipH);
             }
             
-            // Determine Color
+            maxActivity = Math.max(maxActivity, barHeight);
+
+            // Если высота 0, не рисуем этот бар
+            if (barHeight < 0.5 && (!config.showTips || tipBars[i] < 0.5)) continue;
+
+             // Color Logic
             let color = '#fff';
             switch (config.style) {
               case 'blue': color = '#00f3ff'; break;
               case 'pink': color = '#ff00ff'; break;
               case 'matrix':
-                 const intensity = Math.min(255, val + 50);
+                 // Dynamic green brightness
+                 const intensity = Math.min(255, (barHeight / HEIGHT) * 255 + 50);
                  color = `rgb(0, ${intensity}, 0)`;
                  break;
               case 'inferno':
-                 color = `hsl(${val / 3}, 100%, 50%)`;
+                 const hue = (barHeight / HEIGHT) * 60; 
+                 color = `hsl(${hue}, 100%, 50%)`;
                  break;
               case 'retro':
               default:
@@ -194,51 +248,149 @@ const Visualizer: React.FC<VisualizerProps> = ({ analyser, isPlaying, config, fp
                 break;
             }
 
-            // Set Styles
+            // --- DRAWING POSITION ---
+            let barWidth = 0;
+            let startX = 0;
+
+            if (config.mirror) {
+                barWidth = (WIDTH / 2) / config.barCount;
+                startX = WIDTH / 2;
+            } else {
+                barWidth = WIDTH / config.barCount;
+                startX = 0;
+            }
+
+            let y = 0;
+            const getY = (h: number) => {
+                switch (config.position) {
+                    case 'top': return 0;
+                    case 'bottom': return HEIGHT - h;
+                    case 'center': return (HEIGHT / 2) - (h / 2);
+                    default: return HEIGHT - h;
+                }
+            };
+            y = getY(barHeight);
+
             ctx.fillStyle = color;
-            ctx.shadowBlur = config.style === 'matrix' ? 5 : 10;
-            ctx.shadowColor = color;
             ctx.globalAlpha = config.fillOpacity;
-            
             const gap = config.barGap;
             const drawWidth = Math.max(0.5, barWidth - gap);
 
-            // Draw based on mode
+            // --- DRAW BAR HELPER ---
+            const drawBar = (bx: number, by: number, bw: number, bh: number) => {
+                 if (bh <= 0) return;
+                 if (config.segmented) {
+                     const segHeight = config.segmentHeight || 4; 
+                     const segGap = config.segmentGap || 2;       
+                     const unit = segHeight + segGap;
+                     const segments = Math.floor(bh / unit);
+                     
+                     if (segments === 0) return;
+
+                     const drawSegment = (sy: number) => {
+                        ctx.fillRect(bx, sy, bw, segHeight);
+                        if (config.strokeEnabled) {
+                            ctx.strokeStyle = color;
+                            ctx.lineWidth = 1;
+                            ctx.globalAlpha = config.strokeOpacity;
+                            ctx.strokeRect(bx, sy, bw, segHeight);
+                            ctx.globalAlpha = config.fillOpacity;
+                        }
+                     };
+
+                     if (config.position === 'bottom') {
+                         for (let s = 0; s < segments; s++) {
+                             const sy = HEIGHT - segHeight - (s * unit);
+                             drawSegment(sy);
+                         }
+                     } else if (config.position === 'center') {
+                         const mid = HEIGHT / 2;
+                         const halfSegments = Math.ceil(segments / 2);
+                         for (let s = 0; s < halfSegments; s++) {
+                             const sy = mid - (segGap / 2) - segHeight - (s * unit);
+                             drawSegment(sy);
+                         }
+                         for (let s = 0; s < halfSegments; s++) {
+                             const sy = mid + (segGap / 2) + (s * unit);
+                             drawSegment(sy);
+                         }
+                     } else {
+                         for (let s = 0; s < segments; s++) {
+                             drawSegment(by + (s * unit));
+                         }
+                     }
+                 } else {
+                     // NORMAL BAR
+                     ctx.fillRect(bx, by, bw, bh);
+                     if (config.strokeEnabled) {
+                        ctx.strokeStyle = color;
+                        ctx.lineWidth = 1;
+                        ctx.globalAlpha = config.strokeOpacity;
+                        ctx.strokeRect(bx, by, bw, bh);
+                        ctx.globalAlpha = config.fillOpacity;
+                     }
+                 }
+            };
+
+            // --- RENDER BARS ---
             if (config.mirror) {
-                // Right side
                 const xRight = startX + (i * barWidth) + (gap / 2);
-                ctx.fillRect(xRight, y, drawWidth, barHeight);
-
-                // Left side (mirrored)
-                // (i + 1) ensures we don't overlap perfectly at 0, pushes leftwards
+                drawBar(xRight, y, drawWidth, barHeight);
                 const xLeft = startX - ((i + 1) * barWidth) + (gap / 2);
-                ctx.fillRect(xLeft, y, drawWidth, barHeight);
-
-                // Strokes
-                if (config.strokeEnabled) {
-                    ctx.strokeStyle = color;
-                    ctx.lineWidth = 1;
-                    ctx.globalAlpha = config.strokeOpacity;
-                    ctx.strokeRect(xRight, y, drawWidth, barHeight);
-                    ctx.strokeRect(xLeft, y, drawWidth, barHeight);
-                }
+                drawBar(xLeft, y, drawWidth, barHeight);
             } else {
-                // Standard Left-to-Right
                 const x = (i * barWidth) + (gap / 2);
-                ctx.fillRect(x, y, drawWidth, barHeight);
-
-                if (config.strokeEnabled) {
-                    ctx.strokeStyle = color;
-                    ctx.lineWidth = 1;
-                    ctx.globalAlpha = config.strokeOpacity;
-                    ctx.strokeRect(x, y, drawWidth, barHeight);
-                }
+                drawBar(x, y, drawWidth, barHeight);
             }
 
-            ctx.globalAlpha = 1.0;
+            // --- RENDER TIPS ---
+            if (config.showTips) {
+                const tipH = tipBars[i];
+                if (tipH > 2) {
+                    const tipThickness = config.tipHeight || 2; 
+                    let tipY = 0;
+                    if (config.position === 'bottom') tipY = HEIGHT - tipH - tipThickness - 1; 
+                    else if (config.position === 'top') tipY = tipH + 1;
+                    else if (config.position === 'center') {
+                         const center = HEIGHT / 2;
+                         const topTipY = center - (tipH / 2) - tipThickness - 1;
+                         const bottomTipY = center + (tipH / 2) + 1;
+                         ctx.fillStyle = '#ffffff'; 
+                         ctx.globalAlpha = Math.min(1, config.fillOpacity + 0.4);
+                         if (config.mirror) {
+                            const xRight = startX + (i * barWidth) + (gap / 2);
+                            const xLeft = startX - ((i + 1) * barWidth) + (gap / 2);
+                            ctx.fillRect(xRight, topTipY, drawWidth, tipThickness);
+                            ctx.fillRect(xRight, bottomTipY, drawWidth, tipThickness);
+                            ctx.fillRect(xLeft, topTipY, drawWidth, tipThickness);
+                            ctx.fillRect(xLeft, bottomTipY, drawWidth, tipThickness);
+                        } else {
+                            const x = (i * barWidth) + (gap / 2);
+                            ctx.fillRect(x, topTipY, drawWidth, tipThickness);
+                            ctx.fillRect(x, bottomTipY, drawWidth, tipThickness);
+                        }
+                        continue;
+                    }
+
+                    ctx.fillStyle = '#ffffff'; 
+                    ctx.globalAlpha = Math.min(1, config.fillOpacity + 0.4);
+
+                    if (config.mirror) {
+                        const xRight = startX + (i * barWidth) + (gap / 2);
+                        const xLeft = startX - ((i + 1) * barWidth) + (gap / 2);
+                        ctx.fillRect(xRight, tipY, drawWidth, tipThickness);
+                        ctx.fillRect(xLeft, tipY, drawWidth, tipThickness);
+                    } else {
+                         const x = (i * barWidth) + (gap / 2);
+                         ctx.fillRect(x, tipY, drawWidth, tipThickness);
+                    }
+                }
+            }
         }
-      } else {
-        // Idle Line
+      }
+
+      // 3. IDLE LINE
+      if (!isPlaying && maxActivity < 2) {
         ctx.beginPath();
         let yLine = HEIGHT / 2;
         if (config.position === 'top') yLine = 10;
@@ -248,8 +400,12 @@ const Visualizer: React.FC<VisualizerProps> = ({ analyser, isPlaying, config, fp
         ctx.lineTo(WIDTH, yLine);
         ctx.strokeStyle = 'rgba(255, 255, 255, 0.2)';
         ctx.lineWidth = 1;
-        ctx.shadowBlur = 0;
         ctx.stroke();
+        
+        if (maxActivity < 0.1) {
+             if (prevBarsRef.current) prevBarsRef.current.fill(0);
+             if (tipBarsRef.current) tipBarsRef.current.fill(0);
+        }
       }
     };
 

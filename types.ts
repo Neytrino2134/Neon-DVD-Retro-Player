@@ -1,5 +1,4 @@
 
-
 export interface AudioTrack {
   id: string;
   name: string;
@@ -40,11 +39,17 @@ export interface VisualizerConfig {
   fillOpacity: number;
   strokeEnabled: boolean;
   strokeOpacity: number;
+  showTips: boolean; 
+  tipHeight: number; // New: Thickness of the tip
+  tipSpeed: number; // New: Falling speed (gravity)
   normalize: boolean;
   minFrequency: number;
   maxFrequency: number;
   barGap: number;
   mirror: boolean;
+  segmented: boolean;
+  segmentHeight: number; 
+  segmentGap: number; 
 }
 
 export interface DvdConfig {
@@ -55,6 +60,10 @@ export interface DvdConfig {
 
 export interface MarqueeConfig {
   enabled: boolean;
+  showProgress: boolean; 
+  progressMode: 'continuous' | 'blocks'; // New
+  progressHeight: number; // New
+  progressOpacity: number; // New
   speed: number;
   opacity: number;
   fontSize: number;
@@ -104,4 +113,9 @@ export interface EffectsConfig {
 export interface CrossfadeConfig {
   enabled: boolean;
   duration: number; // Seconds
+}
+
+export interface PatternConfig {
+  intensity: number;
+  scale: number;
 }

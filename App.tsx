@@ -1,4 +1,5 @@
 
+
 import React, { useState, useRef, useEffect } from 'react';
 import { LanguageProvider, useLanguage } from './contexts/LanguageContext';
 import SettingsPanel from './components/SettingsPanel';
@@ -8,6 +9,7 @@ import CustomCursor from './components/CustomCursor';
 import ContextMenu from './components/ContextMenu';
 import { useAudioPlayer } from './hooks/useAudioPlayer';
 import { useAppConfig } from './hooks/useAppConfig';
+import ProgressBar from './components/ProgressBar'; // Explicitly imported for reference if needed, though used in RetroScreen
 
 function AppContent() {
   const [focusMode, setFocusMode] = useState(false);
@@ -15,7 +17,7 @@ function AppContent() {
   const appContainerRef = useRef<HTMLDivElement>(null);
   
   // Reload State Logic
-  const [rebootPhase, setRebootPhase] = useState<'idle' | 'waiting' | 'countdown'>('idle');
+  const [rebootPhase, setRebootPhase] = useState<'idle' | 'waiting' | 'countdown' | 'blackout'>('idle');
   const [finalTimer, setFinalTimer] = useState(5);
 
   // Custom Hooks
@@ -45,7 +47,8 @@ function AppContent() {
   useEffect(() => {
     if (rebootPhase === 'countdown') {
         if (finalTimer <= 0) {
-            window.location.reload();
+            // Trigger blackout phase instead of immediate reload
+            setRebootPhase('blackout');
             return;
         }
 
@@ -54,6 +57,12 @@ function AppContent() {
         }, 1000);
 
         return () => clearInterval(interval);
+    } else if (rebootPhase === 'blackout') {
+        // Wait 5 seconds in darkness before actual reload
+        const timeout = setTimeout(() => {
+            window.location.reload();
+        }, 5000);
+        return () => clearTimeout(timeout);
     }
   }, [rebootPhase, finalTimer]);
 
@@ -157,6 +166,22 @@ function AppContent() {
     }
   };
 
+  // Wrapper for time update to inject logic control
+  const handleTimeUpdate = (e: any) => {
+      // If we are waiting for a reboot, we want the track to play to the bitter end (onEnded)
+      // and NOT trigger the auto-mix/crossfade logic in the hook.
+      const preventAutoMix = rebootPhase === 'waiting';
+      
+      if (player.activeDeck === 'A') {
+          player.handleTimeUpdate(e, preventAutoMix);
+      } else {
+          player.handleTimeUpdate(e, preventAutoMix);
+      }
+  };
+
+  // Calculate percentage for the new progress bar
+  const playbackPercentage = (player.duration > 0) ? (player.currentTime / player.duration) * 100 : 0;
+
   return (
     <div 
       ref={appContainerRef}
@@ -171,16 +196,20 @@ function AppContent() {
       <audio 
         ref={player.audioRefA} 
         onEnded={player.activeDeck === 'A' ? handleTrackEnded : undefined} 
-        onTimeUpdate={player.activeDeck === 'A' ? player.handleTimeUpdate : undefined}
-        onLoadedMetadata={player.activeDeck === 'A' ? player.handleTimeUpdate : undefined}
+        onTimeUpdate={player.activeDeck === 'A' ? handleTimeUpdate : undefined}
+        onLoadedMetadata={player.activeDeck === 'A' ? handleTimeUpdate : undefined}
+        onPlay={player.onAudioPlay}
+        onPause={player.onAudioPause}
         crossOrigin="anonymous" 
       />
       {/* Deck B */}
       <audio 
         ref={player.audioRefB} 
         onEnded={player.activeDeck === 'B' ? handleTrackEnded : undefined} 
-        onTimeUpdate={player.activeDeck === 'B' ? player.handleTimeUpdate : undefined}
-        onLoadedMetadata={player.activeDeck === 'B' ? player.handleTimeUpdate : undefined}
+        onTimeUpdate={player.activeDeck === 'B' ? handleTimeUpdate : undefined}
+        onLoadedMetadata={player.activeDeck === 'B' ? handleTimeUpdate : undefined}
+        onPlay={player.onAudioPlay}
+        onPause={player.onAudioPause}
         crossOrigin="anonymous" 
       />
       
@@ -195,6 +224,8 @@ function AppContent() {
              dvdConfig={config.dvdConfig} setDvdConfig={config.setDvdConfig}
              effectsConfig={config.effectsConfig} setEffectsConfig={config.setEffectsConfig}
              bgColor={config.bgColor} setBgColor={config.setBgColor}
+             bgPattern={config.bgPattern} setBgPattern={config.setBgPattern}
+             bgPatternConfig={config.bgPatternConfig} setBgPatternConfig={config.setBgPatternConfig}
              onBgMediaUpload={config.handleBgUpload} 
              bgMedia={config.bgMedia} 
              bgList={config.bgList}
@@ -202,11 +233,13 @@ function AppContent() {
              onRemoveBg={config.removeBg}
              onMoveBg={config.moveBg}
              onSelectBg={config.selectBg}
+             onDeselectBg={config.deselectBg}
              onClearBgMedia={config.handleClearBg}
              onExportConfig={config.exportConfig}
              bgAutoplayInterval={config.bgAutoplayInterval}
              setBgAutoplayInterval={config.setBgAutoplayInterval}
              onScheduleReload={handleScheduleReload}
+             onAudioUpload={handleFilesSelected}
              // Audio Props
              crossfadeDuration={player.crossfadeDuration}
              setCrossfadeDuration={player.setCrossfadeDuration}
@@ -221,6 +254,8 @@ function AppContent() {
         currentTrack={player.tracks[player.currentTrackIndex]}
         bgMedia={config.bgMedia}
         bgColor={config.bgColor}
+        bgPattern={config.bgPattern}
+        bgPatternConfig={config.bgPatternConfig}
         visualizerConfig={config.visualizerConfig}
         showVisualizer={config.showVisualizer}
         dvdConfig={config.dvdConfig}
@@ -230,6 +265,7 @@ function AppContent() {
         rebootPhase={rebootPhase}
         trackRemaining={Math.max(0, player.duration - player.currentTime)}
         finalTimer={finalTimer}
+        progress={playbackPercentage}
         focusMode={focusMode}
         setFocusMode={setFocusMode}
         isDragging={isDragging}

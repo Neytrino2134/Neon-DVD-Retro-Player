@@ -1,11 +1,13 @@
 
+
 import React, { useRef, useEffect, forwardRef, useMemo, useState } from 'react';
-import { Upload, Minimize, Maximize, Monitor } from 'lucide-react';
-import { AudioTrack, VisualizerConfig, EffectsConfig, DvdConfig, MarqueeConfig } from '../types';
+import { Upload, Minimize, Maximize, Monitor, AlertTriangle, Power } from 'lucide-react';
+import { AudioTrack, VisualizerConfig, EffectsConfig, DvdConfig, MarqueeConfig, PatternConfig } from '../types';
 import DvdLogo from './DvdLogo';
 import Visualizer from './Visualizer';
 import MediaRenderer from './MediaRenderer';
 import NoiseOverlay from './NoiseOverlay';
+import PatternOverlay from './PatternOverlay';
 import ScanlineEffect from './effects/ScanlineEffect';
 import GlitchEffect from './effects/GlitchEffect';
 import CyberHackEffect from './effects/CyberHackEffect';
@@ -14,59 +16,148 @@ import ChromaticAberration from './effects/ChromaticAberration';
 import TransitionEffect from './effects/TransitionEffect';
 import HologramEffect from './effects/HologramEffect';
 import Marquee from './Marquee';
+import ProgressBar from './ProgressBar';
 import { useLanguage } from '../contexts/LanguageContext';
 
 interface ReloadOverlayProps {
-  phase: 'idle' | 'waiting' | 'countdown';
+  phase: 'idle' | 'waiting' | 'countdown' | 'blackout';
   trackRemaining: number;
   finalSeconds: number;
 }
 
 function ReloadOverlay({ phase, trackRemaining, finalSeconds }: ReloadOverlayProps) {
   const { t } = useLanguage();
+  const [animState, setAnimState] = useState<'spawn' | 'expandX' | 'expandY' | 'content'>('spawn');
   
+  // Reset animation state when entering countdown
+  useEffect(() => {
+    if (phase === 'countdown') {
+        setAnimState('spawn');
+        
+        const t1 = setTimeout(() => setAnimState('expandX'), 500);
+        const t2 = setTimeout(() => setAnimState('expandY'), 1000);
+        const t3 = setTimeout(() => setAnimState('content'), 1500);
+        
+        return () => {
+            clearTimeout(t1);
+            clearTimeout(t2);
+            clearTimeout(t3);
+        };
+    }
+  }, [phase]);
+
   if (phase === 'idle') return null;
 
-  const formatTime = (totalSeconds: number) => {
-    if (!Number.isFinite(totalSeconds) || totalSeconds < 0) return "00:00";
-    const m = Math.floor(totalSeconds / 60);
-    const s = Math.floor(totalSeconds % 60);
-    return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
-  };
+  // 1. REBOOT SCHEDULED (Waiting)
+  if (phase === 'waiting') {
+    return (
+       <div className="absolute top-6 right-16 z-[60] flex flex-col items-end pointer-events-none animate-slide-in-right">
+          <div className="flex flex-col items-end">
+              <div className="flex items-center gap-2 mb-1">
+                  <div className="w-2 h-2 rounded-full bg-neon-green animate-pulse shadow-[0_0_5px_#00ff00]"></div>
+                  <span className="font-mono font-bold text-xs text-neon-green tracking-widest uppercase drop-shadow-[0_0_5px_rgba(0,255,0,0.5)]">
+                      {t('reboot_scheduled')}
+                  </span>
+              </div>
+              <div className="font-mono text-[10px] text-gray-400 tracking-wider">
+                  {t('waiting_stream')}
+              </div>
+          </div>
+       </div>
+    );
+  }
 
-  const isCritical = phase === 'countdown';
+  // 2. SYSTEM CRITICAL (Countdown) - Hologram Style with Full Overlay
+  if (phase === 'countdown') {
+    // Dynamic sizes for animation steps
+    let width = '40px';
+    let height = '40px';
+    let opacity = 0;
+    
+    if (animState === 'spawn') {
+        opacity = 1;
+    } else if (animState === 'expandX') {
+        opacity = 1;
+        width = '400px';
+    } else if (animState === 'expandY' || animState === 'content') {
+        opacity = 1;
+        width = '400px';
+        height = 'auto'; // Let content dictate or set fixed
+    }
 
-  return (
-     <div className="absolute top-6 right-6 z-[60] flex justify-end pointer-events-none">
-        <div className={`
-          px-5 py-2 rounded-sm border backdrop-blur-sm 
-          flex flex-row items-center gap-6 transition-all duration-500
-          animate-pulse
-          ${isCritical 
-            ? 'border-red-600/60 bg-red-900/30 shadow-[0_0_20px_rgba(220,38,38,0.4)]' 
-            : 'border-neon-yellow/60 bg-gray-900/40 shadow-[0_0_20px_rgba(249,248,113,0.2)]'}
-        `}>
-           <div className="flex flex-col items-start mr-2">
-               <div className={`font-mono font-bold text-[10px] uppercase tracking-[0.1em] whitespace-nowrap ${isCritical ? 'text-red-400' : 'text-neon-yellow'}`}>
-                 {isCritical ? t('system_critical') : t('reboot_scheduled')}
-               </div>
-               
-               {!isCritical && (
-                   <div className="text-gray-300 font-mono text-[9px] tracking-wider opacity-80 whitespace-nowrap">
-                       {t('waiting_stream')}
-                   </div>
-               )}
-           </div>
+    return (
+      <div className="fixed inset-0 z-[9999] bg-black flex items-center justify-center">
+          {/* Noise/Effect Layer on black bg */}
+          <div className="absolute inset-0 bg-white/5 opacity-10 pointer-events-none scanlines"></div>
+          
+          {/* Hologram Container */}
+          <div 
+            className="relative bg-black border-2 border-red-600 shadow-[0_0_50px_rgba(220,38,38,0.5)] overflow-hidden transition-all duration-500 ease-out"
+            style={{ 
+                width: width, 
+                minHeight: height === 'auto' ? '250px' : height,
+                height: height === 'auto' ? 'auto' : height,
+                opacity: opacity 
+            }}
+          >
+              {/* Background Grid inside box */}
+              <div className="absolute inset-0 bg-[linear-gradient(rgba(255,0,0,0.1)_1px,transparent_1px)] bg-[length:100%_4px] pointer-events-none"></div>
 
-           <div className={`font-mono font-black text-2xl tabular-nums leading-none ${isCritical ? 'text-red-500' : 'text-neon-yellow'}`}>
-             {isCritical 
-                ? `00:${finalSeconds.toString().padStart(2, '0')}` 
-                : formatTime(trackRemaining)
-             }
-           </div>
-        </div>
-     </div>
-  );
+              {/* Decorative Corners */}
+              <div className="absolute top-0 left-0 w-4 h-4 border-t-2 border-l-2 border-red-500"></div>
+              <div className="absolute top-0 right-0 w-4 h-4 border-t-2 border-r-2 border-red-500"></div>
+              <div className="absolute bottom-0 left-0 w-4 h-4 border-b-2 border-l-2 border-red-500"></div>
+              <div className="absolute bottom-0 right-0 w-4 h-4 border-b-2 border-r-2 border-red-500"></div>
+
+              {/* Header - Always visible once expanded X */}
+              <div className={`bg-red-600/20 border-b border-red-600/50 p-2 flex items-center justify-between transition-opacity duration-300 ${animState !== 'spawn' ? 'opacity-100' : 'opacity-0'}`}>
+                  <div className="flex items-center gap-2 text-red-500">
+                      <AlertTriangle size={16} className="animate-pulse" />
+                      <span className="font-mono text-xs font-bold tracking-widest uppercase">SYSTEM FAILURE</span>
+                  </div>
+                  <div className="flex gap-1">
+                      <div className="w-1.5 h-1.5 bg-red-600 rounded-full"></div>
+                      <div className="w-1.5 h-1.5 bg-red-600/50 rounded-full"></div>
+                  </div>
+              </div>
+
+              {/* Content - Only visible in final state */}
+              <div className={`p-6 flex flex-col items-center justify-center text-center space-y-4 transition-opacity duration-500 ${animState === 'content' ? 'opacity-100' : 'opacity-0'}`}>
+                  <div className="font-mono text-red-500 font-bold text-sm tracking-[0.2em] animate-pulse border-b border-red-500/30 pb-2">
+                      CRITICAL ERROR DETECTED
+                  </div>
+                  
+                  <div className="text-7xl font-mono font-black text-red-600 animate-pulse tabular-nums drop-shadow-[0_0_10px_rgba(255,0,0,0.8)]">
+                      00:0{finalSeconds}
+                  </div>
+
+                  <div className="font-mono text-[10px] text-red-400/70 max-w-[250px] leading-relaxed uppercase">
+                      System integrity compromised.<br/>Initiating emergency shutdown protocol.
+                  </div>
+              </div>
+
+              {/* Footer */}
+              <div className={`absolute bottom-0 left-0 w-full border-t border-red-600/30 p-2 bg-red-900/10 flex justify-between items-center font-mono text-[9px] text-red-500/50 transition-opacity duration-300 ${animState === 'content' ? 'opacity-100' : 'opacity-0'}`}>
+                  <span>ERR_CODE: 0xDEADBEEF</span>
+                  <span>CORE_DUMP...</span>
+              </div>
+          </div>
+      </div>
+    );
+  }
+
+  // 3. BLACKOUT (TV Turn Off)
+  if (phase === 'blackout') {
+      return (
+          <div className="fixed inset-0 z-[10000] bg-black overflow-hidden pointer-events-none">
+              <div className="tv-off-container">
+                  <div className="tv-off-flash-overlay"></div>
+              </div>
+          </div>
+      );
+  }
+
+  return null;
 }
 
 interface RetroScreenProps {
@@ -75,6 +166,8 @@ interface RetroScreenProps {
   currentTrack: AudioTrack | undefined;
   bgMedia: { type: 'image' | 'video', url: string } | null;
   bgColor: string;
+  bgPattern?: string;
+  bgPatternConfig?: PatternConfig;
   
   // Configs
   visualizerConfig: VisualizerConfig;
@@ -85,10 +178,13 @@ interface RetroScreenProps {
   marqueeConfig: MarqueeConfig;
   
   // Reboot State
-  rebootPhase: 'idle' | 'waiting' | 'countdown';
+  rebootPhase: 'idle' | 'waiting' | 'countdown' | 'blackout';
   trackRemaining: number;
   finalTimer: number;
   
+  // Progress
+  progress?: number;
+
   // UI State
   focusMode: boolean;
   setFocusMode: (v: boolean) => void;
@@ -102,9 +198,9 @@ interface RetroScreenProps {
 }
 
 const RetroScreen = forwardRef<HTMLDivElement, RetroScreenProps>(({
-  analyser, isPlaying, currentTrack, bgMedia, bgColor,
+  analyser, isPlaying, currentTrack, bgMedia, bgColor, bgPattern = 'none', bgPatternConfig,
   visualizerConfig, showVisualizer, dvdConfig, showDvd, effectsConfig, marqueeConfig,
-  rebootPhase, trackRemaining, finalTimer,
+  rebootPhase, trackRemaining, finalTimer, progress = 0,
   focusMode, setFocusMode, isDragging,
   onDragOver, onDragEnter, onDragEnter: onDragEnterProp, onDragLeave, onDrop
 }, externalRef) => {
@@ -198,7 +294,7 @@ const RetroScreen = forwardRef<HTMLDivElement, RetroScreenProps>(({
       <div 
         ref={shakeRef}
         onDoubleClick={() => setFocusMode(!focusMode)}
-        className={`relative w-full h-full bg-gray-900 transition-all duration-700 ${focusMode ? 'rounded-none border-0' : 'rounded-2xl border-4'} ${isDragging ? 'border-neon-blue shadow-[0_0_30px_#00f3ff]' : 'border-gray-800'} overflow-hidden group`}
+        className={`cursor-hide-center relative w-full h-full bg-gray-900 transition-all duration-700 ${focusMode ? 'rounded-none border-0' : 'rounded-2xl border-4'} ${isDragging ? 'border-neon-blue shadow-[0_0_30px_#00f3ff]' : 'border-gray-800'} overflow-hidden group`}
         onDragOver={onDragOver}
         onDragEnter={onDragEnter}
         onDragLeave={onDragLeave}
@@ -209,14 +305,14 @@ const RetroScreen = forwardRef<HTMLDivElement, RetroScreenProps>(({
             <div className="absolute top-4 right-4 z-50 flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
               <button 
                 onClick={() => setFocusMode(!focusMode)} 
-                className="text-white/60 hover:text-neon-blue p-2 bg-black/40 backdrop-blur rounded-full transition-colors border border-transparent hover:border-neon-blue/50"
+                className="text-neon-green p-2 bg-transparent rounded-full transition-all border border-transparent hover:bg-neon-green/20 hover:shadow-[0_0_15px_rgba(0,255,0,0.5)]"
                 title={focusMode ? "Exit Full Screen" : "Full Screen"}
               >
                   {focusMode ? <Minimize size={20} /> : <Maximize size={20} />}
               </button>
             </div>
 
-            {/* Reload Overlay */}
+            {/* Reload Overlay (Handles Waiting, Countdown, and Blackout phases) */}
             <ReloadOverlay 
               phase={rebootPhase} 
               trackRemaining={trackRemaining} 
@@ -234,14 +330,28 @@ const RetroScreen = forwardRef<HTMLDivElement, RetroScreenProps>(({
                 {/* 1. BACKGROUND LAYER (Z-0) */}
                 <MediaRenderer type={activeMedia ? activeMedia.type : 'color'} url={activeMedia?.url} bgColor={bgColor} effects={effectsConfig} />
                 
+                {/* 1.5 PATTERN OVERLAY (Z-1) */}
+                <PatternOverlay pattern={bgPattern} config={bgPatternConfig} />
+                
                 {/* 2. TRANSITION MASK LAYER (Z-5) */}
                 {/* Covers background but sits BEHIND visualizers */}
                 <TransitionEffect phase={transitionPhase} />
                 
                 {/* 3. VISUALIZATION & UI LAYERS (Z-10+) */}
-                {showVisualizer && <Visualizer analyser={analyser} isPlaying={isPlaying} config={visualizerConfig} fps={effectsConfig.fps} />}
+                {/* Force 120FPS for visualizer so it ignores the retro FPS limiter used elsewhere */}
+                {showVisualizer && <Visualizer analyser={analyser} isPlaying={isPlaying} config={visualizerConfig} fps={120} />}
                 {showDvd && <DvdLogo containerRef={containerRef} fps={effectsConfig.fps} effectsConfig={effectsConfig} config={dvdConfig} />}
                 
+                {/* Progress Bar (Retro Loading Style) */}
+                <ProgressBar 
+                    progress={progress} 
+                    visible={marqueeConfig.enabled && marqueeConfig.showProgress} 
+                    mode={marqueeConfig.progressMode}
+                    height={marqueeConfig.progressHeight}
+                    opacity={marqueeConfig.progressOpacity}
+                    color="#00ff00"
+                />
+
                 {/* Marquee Overlay */}
                 {marqueeConfig.enabled && (
                    <div className="absolute top-8 left-0 w-full h-24 z-20 pointer-events-none mix-blend-screen flex items-center">

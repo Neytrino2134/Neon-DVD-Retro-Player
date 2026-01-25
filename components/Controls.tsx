@@ -1,4 +1,5 @@
 
+
 import React, { useRef, useState } from 'react';
 import { Play, Pause, Square, SkipBack, SkipForward, FolderOpen, Music, Volume2, VolumeX, Trash2, AlertTriangle, ArrowDownAZ, Shuffle } from 'lucide-react';
 import { AudioTrack } from '../types';
@@ -106,6 +107,8 @@ const Controls: React.FC<ControlsProps> = ({
     setShowClearConfirm(false);
   };
 
+  const remainingTime = Math.max(0, duration - currentTime);
+
   return (
     <div className="relative w-full h-full flex flex-col bg-gray-900 border-l-4 border-gray-800 p-4 shadow-inner">
       
@@ -165,20 +168,32 @@ const Controls: React.FC<ControlsProps> = ({
         />
       </div>
 
-      {/* Progress Bar (Scrubber) */}
+      {/* Progress Bar (Scrubber) with Stop Button */}
       <div className="mb-4">
         <div className="flex justify-between text-xs font-mono text-neon-blue mb-1">
           <span>{formatTime(currentTime)}</span>
-          <span>{formatTime(duration)}</span>
+          <div className="flex gap-2">
+            <span>{formatTime(duration)}</span>
+            <span className="text-gray-500">(-{formatTime(remainingTime)})</span>
+          </div>
         </div>
-        <input
-          type="range"
-          min="0"
-          max={duration || 100}
-          value={currentTime}
-          onChange={(e) => onSeek(parseFloat(e.target.value))}
-          className="w-full"
-        />
+        <div className="flex items-center gap-3">
+            <button
+                onClick={onStop}
+                className="p-2 border border-neon-blue text-neon-blue rounded hover:bg-neon-blue hover:text-black transition-all shadow-[0_0_5px_#00f3ff] hover:shadow-[0_0_15px_#00f3ff] active:scale-95 shrink-0"
+                title="Stop"
+            >
+                <Square size={14} fill="currentColor" />
+            </button>
+            <input
+                type="range"
+                min="0"
+                max={duration || 100}
+                value={currentTime}
+                onChange={(e) => onSeek(parseFloat(e.target.value))}
+                className="w-full flex-1"
+            />
+        </div>
       </div>
 
       {/* Main Buttons */}

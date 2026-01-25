@@ -1,11 +1,13 @@
 
 import React, { useRef, useState, useEffect } from 'react';
-import { Settings, Eye, Disc, Image as ImageIcon, Activity, Zap, Layers, Terminal, AlertTriangle, Tv, ChevronUp, ChevronDown, Download, Type, Bug, Trash2, List, Timer, Power, MessageSquare, CheckSquare, Square, AudioWaveform } from 'lucide-react';
-import { VisualizerConfig, EffectsConfig, DvdConfig, MarqueeConfig, BackgroundMedia, HologramCategory } from '../types';
+import { Settings, Eye, Disc, Image as ImageIcon, Activity, Zap, Layers, Terminal, AlertTriangle, Tv, ChevronUp, ChevronDown, Download, Type, Bug, Trash2, List, Timer, Power, MessageSquare, CheckSquare, Square, AudioWaveform, Info, Music, FolderOpen, Grid, Clock, Palette } from 'lucide-react';
+import { VisualizerConfig, EffectsConfig, DvdConfig, MarqueeConfig, BackgroundMedia, HologramCategory, PatternConfig } from '../types';
 import RangeControl from './settings/RangeControl';
 import VisualizerSettings from './settings/VisualizerSettings';
 import CustomSelect from './settings/CustomSelect';
+import ToggleSwitch from './settings/ToggleSwitch';
 import { useLanguage } from '../contexts/LanguageContext';
+import { APP_VERSION } from '../lib/version';
 
 interface SettingsPanelProps {
   showVisualizer: boolean;
@@ -22,13 +24,19 @@ interface SettingsPanelProps {
   setEffectsConfig: (config: EffectsConfig) => void;
   bgColor: string;
   setBgColor: (color: string) => void;
+  bgPattern?: string;
+  setBgPattern?: (pattern: string) => void;
+  bgPatternConfig?: PatternConfig;
+  setBgPatternConfig?: (config: PatternConfig) => void;
   onBgMediaUpload: (files: FileList) => void;
+  onAudioUpload: (files: FileList) => void;
   bgMedia: { type: 'image' | 'video', url: string } | null;
   bgList: BackgroundMedia[];
   currentBgIndex: number;
   onRemoveBg: (id: string) => void;
   onMoveBg: (index: number, dir: 'up' | 'down') => void;
   onSelectBg: (index: number) => void;
+  onDeselectBg?: () => void;
   onClearBgMedia: () => void;
   onExportConfig: () => void;
   bgAutoplayInterval: number;
@@ -38,7 +46,22 @@ interface SettingsPanelProps {
   setCrossfadeDuration: (val: number) => void;
 }
 
-const BG_PALETTE = ['#0f172a', '#000000', '#1a0505', '#051a05', '#05051a', '#1a051a'];
+const BG_PALETTE = [
+  '#0f172a', '#000000', '#1a0505', '#051a05', '#05051a', '#1a051a',
+  '#1a1a1a', '#2d1b2e', '#001a1a', '#2e2e2e'
+];
+
+const PATTERNS = [
+  { id: 'none', label: 'NONE' },
+  { id: 'grid', label: 'GRID' },
+  { id: 'dots', label: 'DOTS' },
+  { id: 'scan-v', label: 'SCAN V' },
+  { id: 'scan-h', label: 'SCAN H' },
+  { id: 'diag', label: 'DIAG' },
+  { id: 'checker', label: 'CHECK' },
+  { id: 'circuit', label: 'TECH' },
+  { id: 'matrix', label: 'CODE' },
+];
 
 const FPS_OPTIONS = [
   { value: 60, label: '60 FPS (OFF)' },
@@ -51,14 +74,17 @@ const FPS_OPTIONS = [
 const SettingsPanel: React.FC<SettingsPanelProps> = ({
   showVisualizer, setShowVisualizer, showDvd, setShowDvd, marqueeConfig, setMarqueeConfig,
   visualizerConfig, setVisualizerConfig, dvdConfig, setDvdConfig,
-  effectsConfig, setEffectsConfig, bgColor, setBgColor,
-  onBgMediaUpload, bgMedia, bgList, currentBgIndex, onRemoveBg, onMoveBg, onSelectBg, onClearBgMedia, onExportConfig,
+  effectsConfig, setEffectsConfig, bgColor, setBgColor, bgPattern = 'none', setBgPattern, bgPatternConfig, setBgPatternConfig,
+  onBgMediaUpload, onAudioUpload, bgMedia, bgList, currentBgIndex, onRemoveBg, onMoveBg, onSelectBg, onDeselectBg, onClearBgMedia, onExportConfig,
   bgAutoplayInterval, setBgAutoplayInterval, onScheduleReload,
   crossfadeDuration, setCrossfadeDuration
 }) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const audioInputRef = useRef<HTMLInputElement>(null);
   const [expandedState, setExpandedState] = useState<Record<string, boolean>>({ mixer: true }); // Expand mixer by default
   const [showBgList, setShowBgList] = useState(false);
+  const [showBgSettings, setShowBgSettings] = useState(false);
+  const [expandTimeScale, setExpandTimeScale] = useState(true);
   const { language, setLanguage, t } = useLanguage();
 
   const toggleExpand = (id: string) => {
@@ -115,6 +141,77 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
       content: <VisualizerSettings config={visualizerConfig} update={updateVisualizer} />
     },
     {
+      id: 'marquee',
+      label: t('top_marquee'),
+      icon: Type,
+      isEnabled: marqueeConfig.enabled,
+      onToggle: () => updateMarquee('enabled', !marqueeConfig.enabled),
+      content: (
+        <div className="pt-2">
+            {/* Custom Collapsible for Time Scale (Progress Bar) */}
+            <div className="bg-gray-800/20 border border-gray-700/50 rounded overflow-hidden mb-3 hover:border-gray-600 transition-colors">
+              <div className="flex items-center justify-between p-3">
+                <div 
+                   className="flex items-center gap-3 cursor-pointer flex-1"
+                   onClick={() => setExpandTimeScale(!expandTimeScale)}
+                >
+                    <div className="text-neon-yellow opacity-80">
+                        <Clock size={16} />
+                    </div>
+                    <span className="font-mono text-[11px] tracking-widest text-white uppercase">{t('time_scale')}</span>
+                    {marqueeConfig.showProgress && (
+                        <ChevronDown size={14} className={`text-neon-blue opacity-70 transition-transform ${expandTimeScale ? 'rotate-180' : ''}`} />
+                    )}
+                </div>
+                <button
+                    onClick={() => updateMarquee('showProgress', !marqueeConfig.showProgress)}
+                    className={`relative w-10 h-5 rounded-full transition-all duration-300 shadow-inner ml-2
+                    ${marqueeConfig.showProgress ? 'bg-neon-purple shadow-[0_0_8px_rgba(188,19,254,0.5)]' : 'bg-gray-700'}
+                    `}
+                >
+                    <div className={`absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full shadow-md transition-transform duration-300
+                    ${marqueeConfig.showProgress ? 'translate-x-5' : 'translate-x-0'}
+                    `}></div>
+                </button>
+              </div>
+              
+              {/* Collapsible Progress Bar Settings */}
+              <div className={`transition-[max-height,opacity,padding] duration-300 ease-in-out overflow-hidden ${marqueeConfig.showProgress && expandTimeScale ? 'max-h-60 opacity-100 p-3 pt-0' : 'max-h-0 opacity-0 p-0'}`}>
+                <div className="pl-4 pt-2 space-y-3 border-l-2 border-neon-purple/30 ml-2">
+                   <CustomSelect 
+                      label={t('prog_mode')}
+                      value={marqueeConfig.progressMode || 'continuous'}
+                      options={[
+                        { value: 'continuous', label: t('prog_cont') },
+                        { value: 'blocks', label: t('prog_blocks') }
+                      ]}
+                      onChange={v => updateMarquee('progressMode', v)}
+                   />
+                   <RangeControl 
+                      label={t('prog_height')} 
+                      value={marqueeConfig.progressHeight || 4} 
+                      min={2} max={20} step={1} 
+                      onChange={v => updateMarquee('progressHeight', v)} 
+                      className="mb-0"
+                   />
+                   <RangeControl 
+                      label={t('prog_opacity')} 
+                      value={marqueeConfig.progressOpacity || 0.8} 
+                      min={0.1} max={1} step={0.1} 
+                      onChange={v => updateMarquee('progressOpacity', v)} 
+                      className="mb-0"
+                   />
+                </div>
+              </div>
+            </div>
+
+            <RangeControl label={t('speed')} value={marqueeConfig.speed} min={0.5} max={10} step={0.5} onChange={v => updateMarquee('speed', v)} />
+            <RangeControl label={t('opacity')} value={marqueeConfig.opacity} min={0} max={1} step={0.1} onChange={v => updateMarquee('opacity', v)} />
+            <RangeControl label={t('text_size')} value={marqueeConfig.fontSize} min={12} max={120} step={2} onChange={v => updateMarquee('fontSize', v)} />
+        </div>
+      )
+    },
+    {
       id: 'dvd',
       label: t('dvd_saver'),
       icon: Disc,
@@ -125,20 +222,6 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
           <RangeControl label={t('size')} value={dvdConfig.size} min={60} max={300} step={10} onChange={v => updateDvd('size', v)} />
           <RangeControl label={t('speed')} value={dvdConfig.speed} min={1} max={15} step={1} onChange={v => updateDvd('speed', v)} />
           <RangeControl label={t('opacity')} value={dvdConfig.opacity} min={0} max={1} step={0.1} onChange={v => updateDvd('opacity', v)} />
-        </div>
-      )
-    },
-    {
-      id: 'marquee',
-      label: t('top_marquee'),
-      icon: Type,
-      isEnabled: marqueeConfig.enabled,
-      onToggle: () => updateMarquee('enabled', !marqueeConfig.enabled),
-      content: (
-        <div className="pt-2">
-            <RangeControl label={t('speed')} value={marqueeConfig.speed} min={0.5} max={10} step={0.5} onChange={v => updateMarquee('speed', v)} />
-            <RangeControl label={t('opacity')} value={marqueeConfig.opacity} min={0} max={1} step={0.1} onChange={v => updateMarquee('opacity', v)} />
-            <RangeControl label={t('text_size')} value={marqueeConfig.fontSize} min={12} max={120} step={2} onChange={v => updateMarquee('fontSize', v)} />
         </div>
       )
     },
@@ -276,7 +359,13 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
         <div className="flex items-center justify-between pb-2">
           <div className="flex items-center gap-2">
             <Settings className="animate-spin-slow text-neon-yellow" size={24} />
-            <h2 className="text-xl font-mono text-white">{t('system')}</h2>
+            <div className="flex items-center gap-3">
+                <h2 className="text-xl font-mono text-white leading-none">{t('system')}</h2>
+                <div className="flex items-center gap-1.5 opacity-60 pt-1">
+                    <div className="w-1.5 h-1.5 bg-neon-green rounded-full animate-pulse"></div>
+                    <span className="text-[9px] font-mono text-neon-blue tracking-widest">{APP_VERSION}</span>
+                </div>
+            </div>
           </div>
           
           <div className="flex items-center gap-2">
@@ -361,7 +450,7 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
 
               <div 
                 className={`transition-[max-height,opacity] duration-300 ease-in-out overflow-hidden
-                  ${isExpanded && m.isEnabled ? 'max-h-[1200px] opacity-100' : 'max-h-0 opacity-0'}
+                  ${isExpanded && m.isEnabled ? 'max-h-[3000px] opacity-100' : 'max-h-0 opacity-0'}
                 `}
               >
                 <div className="p-3 pt-0 border-t border-gray-700/50">
@@ -376,24 +465,88 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
       <div className="p-4 bg-gray-900 border-t border-gray-800 z-10 shrink-0 space-y-3">
         <div>
           <h3 className="flex items-center gap-2 text-xs font-mono text-white mb-2 opacity-80"><Layers size={14} className="text-neon-yellow" /> {t('background')}</h3>
-          <div className="grid grid-cols-6 gap-2 mb-4">
-            {BG_PALETTE.map(c => <button key={c} onClick={() => { setBgColor(c); onClearBgMedia(); }} className={`h-6 rounded border-2 ${bgColor === c && !bgMedia ? 'border-neon-purple shadow-[0_0_10px_#bc13fe]' : 'border-gray-600'}`} style={{ backgroundColor: c }} />)}
+          
+          {/* Colors & Patterns Collapsible */}
+          <div className="rounded border border-gray-700 bg-black/40 overflow-hidden mb-2">
+              <button 
+                  onClick={() => setShowBgSettings(!showBgSettings)}
+                  className="w-full flex items-center justify-between p-2 text-xs font-mono text-gray-400 hover:text-white hover:bg-gray-800 transition-colors"
+              >
+                  <div className="flex items-center gap-2">
+                      <Palette size={12} />
+                      <span>COLORS & PATTERNS</span>
+                  </div>
+                  <ChevronDown size={12} className={`transition-transform duration-300 ${showBgSettings ? 'rotate-180' : ''}`} />
+              </button>
+              
+              <div className={`transition-all duration-300 ease-in-out overflow-hidden px-2 ${showBgSettings ? 'max-h-[500px] py-2 border-t border-gray-800' : 'max-h-0'}`}>
+                {/* Colors */}
+                <div className="grid grid-cols-5 gap-1.5 mb-3">
+                  {BG_PALETTE.map(c => (
+                    <button 
+                      key={c} 
+                      onClick={() => { 
+                        setBgColor(c); 
+                        // Do not clear media list, just deselect current media
+                        if (onDeselectBg) onDeselectBg(); 
+                      }} 
+                      className={`h-6 rounded-sm border ${bgColor === c && !bgMedia ? 'border-neon-purple shadow-[0_0_10px_#bc13fe] scale-105' : 'border-gray-600 hover:border-gray-400'}`} 
+                      style={{ backgroundColor: c }} 
+                    />
+                  ))}
+                </div>
+                
+                {/* Patterns */}
+                <div className="grid grid-cols-3 gap-1.5 mb-3">
+                  {setBgPattern && PATTERNS.map(p => (
+                    <button 
+                      key={p.id}
+                      onClick={() => setBgPattern(p.id)}
+                      className={`
+                          px-1 py-1 text-[9px] font-mono border rounded-sm transition-all
+                          ${bgPattern === p.id 
+                              ? 'border-neon-blue bg-neon-blue/20 text-neon-blue shadow-[0_0_5px_rgba(0,243,255,0.4)]' 
+                              : 'border-gray-700 bg-black/20 text-gray-400 hover:border-gray-500'}
+                      `}
+                    >
+                      {p.label}
+                    </button>
+                  ))}
+                </div>
+
+                {/* Pattern Intensity & Scale - Only show if pattern is not 'none' */}
+                {bgPattern !== 'none' && bgPatternConfig && setBgPatternConfig && (
+                   <div className="space-y-3 pt-2 border-t border-gray-800">
+                      <RangeControl 
+                        label={t('intensity')} 
+                        value={bgPatternConfig.intensity} 
+                        min={0} max={1} step={0.05} 
+                        onChange={(v) => setBgPatternConfig({ ...bgPatternConfig, intensity: v })} 
+                        className="mb-0"
+                      />
+                      <RangeControl 
+                        label={t('scale')} 
+                        value={bgPatternConfig.scale} 
+                        min={0.1} max={5.0} step={0.1} 
+                        onChange={(v) => setBgPatternConfig({ ...bgPatternConfig, scale: v })} 
+                        className="mb-0"
+                      />
+                   </div>
+                )}
+              </div>
           </div>
           
           <div className="space-y-2">
-            <button onClick={() => fileInputRef.current?.click()} className="w-full flex items-center justify-center gap-2 p-2 bg-gray-800 border border-gray-600 rounded text-gray-300 hover:text-white hover:border-neon-yellow transition-colors">
-                <ImageIcon size={16} className="text-neon-yellow" /> <span className="font-mono text-xs">{t('load_img')} ({bgMedia ? 'ACTIVE' : 'NONE'})</span>
-            </button>
-            
+            {/* Moved BG List Resource ABOVE Buttons */}
             {bgList.length > 0 && (
-                <div className="rounded border border-gray-700 bg-black/40 overflow-hidden">
+                <div className="rounded border border-gray-700 bg-black/40 overflow-hidden mb-2">
                     <button 
                         onClick={() => setShowBgList(!showBgList)}
                         className="w-full flex items-center justify-between p-2 text-xs font-mono text-gray-400 hover:text-white hover:bg-gray-800 transition-colors"
                     >
                         <div className="flex items-center gap-2">
                             <List size={12} />
-                            <span>LOADED RESOURCES [{bgList.length}]</span>
+                            <span>BG RESOURCES [{bgList.length}]</span>
                         </div>
                         <ChevronDown size={12} className={`transition-transform duration-300 ${showBgList ? 'rotate-180' : ''}`} />
                     </button>
@@ -467,6 +620,19 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
                     </div>
                 </div>
             )}
+
+            <div className="flex gap-2">
+                <button onClick={() => fileInputRef.current?.click()} className="flex-1 flex items-center justify-center gap-2 p-2 bg-gray-800 border border-gray-600 rounded text-gray-300 hover:text-white hover:border-neon-yellow transition-colors" title="Load Background Image/Video">
+                    <ImageIcon size={16} className="text-neon-yellow" /> <span className="font-mono text-xs">IMG/VID</span>
+                </button>
+                <button onClick={() => audioInputRef.current?.click()} className="flex-1 flex items-center justify-center gap-2 p-2 bg-gray-800 border border-gray-600 rounded text-gray-300 hover:text-white hover:border-neon-green transition-colors" title="Load Audio Tracks">
+                    <Music size={16} className="text-neon-green" /> <span className="font-mono text-xs">AUDIO</span>
+                </button>
+                <button onClick={onExportConfig} className="shrink-0 w-10 flex items-center justify-center p-2 bg-gray-800 border border-neon-purple text-neon-purple rounded hover:bg-neon-purple hover:text-black hover:shadow-[0_0_15px_#bc13fe] transition-all active:scale-95" title={t('export_config')}>
+                   <Download size={16} />
+                </button>
+            </div>
+            
           </div>
 
           <input 
@@ -482,16 +648,19 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
             multiple
             className="hidden" 
           />
-        </div>
-
-        <div className="pt-2 border-t border-gray-800">
-           <button 
-             onClick={onExportConfig}
-             className="w-full flex items-center justify-center gap-2 p-2 bg-gray-800 border border-neon-purple text-neon-purple rounded hover:bg-neon-purple hover:text-black hover:shadow-[0_0_15px_#bc13fe] transition-all active:scale-95"
-           >
-              <Download size={16} />
-              <span className="font-mono text-xs font-bold uppercase tracking-widest">{t('export_config')}</span>
-           </button>
+          <input 
+            type="file" 
+            ref={audioInputRef} 
+            onChange={e => {
+                if(e.target.files && e.target.files.length > 0) {
+                    onAudioUpload(e.target.files);
+                    e.target.value = '';
+                }
+            }} 
+            accept="audio/*" 
+            multiple
+            className="hidden" 
+          />
         </div>
       </div>
     </div>

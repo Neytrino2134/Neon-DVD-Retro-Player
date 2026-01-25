@@ -1,5 +1,4 @@
 
-
 export const en = {
   system: "SYSTEM",
   modules: "MODULES",
@@ -59,6 +58,12 @@ export const en = {
   normalize: "NORMALIZE",
   mirror: "MIRROR",
   stroke: "STROKE",
+  visual_segmented: "SEGMENTED BARS",
+  seg_height: "BLOCK HEIGHT",
+  seg_gap: "BLOCK GAP",
+  visual_tips: "SHOW TIPS (PEAKS)",
+  tip_height: "TIP THICKNESS",
+  tip_speed: "GRAVITY SPEED",
   bar_count: "BAR COUNT",
   bar_gap: "BAR GAP",
   min_freq: "LOW CUTOFF",
@@ -69,6 +74,12 @@ export const en = {
   
   // Marquee
   text_size: "TEXT SIZE",
+  time_scale: "TIME SCALE",
+  prog_mode: "PROGRESS MODE",
+  prog_cont: "CONTINUOUS",
+  prog_blocks: "DIGITAL BLOCKS",
+  prog_height: "BAR THICKNESS",
+  prog_opacity: "BAR OPACITY",
   
   // Glitch Variants
   glitch_variant: "GLITCH VARIANT",

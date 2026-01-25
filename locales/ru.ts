@@ -1,5 +1,4 @@
 
-
 export const ru = {
   system: "СИСТЕМА",
   modules: "МОДУЛИ",
@@ -59,6 +58,12 @@ export const ru = {
   normalize: "НОРМАЛИЗАЦИЯ",
   mirror: "ЗЕРКАЛО",
   stroke: "ОБВОДКА",
+  visual_segmented: "СЕГМЕНТЫ (БЛОКИ)",
+  seg_height: "ВЫСОТА БЛОКА",
+  seg_gap: "ОТСТУП БЛОКА",
+  visual_tips: "ВЕРХУШКИ (ПИКИ)",
+  tip_height: "ТОЛЩИНА ПИКА",
+  tip_speed: "ГРАВИТАЦИЯ",
   bar_count: "КОЛ-ВО ПОЛОС",
   bar_gap: "ОТСТУП (GAP)",
   min_freq: "СРЕЗ НИЗКИХ (CUT OFF)",
@@ -69,6 +74,12 @@ export const ru = {
   
   // Marquee
   text_size: "РАЗМЕР ТЕКСТА",
+  time_scale: "ШКАЛА ВРЕМЕНИ",
+  prog_mode: "ТИП ШКАЛЫ",
+  prog_cont: "СПЛОШНАЯ",
+  prog_blocks: "ЦИФРОВЫЕ БЛОКИ",
+  prog_height: "ВЫСОТА ШКАЛЫ",
+  prog_opacity: "ПРОЗРАЧНОСТЬ",
   
   // Glitch Variants
   glitch_variant: "ВАРИАНТ ГЛИТЧА",
@@ -76,7 +87,7 @@ export const ru = {
   variant_v2: "V2 (БЛОКИ)",
   
   // Options
-  style_retro: "РЕТРО (МУЛЬТИ)",
+  style_retro: "РЕТРО (MULTI)",
   style_blue: "NEON СИНИЙ",
   style_pink: "NEON РОЗОВЫЙ",
   style_matrix: "МАТРИЦА",

@@ -1,6 +1,6 @@
 
 import { useState, useEffect, useCallback } from 'react';
-import { VisualizerConfig, DvdConfig, EffectsConfig, MarqueeConfig, BackgroundMedia } from '../types';
+import { VisualizerConfig, DvdConfig, EffectsConfig, MarqueeConfig, BackgroundMedia, PatternConfig } from '../types';
 import { getAllBackgrounds, saveBackground, clearBackgrounds, deleteBackground } from '../lib/db';
 
 const STORAGE_KEYS = {
@@ -8,6 +8,8 @@ const STORAGE_KEYS = {
   DVD: 'neon_dvd_config',
   EFFECTS: 'neon_effects_config',
   BG_COLOR: 'neon_bg_color',
+  BG_PATTERN: 'neon_bg_pattern',
+  BG_PATTERN_CONFIG: 'neon_bg_pattern_config',
   SHOW_VISUALIZER: 'neon_show_visualizer',
   SHOW_DVD: 'neon_show_dvd',
   MARQUEE: 'neon_marquee_config',
@@ -25,24 +27,43 @@ export const useAppConfig = () => {
   const [showDvd, setShowDvd] = useState(() => getInitial(STORAGE_KEYS.SHOW_DVD, true));
   
   const [marqueeConfig, setMarqueeConfig] = useState<MarqueeConfig>(() => {
-    const initial = getInitial(STORAGE_KEYS.MARQUEE, {
-      enabled: true, speed: 1, opacity: 0.9, fontSize: 40
-    });
-    // Merge with defaults to ensure fontSize exists if loading old config
-    return {
+    const defaults = {
       enabled: true, 
+      showProgress: true, 
+      progressMode: 'blocks',
+      progressHeight: 20,
+      progressOpacity: 0.6,
       speed: 1, 
       opacity: 0.9, 
-      fontSize: 40,
+      fontSize: 40
+    } as MarqueeConfig;
+
+    const initial = getInitial(STORAGE_KEYS.MARQUEE, defaults);
+    
+    // Merge with defaults to ensure new props exist
+    return {
+      ...defaults,
       ...initial
     };
   });
 
-  const [visualizerConfig, setVisualizerConfig] = useState<VisualizerConfig>(() => getInitial(STORAGE_KEYS.VISUALIZER, {
-    style: 'blue', position: 'bottom', barCount: 128, sensitivity: 1.5, fillOpacity: 0.3,
-    strokeEnabled: true, strokeOpacity: 0.8, normalize: false, minFrequency: 0, maxFrequency: 100, 
-    barGap: 2, mirror: false,
-  }));
+  const [visualizerConfig, setVisualizerConfig] = useState<VisualizerConfig>(() => {
+    const initial = getInitial(STORAGE_KEYS.VISUALIZER, {
+      style: 'blue', position: 'bottom', barCount: 128, sensitivity: 1.5, fillOpacity: 0.3,
+      strokeEnabled: true, strokeOpacity: 0.8, showTips: true, normalize: false, minFrequency: 0, maxFrequency: 100, 
+      barGap: 2, mirror: false, segmented: false, segmentHeight: 4, segmentGap: 2,
+      tipHeight: 2, tipSpeed: 15
+    });
+
+    // Merge for backward compatibility
+    return {
+        style: 'blue', position: 'bottom', barCount: 128, sensitivity: 1.5, fillOpacity: 0.3,
+        strokeEnabled: true, strokeOpacity: 0.8, showTips: true, normalize: false, minFrequency: 0, maxFrequency: 100, 
+        barGap: 2, mirror: false, segmented: false, segmentHeight: 4, segmentGap: 2,
+        tipHeight: 2, tipSpeed: 15,
+        ...initial
+    }
+  });
 
   const [dvdConfig, setDvdConfig] = useState<DvdConfig>(() => getInitial(STORAGE_KEYS.DVD, { size: 120, speed: 2, opacity: 1.0 }));
 
@@ -94,6 +115,8 @@ export const useAppConfig = () => {
   });
   
   const [bgColor, setBgColor] = useState(() => localStorage.getItem(STORAGE_KEYS.BG_COLOR) || '#0f172a');
+  const [bgPattern, setBgPattern] = useState(() => localStorage.getItem(STORAGE_KEYS.BG_PATTERN) || 'none');
+  const [bgPatternConfig, setBgPatternConfig] = useState<PatternConfig>(() => getInitial(STORAGE_KEYS.BG_PATTERN_CONFIG, { intensity: 0.25, scale: 1.0 }));
   
   // Background State: List + Current Index
   const [bgList, setBgList] = useState<BackgroundMedia[]>([]);
@@ -108,11 +131,13 @@ export const useAppConfig = () => {
     localStorage.setItem(STORAGE_KEYS.DVD, JSON.stringify(dvdConfig));
     localStorage.setItem(STORAGE_KEYS.EFFECTS, JSON.stringify(effectsConfig));
     localStorage.setItem(STORAGE_KEYS.BG_COLOR, bgColor);
+    localStorage.setItem(STORAGE_KEYS.BG_PATTERN, bgPattern);
+    localStorage.setItem(STORAGE_KEYS.BG_PATTERN_CONFIG, JSON.stringify(bgPatternConfig));
     localStorage.setItem(STORAGE_KEYS.SHOW_VISUALIZER, JSON.stringify(showVisualizer));
     localStorage.setItem(STORAGE_KEYS.SHOW_DVD, JSON.stringify(showDvd));
     localStorage.setItem(STORAGE_KEYS.MARQUEE, JSON.stringify(marqueeConfig));
     localStorage.setItem(STORAGE_KEYS.BG_AUTOPLAY, JSON.stringify(bgAutoplayInterval));
-  }, [visualizerConfig, dvdConfig, effectsConfig, bgColor, showVisualizer, showDvd, marqueeConfig, bgAutoplayInterval]);
+  }, [visualizerConfig, dvdConfig, effectsConfig, bgColor, bgPattern, bgPatternConfig, showVisualizer, showDvd, marqueeConfig, bgAutoplayInterval]);
 
   // Load Backgrounds from DB
   useEffect(() => {
@@ -198,6 +223,11 @@ export const useAppConfig = () => {
       }
   };
 
+  // Switch to color mode without clearing list
+  const deselectBg = () => {
+      setCurrentBgIndex(-1);
+  };
+
   const handleClearBg = async () => {
     // Revoke URLs to free memory
     bgList.forEach(bg => URL.revokeObjectURL(bg.url));
@@ -230,7 +260,7 @@ export const useAppConfig = () => {
 
   const exportConfig = () => {
     const config = {
-      visualizerConfig, dvdConfig, effectsConfig, bgColor, showVisualizer, showDvd, marqueeConfig, bgAutoplayInterval, version: '1.0'
+      visualizerConfig, dvdConfig, effectsConfig, bgColor, bgPattern, bgPatternConfig, showVisualizer, showDvd, marqueeConfig, bgAutoplayInterval, version: '1.0'
     };
     const blob = new Blob([JSON.stringify(config, null, 2)], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
@@ -252,6 +282,8 @@ export const useAppConfig = () => {
         if (content.dvdConfig) setDvdConfig(content.dvdConfig);
         if (content.effectsConfig) setEffectsConfig(content.effectsConfig);
         if (content.bgColor) setBgColor(content.bgColor);
+        if (content.bgPattern) setBgPattern(content.bgPattern);
+        if (content.bgPatternConfig) setBgPatternConfig(content.bgPatternConfig);
         if (typeof content.showVisualizer === 'boolean') setShowVisualizer(content.showVisualizer);
         if (typeof content.showDvd === 'boolean') setShowDvd(content.showDvd);
         if (content.marqueeConfig) setMarqueeConfig(content.marqueeConfig);
@@ -271,12 +303,14 @@ export const useAppConfig = () => {
     dvdConfig, setDvdConfig,
     effectsConfig, setEffectsConfig,
     bgColor, setBgColor,
+    bgPattern, setBgPattern,
+    bgPatternConfig, setBgPatternConfig,
     bgMedia: bgList[currentBgIndex] || null, 
     bgList,
     currentBgIndex,
     bgAutoplayInterval, setBgAutoplayInterval,
     handleBgUpload, handleClearBg,
-    removeBg, moveBg, selectBg,
+    removeBg, moveBg, selectBg, deselectBg,
     nextBg, prevBg,
     bgCount: bgList.length,
     exportConfig, importConfig

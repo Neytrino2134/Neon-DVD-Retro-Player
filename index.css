@@ -168,3 +168,66 @@ input[type=range]::-webkit-slider-thumb,
 input[type=range]::-webkit-slider-runnable-track {
   cursor: none !important;
 }
+
+/* --- ANIMATIONS FOR REBOOT SEQUENCE --- */
+
+@keyframes slide-up {
+  0% { transform: translateY(100%); opacity: 0; }
+  100% { transform: translateY(0); opacity: 1; }
+}
+
+.animate-slide-up {
+  animation: slide-up 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+@keyframes fade-in-text {
+  0% { opacity: 0; transform: translateY(10px); }
+  100% { opacity: 1; transform: translateY(0); }
+}
+
+.animate-fade-in-text {
+  animation: fade-in-text 1s ease-out forwards;
+}
+
+@keyframes typewriter {
+  from { width: 0; }
+  to { width: 100%; }
+}
+
+.animate-typewriter {
+  overflow: hidden;
+  white-space: nowrap;
+  animation: typewriter 2s steps(40, end) forwards;
+}
+
+/* TV TURN OFF EFFECT */
+@keyframes tv-off-scale {
+  0% { transform: scale(1, 1); }
+  40% { transform: scale(1, 0.002); }
+  80% { transform: scale(0, 0.002); }
+  100% { transform: scale(0, 0); }
+}
+
+@keyframes tv-off-flash {
+  0% { background-color: transparent; }
+  40% { background-color: white; opacity: 1; }
+  80% { background-color: white; opacity: 0.5; }
+  100% { background-color: black; opacity: 1; }
+}
+
+.tv-off-container {
+  animation: tv-off-scale 0.5s ease-in forwards;
+  background: black;
+  position: absolute;
+  inset: 0;
+  z-index: 100;
+  transform-origin: center;
+}
+
+.tv-off-flash-overlay {
+  animation: tv-off-flash 0.6s ease-out forwards;
+  position: absolute;
+  inset: 0;
+  z-index: 101;
+  pointer-events: none;
+}
