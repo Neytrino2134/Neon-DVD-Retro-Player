@@ -1,4 +1,5 @@
 
+
 export const ru = {
   system: "СИСТЕМА",
   modules: "МОДУЛИ",
@@ -8,15 +9,21 @@ export const ru = {
   scanlines: "СКАНЛАЙНЫ",
   cyber_hack: "КИБЕР ВЗЛОМ",
   digital_glitch: "ЦИФРОВОЙ ГЛИТЧ",
+  debug_console: "КОНСОЛЬ ОТЛАДКИ",
+  holograms: "ГОЛОГРАММЫ",
   waveform_config: "НАСТРОЙКИ ВОЛНЫ",
   dvd_config: "НАСТРОЙКИ DVD",
   scanline_config: "НАСТРОЙКИ ЭЛТ",
   cyber_config: "КОНСОЛЬ ВЗЛОМА",
   glitch_config: "ГЛИТЧ ЭФФЕКТЫ",
+  debug_config: "СИСТЕМНЫЕ ЛОГИ",
   signal_processor: "ОБРАБОТКА СИГНАЛА",
   background: "ФОНОВЫЙ РЕЖИМ",
   load_img: "ЗАГРУЗИТЬ ФОН",
   export_config: "ЭКСПОРТ КОНФИГА",
+  mixer_deck: "DJ МИКШЕР",
+  crossfade_duration: "КРОССФЕЙД (СЕК)",
+  constant_power_hint: "Использует кривую постоянной мощности для плавности.",
   
   // Controls
   size: "РАЗМЕР",
@@ -31,6 +38,18 @@ export const ru = {
   pixelation: "ПИКСЕЛИЗАЦИЯ",
   static_noise: "БЕЛЫЙ ШУМ",
   vhs_jitter: "VHS ДРОЖАНИЕ",
+  chromatic_aberration: "ХРОМ. АБЕРРАЦИЯ",
+  msg_speed: "СКОР. ТЕКСТА",
+  msg_interval: "ИНТЕРВАЛ (С)",
+  hologram_incoming: "ВХОДЯЩЕЕ СООБЩЕНИЕ",
+
+  // Hologram Categories
+  cat_system: "СИСТЕМНЫЕ",
+  cat_interactive: "ИНТЕРАКТИВ",
+  cat_music: "МУЗЫКА/ВАЙБ",
+  cat_motivational: "МОТИВАЦИЯ",
+  cat_philosophy: "ФИЛОСОФИЯ",
+  cat_space: "ТАЙНЫ КОСМОСА",
   
   // Visualizer Specific
   position: "ПОЗИЦИЯ",
@@ -48,6 +67,9 @@ export const ru = {
   fill_opacity: "ПРОЗР. ЗАЛИВКИ",
   stroke_opacity: "ПРОЗР. ОБВОДКИ",
   
+  // Marquee
+  text_size: "РАЗМЕР ТЕКСТА",
+  
   // Glitch Variants
   glitch_variant: "ВАРИАНТ ГЛИТЧА",
   variant_v1: "V1 (ЧАСТИЦЫ)",
@@ -55,11 +77,38 @@ export const ru = {
   
   // Options
   style_retro: "РЕТРО (МУЛЬТИ)",
-  style_blue: "НЕОН СИНИЙ",
-  style_pink: "НЕОН РОЗОВЫЙ",
+  style_blue: "NEON СИНИЙ",
+  style_pink: "NEON РОЗОВЫЙ",
   style_matrix: "МАТРИЦА",
   style_inferno: "ИНФЕРНО",
   pos_top: "СВЕРХУ",
   pos_center: "ПО ЦЕНТРУ",
-  pos_bottom: "СНИЗУ"
+  pos_bottom: "СНИЗУ",
+
+  // Playlist
+  clear_playlist: "ОЧИСТИТЬ",
+  confirm_clear: "Вы уверены, что хотите удалить все треки?",
+  sort_az: "Сорт. по имени (А-Я)",
+  shuffle: "Перемешать",
+
+  // Background
+  auto_timer: "АВТО-СМЕНА (МИН)",
+
+  // System
+  system_down: "СИСТЕМА ОТКЛЮЧИТСЯ ЧЕРЕЗ",
+  reboot: "ТАЙМЕР ПЕРЕЗАГРУЗКИ",
+  reboot_scheduled: "ПЕРЕЗАГРУЗКА ЗАПЛАНИРОВАНА",
+  waiting_stream: "ОЖИДАНИЕ КОНЦА ТРЕКА",
+  system_critical: "Critical! System will down NOW!",
+
+  // Context Menu
+  ctx_actions: "БЫСТРОЕ МЕНЮ",
+  ctx_track_ctrl: "УПРАВЛЕНИЕ ТРЕКАМИ",
+  ctx_bg_ctrl: "УПРАВЛЕНИЕ ФОНОМ",
+  ctx_view_ctrl: "УПРАВЛЕНИЕ ВИДОМ",
+  ctx_next_track: "СЛЕД. ТРЕК",
+  ctx_prev_track: "ПРЕД. ТРЕК",
+  ctx_next_bg: "СЛЕД. ФОН",
+  ctx_prev_bg: "ПРЕД. ФОН",
+  ctx_fullscreen: "НА ВЕСЬ ЭКРАН",
 };

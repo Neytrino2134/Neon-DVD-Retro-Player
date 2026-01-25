@@ -75,7 +75,22 @@ const HACK_CODE_TEMPLATES = [
   "CRITICAL: {ERROR} AT ADDRESS 0x{HEX}",
   "WARNING: CPU TEMPERATURE {NUMBER}°C",
   "ALERT: INTRUSION DETECTED IN {DIR}",
-  "SUCCESS: {TARGET} COMPROMISED"
+  "SUCCESS: {TARGET} COMPROMISED",
+
+  // --- BRANDING & CUSTOM TEXT ---
+  "Neon Waves – Your Perfect Destination",
+  "Neon Waves: INITIALIZING...",
+  "USER: MeowMasterArt [VERIFIED]",
+  "CONTACT: MeowMasterArt@gmail.com",
+  "Admin: MeowMaster [GOD MODE]",
+  "MeowMaster is God of waves",
+  "Neon Waves best youtube channel",
+  "DOWNLOADING WAVE_DATA FROM NEON WAVES...",
+  "ACCESSING MEOWMASTER_ART ARCHIVES...",
+  "STREAMING: NEON WAVES PROTOCOL",
+  "YOUTUBE CHANNEL: NEON WAVES [SUBSCRIBED]",
+  "VIBE CHECK: NEON WAVES [PASSED]",
+  "RETRO_SONIC_ULTRA // MEOWMASTER_ART"
 ];
 
 const CyberHackEffect: React.FC<CyberHackEffectProps> = ({ effects }) => {
@@ -155,7 +170,8 @@ const CyberHackEffect: React.FC<CyberHackEffectProps> = ({ effects }) => {
         if (text.includes('ERROR') || text.includes('FAILED') || text.includes('DENIED') || text.includes('ALERT')) color = '#ff3333';
         else if (text.includes('WARNING') || text.includes('Running')) color = '#ffff00';
         else if (text.startsWith('>')) color = '#00f3ff';
-        else if (text.includes('SUCCESS') || text.includes('GRANTED')) color = '#00ff00';
+        else if (text.includes('SUCCESS') || text.includes('GRANTED') || text.includes('Neon Waves') || text.includes('MeowMaster')) color = '#00ff00';
+        else if (text.includes('Admin')) color = '#bc13fe'; // Purple for Admin
 
         // Difficulty determines how fast a progress bar fills or text types
         // Range 0.5 (Slow/Hard) to 2.0 (Fast/Easy)

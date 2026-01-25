@@ -3,6 +3,27 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Disable text selection globally for a better app-like experience */
+*, *::before, *::after {
+  -webkit-user-select: none;
+  -moz-user-select: none;
+  -ms-user-select: none;
+  user-select: none;
+}
+
+/* Allow text selection only in text inputs and textareas if they are used */
+input[type="text"], 
+input[type="password"], 
+input[type="email"], 
+input[type="number"], 
+input[type="search"], 
+textarea {
+  -webkit-user-select: text;
+  -moz-user-select: text;
+  -ms-user-select: text;
+  user-select: text;
+}
+
 body {
   background-color: #030712; /* Fallback for bg-gray-950 */
   color: white;
@@ -113,4 +134,37 @@ input[type=range]::-moz-range-thumb {
 
 input[type=range]:focus {
   outline: none;
+}
+
+@keyframes text-flash {
+  /* Idle state: Made lighter gray (#9ca3af) and increased opacity (0.85) to be more visible */
+  0%, 92% { color: #9ca3af; text-shadow: none; opacity: 0.85; }
+  
+  /* Flash state: Made slightly grayer (#d4d4d4) instead of pure white to reduce brightness */
+  93% { color: #d4d4d4; text-shadow: 0 0 8px #d4d4d4; opacity: 1; }
+  
+  /* Return to Idle */
+  94% { color: #9ca3af; text-shadow: none; opacity: 0.85; }
+  
+  /* Flash again */
+  96% { color: #d4d4d4; text-shadow: 0 0 8px #d4d4d4; opacity: 1; }
+  
+  /* Return to Idle */
+  100% { color: #9ca3af; text-shadow: none; opacity: 0.85; }
+}
+
+.animate-text-flash {
+  animation: text-flash 10s infinite;
+}
+
+/* Custom Cursor Support */
+body, button, a, input, select, textarea, [role="button"], .cursor-pointer {
+  cursor: none !important;
+}
+
+/* Ensure range inputs obey */
+input[type=range],
+input[type=range]::-webkit-slider-thumb,
+input[type=range]::-webkit-slider-runnable-track {
+  cursor: none !important;
 }

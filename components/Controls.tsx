@@ -1,7 +1,8 @@
 
-import React, { useRef } from 'react';
-import { Play, Pause, Square, SkipBack, SkipForward, FolderOpen, Music, Volume2, VolumeX } from 'lucide-react';
+import React, { useRef, useState } from 'react';
+import { Play, Pause, Square, SkipBack, SkipForward, FolderOpen, Music, Volume2, VolumeX, Trash2, AlertTriangle, ArrowDownAZ, Shuffle } from 'lucide-react';
 import { AudioTrack } from '../types';
+import { useLanguage } from '../contexts/LanguageContext';
 
 interface ControlsProps {
   tracks: AudioTrack[];
@@ -20,22 +21,35 @@ interface ControlsProps {
   onTrackSelect: (index: number) => void;
   onFilesSelected: (files: FileList) => void;
   onToggleCinema: () => void;
+  onClearPlaylist: () => void;
+  onSort: () => void;
+  onShuffle: () => void;
 }
 
 interface NeonButtonProps {
   onClick: () => void;
   children: React.ReactNode;
   className?: string;
+  color?: 'blue' | 'purple' | 'green' | 'pink';
 }
 
-const NeonButton: React.FC<NeonButtonProps> = ({ onClick, children, className = "" }) => (
-  <button
-    onClick={onClick}
-    className={`p-3 rounded-full border-2 border-neon-blue text-neon-blue shadow-[0_0_10px_#00f3ff] hover:bg-neon-blue hover:text-black hover:shadow-[0_0_20px_#00f3ff] transition-all active:scale-95 ${className}`}
-  >
-    {children}
-  </button>
-);
+const NeonButton: React.FC<NeonButtonProps> = ({ onClick, children, className = "", color = 'blue' }) => {
+  const colorClasses = {
+    blue: "border-neon-blue text-neon-blue shadow-[0_0_10px_#00f3ff] hover:bg-neon-blue hover:shadow-[0_0_20px_#00f3ff]",
+    purple: "border-neon-purple text-neon-purple shadow-[0_0_10px_#bc13fe] hover:bg-neon-purple hover:shadow-[0_0_20px_#bc13fe]",
+    green: "border-neon-green text-neon-green shadow-[0_0_10px_#00ff00] hover:bg-neon-green hover:shadow-[0_0_20px_#00ff00]",
+    pink: "border-neon-pink text-neon-pink shadow-[0_0_10px_#ff00ff] hover:bg-neon-pink hover:shadow-[0_0_20px_#ff00ff]",
+  };
+
+  return (
+    <button
+      onClick={onClick}
+      className={`p-3 rounded-full border-2 transition-all active:scale-95 hover:text-black ${colorClasses[color]} ${className}`}
+    >
+      {children}
+    </button>
+  );
+};
 
 const formatTime = (seconds: number) => {
   if (!seconds || isNaN(seconds)) return "00:00";
@@ -61,8 +75,13 @@ const Controls: React.FC<ControlsProps> = ({
   onTrackSelect,
   onFilesSelected,
   onToggleCinema,
+  onClearPlaylist,
+  onSort,
+  onShuffle
 }) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [showClearConfirm, setShowClearConfirm] = useState(false);
+  const { t } = useLanguage();
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files.length > 0) {
@@ -72,8 +91,53 @@ const Controls: React.FC<ControlsProps> = ({
     }
   };
 
+  const requestClear = () => {
+    if (tracks.length > 0) {
+      setShowClearConfirm(true);
+    }
+  };
+
+  const confirmClear = () => {
+    onClearPlaylist();
+    setShowClearConfirm(false);
+  };
+
+  const cancelClear = () => {
+    setShowClearConfirm(false);
+  };
+
   return (
-    <div className="w-full h-full flex flex-col bg-gray-900 border-l-4 border-gray-800 p-4 shadow-inner">
+    <div className="relative w-full h-full flex flex-col bg-gray-900 border-l-4 border-gray-800 p-4 shadow-inner">
+      
+      {/* Confirmation Modal Overlay */}
+      {showClearConfirm && (
+        <div className="absolute inset-0 z-50 bg-black/90 backdrop-blur-sm flex items-center justify-center p-4 rounded-lg">
+          <div className="w-full bg-gray-900 border-2 border-red-500 rounded-lg p-4 shadow-[0_0_20px_rgba(255,0,0,0.4)] animate-pulse-fast">
+            <div className="flex flex-col items-center text-center gap-3">
+              <AlertTriangle className="text-red-500 w-10 h-10" />
+              <h3 className="text-white font-mono font-bold text-lg uppercase">Warning</h3>
+              <p className="text-gray-300 font-mono text-xs mb-2">
+                {t('confirm_clear')}
+              </p>
+              <div className="flex gap-3 w-full justify-center">
+                <button 
+                  onClick={confirmClear}
+                  className="px-4 py-2 bg-red-500 text-black font-mono font-bold rounded hover:bg-red-400 hover:shadow-[0_0_10px_#ff0000] transition-all"
+                >
+                  YES
+                </button>
+                <button 
+                  onClick={cancelClear}
+                  className="px-4 py-2 border border-gray-500 text-gray-300 font-mono rounded hover:bg-gray-800 hover:text-white transition-all"
+                >
+                  NO
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Header */}
       <div className="mb-6 flex items-center justify-between gap-2">
         <h2 className="text-xl md:text-2xl font-mono text-white drop-shadow-[0_0_5px_rgba(255,255,255,0.3)] animate-pulse hidden sm:block">
@@ -83,7 +147,7 @@ const Controls: React.FC<ControlsProps> = ({
         <div className="flex items-center gap-2 ml-auto">
           <button
             onClick={() => fileInputRef.current?.click()}
-            className="flex items-center gap-2 px-3 py-2 bg-gray-800 border border-neon-green text-neon-green rounded hover:bg-neon-green hover:text-black transition-colors shadow-neon-green"
+            className="flex items-center gap-2 px-3 py-2 bg-gray-800 border border-neon-green text-neon-green rounded hover:bg-neon-green hover:text-black transition-colors"
           >
             <FolderOpen size={18} />
             <span className="font-mono text-sm hidden lg:inline">LOAD</span>
@@ -119,29 +183,23 @@ const Controls: React.FC<ControlsProps> = ({
 
       {/* Main Buttons */}
       <div className="grid grid-cols-3 gap-4 mb-6 justify-items-center items-center">
-        <NeonButton onClick={onPrev}>
+        <NeonButton onClick={onPrev} color="blue">
           <SkipBack size={24} />
         </NeonButton>
         
         {isPlaying ? (
-          <NeonButton onClick={onPause} className="w-16 h-16 border-neon-pink text-neon-pink shadow-[0_0_10px_#ff00ff] hover:bg-neon-pink hover:text-black hover:shadow-[0_0_20px_#ff00ff]">
+          <NeonButton onClick={onPause} color="pink" className="w-16 h-16">
             <Pause size={32} />
           </NeonButton>
         ) : (
-          <NeonButton onClick={onPlay} className="w-16 h-16 border-neon-green text-neon-green shadow-[0_0_10px_#00ff00] hover:bg-neon-green hover:text-black hover:shadow-[0_0_20px_#00ff00]">
+          <NeonButton onClick={onPlay} color="purple" className="w-16 h-16">
             <Play size={32} />
           </NeonButton>
         )}
 
-        <NeonButton onClick={onNext}>
+        <NeonButton onClick={onNext} color="blue">
           <SkipForward size={24} />
         </NeonButton>
-
-        <div className="col-span-3 mt-2">
-           <NeonButton onClick={onStop} className="rounded-lg px-6 border-red-500 text-red-500 shadow-[0_0_10px_red] hover:bg-red-500 hover:text-black hover:shadow-[0_0_20px_red]">
-            <Square size={20} fill="currentColor" />
-          </NeonButton>
-        </div>
       </div>
 
       {/* Volume Control */}
@@ -181,7 +239,37 @@ const Controls: React.FC<ControlsProps> = ({
 
       {/* Playlist */}
       <div className="flex-1 overflow-hidden flex flex-col">
-        <h3 className="text-white font-mono mb-2 border-b border-gray-700 pb-1 opacity-80">PLAYLIST [{tracks.length}]</h3>
+        <div className="flex items-center justify-between border-b border-gray-700 pb-1 mb-2">
+            <div className="flex items-center gap-2">
+                <h3 className="text-white font-mono opacity-80">PLAYLIST [{tracks.length}]</h3>
+            </div>
+            {tracks.length > 0 && (
+                <div className="flex items-center gap-3">
+                    <button 
+                        onClick={onSort} 
+                        className="text-gray-400 hover:text-neon-blue transition-colors"
+                        title={t('sort_az')}
+                    >
+                        <ArrowDownAZ size={16} />
+                    </button>
+                    <button 
+                        onClick={onShuffle} 
+                        className="text-gray-400 hover:text-neon-purple transition-colors"
+                        title={t('shuffle')}
+                    >
+                        <Shuffle size={16} />
+                    </button>
+                    <button 
+                      type="button"
+                      onClick={requestClear} 
+                      className="text-red-500 hover:text-red-400 transition-colors ml-1"
+                      title={t('clear_playlist')}
+                    >
+                        <Trash2 size={16} />
+                    </button>
+                </div>
+            )}
+        </div>
         <div className="flex-1 overflow-y-auto pr-2 space-y-1">
           {tracks.map((track, index) => (
             <div

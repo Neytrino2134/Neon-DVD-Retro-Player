@@ -1,4 +1,5 @@
 
+
 export const en = {
   system: "SYSTEM",
   modules: "MODULES",
@@ -8,15 +9,21 @@ export const en = {
   scanlines: "SCANLINES",
   cyber_hack: "CYBER HACK",
   digital_glitch: "DIGITAL GLITCH",
+  debug_console: "DEBUG CONSOLE",
+  holograms: "HOLOGRAMS",
   waveform_config: "WAVEFORM CONFIG",
   dvd_config: "DVD CONFIG",
   scanline_config: "SCANLINE CONFIG",
   cyber_config: "CYBER CONFIG",
   glitch_config: "GLITCH CONFIG",
+  debug_config: "SYSTEM LOGS",
   signal_processor: "SIGNAL PROCESSOR",
   background: "BACKGROUND",
   load_img: "LOAD IMG/VIDEO",
   export_config: "EXPORT NRP CONFIG",
+  mixer_deck: "DJ MIXER DECK",
+  crossfade_duration: "CROSSFADE (SEC)",
+  constant_power_hint: "Uses Constant Power curve for smooth transitions.",
   
   // Controls
   size: "SIZE",
@@ -31,6 +38,18 @@ export const en = {
   pixelation: "PIXELATION",
   static_noise: "STATIC NOISE",
   vhs_jitter: "VHS JITTER",
+  chromatic_aberration: "CHROMATIC ABERRATION",
+  msg_speed: "MSG SPEED",
+  msg_interval: "INTERVAL (S)",
+  hologram_incoming: "INCOMING TRANSMISSION",
+  
+  // Hologram Categories
+  cat_system: "SYSTEM",
+  cat_interactive: "INTERACTIVE",
+  cat_music: "MUSIC TUNING",
+  cat_motivational: "MOTIVATIONAL",
+  cat_philosophy: "PHILOSOPHY",
+  cat_space: "SPACE MYSTERIES",
   
   // Visualizer Specific
   position: "POSITION",
@@ -48,6 +67,9 @@ export const en = {
   fill_opacity: "FILL OPACITY",
   stroke_opacity: "STROKE OPACITY",
   
+  // Marquee
+  text_size: "TEXT SIZE",
+  
   // Glitch Variants
   glitch_variant: "GLITCH VARIANT",
   variant_v1: "V1 (PARTICLES)",
@@ -61,5 +83,32 @@ export const en = {
   style_inferno: "INFERNO",
   pos_top: "TOP",
   pos_center: "CENTER",
-  pos_bottom: "BOTTOM"
+  pos_bottom: "BOTTOM",
+
+  // Playlist
+  clear_playlist: "CLEAR LIST",
+  confirm_clear: "Are you sure you want to delete all tracks?",
+  sort_az: "Sort by name (A-Z)",
+  shuffle: "Randomize order",
+
+  // Background
+  auto_timer: "AUTO SWAP (MIN)",
+
+  // System
+  system_down: "SYSTEM WILL DOWN AFTER",
+  reboot: "SCHEDULE REBOOT",
+  reboot_scheduled: "REBOOT SCHEDULED",
+  waiting_stream: "WAITING FOR STREAM END",
+  system_critical: "Critical! System will down NOW!",
+
+  // Context Menu
+  ctx_actions: "CONTEXT ACTIONS",
+  ctx_track_ctrl: "TRACK CONTROL",
+  ctx_bg_ctrl: "BACKGROUND CTRL",
+  ctx_view_ctrl: "VIEW CONTROL",
+  ctx_next_track: "NEXT TRACK",
+  ctx_prev_track: "PREV TRACK",
+  ctx_next_bg: "NEXT BG",
+  ctx_prev_bg: "PREV BG",
+  ctx_fullscreen: "TOGGLE FULLSCREEN",
 };

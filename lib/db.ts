@@ -50,33 +50,60 @@ export const getAllTracks = async (): Promise<{ id: string; name: string; file: 
   });
 };
 
+export const clearTracks = async () => {
+  const db = await initDB();
+  return new Promise<void>((resolve, reject) => {
+    const transaction = db.transaction(STORES.TRACKS, 'readwrite');
+    const store = transaction.objectStore(STORES.TRACKS);
+    const request = store.clear();
+    request.onsuccess = () => resolve();
+    request.onerror = () => reject(request.error);
+  });
+};
+
+// --- BACKGROUND FUNCTIONS ---
+
 export const saveBackground = async (media: { id: string; type: 'image' | 'video'; file: File }) => {
   const db = await initDB();
   return new Promise<void>((resolve, reject) => {
     const transaction = db.transaction(STORES.BACKGROUND, 'readwrite');
     const store = transaction.objectStore(STORES.BACKGROUND);
-    // Clear previous background
-    store.clear().onsuccess = () => {
-        const request = store.put(media);
-        request.onsuccess = () => resolve();
-        request.onerror = () => reject(request.error);
-    };
+    // Note: We no longer clear here to allow multiple uploads
+    const request = store.put(media);
+    request.onsuccess = () => resolve();
+    request.onerror = () => reject(request.error);
   });
 };
 
-export const getBackground = async (): Promise<{ id: string; type: 'image' | 'video'; file: File } | null> => {
+export const deleteBackground = async (id: string) => {
+  const db = await initDB();
+  return new Promise<void>((resolve, reject) => {
+    const transaction = db.transaction(STORES.BACKGROUND, 'readwrite');
+    const store = transaction.objectStore(STORES.BACKGROUND);
+    const request = store.delete(id);
+    request.onsuccess = () => resolve();
+    request.onerror = () => reject(request.error);
+  });
+};
+
+export const getAllBackgrounds = async (): Promise<{ id: string; type: 'image' | 'video'; file: File }[]> => {
   const db = await initDB();
   return new Promise((resolve, reject) => {
     const transaction = db.transaction(STORES.BACKGROUND, 'readonly');
     const store = transaction.objectStore(STORES.BACKGROUND);
     const request = store.getAll();
-    request.onsuccess = () => resolve(request.result[0] || null);
+    request.onsuccess = () => resolve(request.result || []);
     request.onerror = () => reject(request.error);
   });
 };
 
-export const clearBackground = async () => {
+export const clearBackgrounds = async () => {
   const db = await initDB();
-  const transaction = db.transaction(STORES.BACKGROUND, 'readwrite');
-  transaction.objectStore(STORES.BACKGROUND).clear();
+  return new Promise<void>((resolve, reject) => {
+    const transaction = db.transaction(STORES.BACKGROUND, 'readwrite');
+    const store = transaction.objectStore(STORES.BACKGROUND);
+    const request = store.clear();
+    request.onsuccess = () => resolve();
+    request.onerror = () => reject(request.error);
+  });
 };

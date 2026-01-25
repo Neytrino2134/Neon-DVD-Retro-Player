@@ -1,5 +1,5 @@
 
-import React, { useRef, useEffect, forwardRef } from 'react';
+import React, { useRef, useEffect, forwardRef, useMemo, useState } from 'react';
 import { Upload, Minimize, Maximize, Monitor } from 'lucide-react';
 import { AudioTrack, VisualizerConfig, EffectsConfig, DvdConfig, MarqueeConfig } from '../types';
 import DvdLogo from './DvdLogo';
@@ -9,6 +9,65 @@ import NoiseOverlay from './NoiseOverlay';
 import ScanlineEffect from './effects/ScanlineEffect';
 import GlitchEffect from './effects/GlitchEffect';
 import CyberHackEffect from './effects/CyberHackEffect';
+import DebugConsoleEffect from './effects/DebugConsoleEffect';
+import ChromaticAberration from './effects/ChromaticAberration';
+import TransitionEffect from './effects/TransitionEffect';
+import HologramEffect from './effects/HologramEffect';
+import Marquee from './Marquee';
+import { useLanguage } from '../contexts/LanguageContext';
+
+interface ReloadOverlayProps {
+  phase: 'idle' | 'waiting' | 'countdown';
+  trackRemaining: number;
+  finalSeconds: number;
+}
+
+function ReloadOverlay({ phase, trackRemaining, finalSeconds }: ReloadOverlayProps) {
+  const { t } = useLanguage();
+  
+  if (phase === 'idle') return null;
+
+  const formatTime = (totalSeconds: number) => {
+    if (!Number.isFinite(totalSeconds) || totalSeconds < 0) return "00:00";
+    const m = Math.floor(totalSeconds / 60);
+    const s = Math.floor(totalSeconds % 60);
+    return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+  };
+
+  const isCritical = phase === 'countdown';
+
+  return (
+     <div className="absolute top-6 right-6 z-[60] flex justify-end pointer-events-none">
+        <div className={`
+          px-5 py-2 rounded-sm border backdrop-blur-sm 
+          flex flex-row items-center gap-6 transition-all duration-500
+          animate-pulse
+          ${isCritical 
+            ? 'border-red-600/60 bg-red-900/30 shadow-[0_0_20px_rgba(220,38,38,0.4)]' 
+            : 'border-neon-yellow/60 bg-gray-900/40 shadow-[0_0_20px_rgba(249,248,113,0.2)]'}
+        `}>
+           <div className="flex flex-col items-start mr-2">
+               <div className={`font-mono font-bold text-[10px] uppercase tracking-[0.1em] whitespace-nowrap ${isCritical ? 'text-red-400' : 'text-neon-yellow'}`}>
+                 {isCritical ? t('system_critical') : t('reboot_scheduled')}
+               </div>
+               
+               {!isCritical && (
+                   <div className="text-gray-300 font-mono text-[9px] tracking-wider opacity-80 whitespace-nowrap">
+                       {t('waiting_stream')}
+                   </div>
+               )}
+           </div>
+
+           <div className={`font-mono font-black text-2xl tabular-nums leading-none ${isCritical ? 'text-red-500' : 'text-neon-yellow'}`}>
+             {isCritical 
+                ? `00:${finalSeconds.toString().padStart(2, '0')}` 
+                : formatTime(trackRemaining)
+             }
+           </div>
+        </div>
+     </div>
+  );
+}
 
 interface RetroScreenProps {
   analyser: AnalyserNode | null;
@@ -25,6 +84,11 @@ interface RetroScreenProps {
   effectsConfig: EffectsConfig;
   marqueeConfig: MarqueeConfig;
   
+  // Reboot State
+  rebootPhase: 'idle' | 'waiting' | 'countdown';
+  trackRemaining: number;
+  finalTimer: number;
+  
   // UI State
   focusMode: boolean;
   setFocusMode: (v: boolean) => void;
@@ -40,34 +104,100 @@ interface RetroScreenProps {
 const RetroScreen = forwardRef<HTMLDivElement, RetroScreenProps>(({
   analyser, isPlaying, currentTrack, bgMedia, bgColor,
   visualizerConfig, showVisualizer, dvdConfig, showDvd, effectsConfig, marqueeConfig,
+  rebootPhase, trackRemaining, finalTimer,
   focusMode, setFocusMode, isDragging,
-  onDragOver, onDragEnter, onDragLeave, onDrop
+  onDragOver, onDragEnter, onDragEnter: onDragEnterProp, onDragLeave, onDrop
 }, externalRef) => {
   
   const internalRef = useRef<HTMLDivElement>(null);
   const containerRef = (externalRef as React.RefObject<HTMLDivElement>) || internalRef;
   const signalLayerRef = useRef<HTMLDivElement>(null);
+  const shakeRef = useRef<HTMLDivElement>(null);
 
-  // VHS Jitter Loop
+  // Transition State
+  const [activeMedia, setActiveMedia] = useState(bgMedia);
+  const [transitionPhase, setTransitionPhase] = useState<'idle' | 'out' | 'in'>('idle');
+
+  // Handle Background Transition Logic
+  useEffect(() => {
+    // If it's the very first load or explicit null to null, just sync
+    if (activeMedia === bgMedia) return;
+
+    // Start Exit Animation (Fill with blocks)
+    setTransitionPhase('out');
+
+    // Wait for screen to be sufficiently covered (800ms - Faster, but allows gradual fill)
+    const timeout1 = setTimeout(() => {
+      setActiveMedia(bgMedia); // Swap the actual media behind the mask
+      setTransitionPhase('in'); // Start Reveal Animation (Remove blocks)
+
+      // Wait for reveal to finish (800ms)
+      const timeout2 = setTimeout(() => {
+        setTransitionPhase('idle');
+      }, 800);
+
+      return () => clearTimeout(timeout2);
+    }, 800);
+
+    return () => clearTimeout(timeout1);
+  }, [bgMedia]); 
+
+  // Screen Shake Loop (Combines VHS Jitter + Transition Shake)
   useEffect(() => {
     let aid: number;
     const loop = () => {
-      if (signalLayerRef.current && effectsConfig.vhsJitter > 0) {
-        signalLayerRef.current.style.transform = `translate3d(${(Math.random()-0.5)*effectsConfig.vhsJitter*0.2}px, ${(Math.random()-0.5)*effectsConfig.vhsJitter*2}px, 0)`;
-      } else if (signalLayerRef.current) {
-        signalLayerRef.current.style.transform = 'none';
+      // Base VHS Jitter
+      let x = 0;
+      let y = 0;
+
+      if (effectsConfig.vhsJitter > 0) {
+        x += (Math.random()-0.5) * effectsConfig.vhsJitter * 0.2;
+        y += (Math.random()-0.5) * effectsConfig.vhsJitter * 2;
       }
+
+      // Transition Shake (subtle rumble during swap)
+      if (transitionPhase !== 'idle') {
+        const shakeIntensity = 8; 
+        x += (Math.random() - 0.5) * shakeIntensity;
+        y += (Math.random() - 0.5) * shakeIntensity;
+      }
+
+      if (signalLayerRef.current) {
+        signalLayerRef.current.style.transform = `translate3d(${x}px, ${y}px, 0)`;
+      }
+
       aid = requestAnimationFrame(loop);
     };
     loop();
     return () => cancelAnimationFrame(aid);
-  }, [effectsConfig.vhsJitter]);
+  }, [effectsConfig.vhsJitter, transitionPhase]);
+
+  const aberrationValue = effectsConfig.chromaticAberration || 0;
+
+  // Prepare Marquee Text
+  const marqueeText = useMemo(() => {
+    const chars = ["@", "#", "$", "%", "&", "*", "!", "?", "0x", "ERR", "//"];
+    const dots = ".........";
+    const brand = "► Neon Waves";
+    
+    const getRandomGlitch = () => {
+       const r = () => chars[Math.floor(Math.random() * chars.length)];
+       return `${r()}${r()}${r()}`;
+    };
+
+    if (currentTrack) {
+        return `NOW PLAYING: ${currentTrack.name.toUpperCase()}  ${dots} ${brand} ${dots} ${getRandomGlitch()} ${dots}  ${currentTrack.name.toUpperCase()}  ${dots} ${brand} ${dots} `;
+    }
+    return `INSERT DISK  ${dots}  SYSTEM READY  ${dots}  ${brand}  ${dots}  WAITING FOR INPUT  ${dots} ${getRandomGlitch()} ${dots} `;
+  }, [currentTrack]);
 
   return (
     <div 
       className={`flex-grow flex items-center justify-center relative bg-gray-950 transition-all duration-500 ${focusMode ? 'p-0' : 'p-1 md:p-3'}`}
     >
       <div 
+        ref={shakeRef}
+        onDoubleClick={() => setFocusMode(!focusMode)}
         className={`relative w-full h-full bg-gray-900 transition-all duration-700 ${focusMode ? 'rounded-none border-0' : 'rounded-2xl border-4'} ${isDragging ? 'border-neon-blue shadow-[0_0_30px_#00f3ff]' : 'border-gray-800'} overflow-hidden group`}
         onDragOver={onDragOver}
         onDragEnter={onDragEnter}
@@ -85,39 +215,52 @@ const RetroScreen = forwardRef<HTMLDivElement, RetroScreenProps>(({
                   {focusMode ? <Minimize size={20} /> : <Maximize size={20} />}
               </button>
             </div>
+
+            {/* Reload Overlay */}
+            <ReloadOverlay 
+              phase={rebootPhase} 
+              trackRemaining={trackRemaining} 
+              finalSeconds={finalTimer} 
+            />
             
-            <div ref={signalLayerRef} className="absolute inset-0 w-full h-full">
-                <MediaRenderer type={bgMedia ? bgMedia.type : 'color'} url={bgMedia?.url} bgColor={bgColor} effects={effectsConfig} />
+            {/* Chromatic Filter Definition */}
+            <ChromaticAberration intensity={aberrationValue} />
+
+            <div 
+                ref={signalLayerRef} 
+                className="absolute inset-0 w-full h-full"
+                style={aberrationValue > 0 ? { filter: 'url(#chromatic-aberration-filter)' } : undefined}
+            >
+                {/* 1. BACKGROUND LAYER (Z-0) */}
+                <MediaRenderer type={activeMedia ? activeMedia.type : 'color'} url={activeMedia?.url} bgColor={bgColor} effects={effectsConfig} />
+                
+                {/* 2. TRANSITION MASK LAYER (Z-5) */}
+                {/* Covers background but sits BEHIND visualizers */}
+                <TransitionEffect phase={transitionPhase} />
+                
+                {/* 3. VISUALIZATION & UI LAYERS (Z-10+) */}
                 {showVisualizer && <Visualizer analyser={analyser} isPlaying={isPlaying} config={visualizerConfig} fps={effectsConfig.fps} />}
                 {showDvd && <DvdLogo containerRef={containerRef} fps={effectsConfig.fps} effectsConfig={effectsConfig} config={dvdConfig} />}
                 
                 {/* Marquee Overlay */}
-                {marqueeConfig.enabled && currentTrack && (
-                   <div className="absolute top-8 left-0 w-full h-12 z-20 overflow-hidden pointer-events-none mix-blend-screen" style={{ opacity: marqueeConfig.opacity }}>
-                     <div 
-                      className="whitespace-nowrap animate-marquee flex items-center h-full"
-                      style={{ animationDuration: `${30 / marqueeConfig.speed}s` }}
-                     >
-                       <span className="text-neon-green font-mono text-xl font-bold drop-shadow-[0_0_8px_rgba(0,255,0,0.8)] px-10">
-                         NOW PLAYING: {currentTrack.name.toUpperCase()}
-                       </span>
-                       <span className="text-neon-green font-mono text-xl font-bold drop-shadow-[0_0_8px_rgba(0,255,0,0.8)] px-10">
-                         /// {currentTrack.name.toUpperCase()} ///
-                       </span>
-                       <span className="text-neon-green font-mono text-xl font-bold drop-shadow-[0_0_8px_rgba(0,255,0,0.8)] px-10">
-                         NOW PLAYING: {currentTrack.name.toUpperCase()}
-                       </span>
-                       <span className="text-neon-green font-mono text-xl font-bold drop-shadow-[0_0_8px_rgba(0,255,0,0.8)] px-10">
-                         /// {currentTrack.name.toUpperCase()} ///
-                       </span>
-                     </div>
+                {marqueeConfig.enabled && (
+                   <div className="absolute top-8 left-0 w-full h-24 z-20 pointer-events-none mix-blend-screen flex items-center">
+                     <Marquee 
+                        text={marqueeText}
+                        speed={marqueeConfig.speed}
+                        opacity={marqueeConfig.opacity}
+                        fontSize={marqueeConfig.fontSize}
+                        className="text-neon-green font-mono font-bold drop-shadow-[0_0_8px_rgba(0,255,0,0.8)]"
+                     />
                    </div>
                 )}
 
                 <GlitchEffect effects={effectsConfig} />
                 <CyberHackEffect effects={effectsConfig} />
+                <HologramEffect effects={effectsConfig} />
             </div>
             
+            <DebugConsoleEffect effects={effectsConfig} />
             <NoiseOverlay opacity={effectsConfig.noise} pixelation={effectsConfig.pixelation} />
             <ScanlineEffect config={effectsConfig} />
             <div className="absolute inset-0 z-30 pointer-events-none flicker bg-white/5"></div>
@@ -139,8 +282,14 @@ const RetroScreen = forwardRef<HTMLDivElement, RetroScreenProps>(({
                 </div>
             )}
          </div>
-         <div className="absolute bottom-2 right-4 text-gray-700 font-bold text-xs z-50 flex items-center gap-1 uppercase pointer-events-none">
-            <Monitor size={12} /> RETRO-SONIC ULTRA
+         <div className="absolute bottom-6 right-8 z-50 flex flex-col items-end pointer-events-none select-none mix-blend-screen">
+            <div className="flex flex-col items-end text-xs font-mono font-bold tracking-wider text-gray-600 mb-1 space-y-0.5">
+               <span className="animate-text-flash" style={{ animationDuration: '7s', animationDelay: '2s' }}>By MeowMasterArt</span>
+               <span className="animate-text-flash" style={{ animationDuration: '11s', animationDelay: '4s' }}>MeowMasterArt@gmail.com</span>
+            </div>
+            <div className="flex items-center gap-2 font-black text-lg tracking-widest uppercase animate-text-flash text-gray-700">
+               <Monitor size={20} /> RETRO-SONIC ULTRA
+            </div>
          </div>
       </div>
     </div>

@@ -1,7 +1,15 @@
 
+
 export interface AudioTrack {
   id: string;
   name: string;
+  url: string;
+  file: File;
+}
+
+export interface BackgroundMedia {
+  id: string;
+  type: 'image' | 'video';
   url: string;
   file: File;
 }
@@ -49,12 +57,16 @@ export interface MarqueeConfig {
   enabled: boolean;
   speed: number;
   opacity: number;
+  fontSize: number;
 }
+
+export type HologramCategory = 'system' | 'interactive' | 'music' | 'motivational' | 'philosophy' | 'space';
 
 export interface EffectsConfig {
   fps: number;
   pixelation: number;
   noise: number;
+  chromaticAberration: number;
   vhsJitter: number;
   scanlineEnabled: boolean;
   scanlineIntensity: number;
@@ -74,4 +86,22 @@ export interface EffectsConfig {
     scale: number;
     backgroundOpacity: number;
   };
+  debugConsole: {
+    enabled: boolean;
+    opacity: number;
+    scale: number;
+  };
+  holograms: {
+    enabled: boolean;
+    opacity: number;
+    speed: number; // Typing speed
+    interval: number; // Seconds between messages
+    scale: number;
+    categories: Record<HologramCategory, boolean>;
+  };
+}
+
+export interface CrossfadeConfig {
+  enabled: boolean;
+  duration: number; // Seconds
 }
