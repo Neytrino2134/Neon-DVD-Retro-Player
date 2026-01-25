@@ -1,14 +1,19 @@
 
+
 import React, { useEffect, useState, useRef } from 'react';
-import { Terminal, Cpu } from 'lucide-react';
+import { Terminal, Cpu, Power } from 'lucide-react';
 import { useLanguage } from '../contexts/LanguageContext';
 
 interface StartupOverlayProps {
   onComplete?: () => void;
+  onFadeOut?: () => void;
+  onPlaySfx?: (filename: string) => void;
+  onStopSfx?: () => void;
 }
 
-const StartupOverlay: React.FC<StartupOverlayProps> = ({ onComplete }) => {
+const StartupOverlay: React.FC<StartupOverlayProps> = ({ onComplete, onFadeOut, onPlaySfx, onStopSfx }) => {
   const [isVisible, setIsVisible] = useState(true);
+  const [hasStarted, setHasStarted] = useState(false); // New state for interaction
   const [windowState, setWindowState] = useState<'hidden' | 'spawn' | 'expand' | 'full' | 'collapse'>('hidden');
   const [lines, setLines] = useState<string[]>([]);
   const [loginText, setLoginText] = useState('');
@@ -18,6 +23,10 @@ const StartupOverlay: React.FC<StartupOverlayProps> = ({ onComplete }) => {
   const [progress, setProgress] = useState(0);
   const [showProgress, setShowProgress] = useState(false);
   const [containerOpacity, setContainerOpacity] = useState(1);
+  
+  // Standby Screen Animation State
+  const [standbyOpacity, setStandbyOpacity] = useState(0);
+  const [isTransitioning, setIsTransitioning] = useState(false);
 
   const { language } = useLanguage();
   const linesEndRef = useRef<HTMLDivElement>(null);
@@ -34,14 +43,29 @@ const StartupOverlay: React.FC<StartupOverlayProps> = ({ onComplete }) => {
     }
   }, [lines, showLogin, showPass, showProgress]);
 
+  // Fade In Standby Screen on Mount
+  useEffect(() => {
+    if (!hasStarted) {
+        // Small timeout to ensure DOM is ready for transition
+        const t = setTimeout(() => setStandbyOpacity(1), 50);
+        return () => clearTimeout(t);
+    }
+  }, [hasStarted]);
+
   // Skip Function
   const handleSkip = () => {
-    if (skippedRef.current || !isVisible) return;
+    if (skippedRef.current || !isVisible || !hasStarted) return;
     skippedRef.current = true;
+
+    // Call stop SFX from parent
+    if (onStopSfx) onStopSfx();
 
     // Clear all active animation timers immediately
     timeoutsRef.current.forEach(window.clearTimeout);
     timeoutsRef.current = [];
+
+    // Notify App to turn on main screen
+    if (onFadeOut) onFadeOut();
 
     // Fade out immediately
     setContainerOpacity(0);
@@ -53,7 +77,33 @@ const StartupOverlay: React.FC<StartupOverlayProps> = ({ onComplete }) => {
     }, 500);
   };
 
+  const handleStart = () => {
+      if (isTransitioning) return;
+      setIsTransitioning(true);
+      
+      // Fade out Standby Screen
+      setStandbyOpacity(0);
+
+      // Wait for fade out, then start boot sequence
+      setTimeout(() => {
+          setHasStarted(true);
+          onPlaySfx?.('Binary_Code_Sound_Effects_Start.mp3');
+      }, 1000);
+  };
+
+  // Keyboard listener for Enter
   useEffect(() => {
+    if (hasStarted || isTransitioning) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+        if (e.key === 'Enter') handleStart();
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [hasStarted, isTransitioning]);
+
+  useEffect(() => {
+    if (!hasStarted) return;
+
     let mounted = true;
     const isRu = language === 'ru';
 
@@ -79,7 +129,7 @@ const StartupOverlay: React.FC<StartupOverlayProps> = ({ onComplete }) => {
     };
 
     const runSequence = async () => {
-      // 1. Initial Delay & Window Spawn
+      // 1. Initial Delay & Window Spawn (SFX is played in handleStart now)
       await wait(500);
       setWindowState('spawn');
       await wait(600);
@@ -143,6 +193,9 @@ const StartupOverlay: React.FC<StartupOverlayProps> = ({ onComplete }) => {
       setWindowState('collapse');
       await wait(800);
       
+      // Notify App that we are about to fade out, so it can turn on the screens
+      if (onFadeOut && mounted) onFadeOut();
+
       // Fade out the entire overlay
       setContainerOpacity(0);
       await wait(1500); // Wait for fade out transition
@@ -159,9 +212,44 @@ const StartupOverlay: React.FC<StartupOverlayProps> = ({ onComplete }) => {
         mounted = false;
         timeoutsRef.current.forEach(window.clearTimeout);
     };
-  }, []); // Empty dependency array is intentional, runs once on mount but reads current language logic inside
+  }, [hasStarted, language, onComplete, onFadeOut]);
 
   if (!isVisible) return null;
+
+  // INITIAL INTERACTION SCREEN
+  if (!hasStarted) {
+    return (
+        <div 
+            className="fixed inset-0 z-[10000] bg-black flex flex-col items-center justify-center cursor-pointer select-none"
+            onClick={handleStart}
+            style={{ 
+                opacity: standbyOpacity, 
+                transition: 'opacity 1s ease-in-out' 
+            }}
+        >
+            {/* CRT Effects */}
+            <div className="absolute inset-0 bg-white/5 opacity-5 pointer-events-none scanlines"></div>
+            <div className="absolute inset-0 pointer-events-none flicker bg-neon-blue/5 opacity-10"></div>
+            
+            <div className="flex flex-col items-center gap-8 z-10 animate-pulse">
+                 <div className="w-24 h-24 rounded-full border-4 border-neon-blue flex items-center justify-center bg-neon-blue/10 shadow-[0_0_40px_#00f3ff] transition-transform hover:scale-110 duration-300">
+                    <Power size={48} className="text-neon-blue" />
+                 </div>
+                 
+                 <div className="text-center space-y-4">
+                     <h1 className="text-3xl md:text-5xl font-mono font-bold text-white tracking-[0.2em] drop-shadow-[0_0_15px_rgba(255,255,255,0.8)]">
+                        SYSTEM STANDBY
+                     </h1>
+                     <div className="inline-block px-6 py-2 rounded">
+                        <p className="text-neon-blue font-mono text-sm md:text-lg tracking-widest font-bold">
+                            {language === 'ru' ? 'НАЖМИТЕ ENTER ДЛЯ ЗАПУСКА' : 'PRESS ENTER TO INITIALIZE SYSTEM'}
+                        </p>
+                     </div>
+                 </div>
+            </div>
+        </div>
+    );
+  }
 
   // Window Sizes based on state
   let width = '0px';

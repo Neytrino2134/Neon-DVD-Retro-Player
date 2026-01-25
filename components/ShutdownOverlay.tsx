@@ -6,6 +6,7 @@ import { useLanguage } from '../contexts/LanguageContext';
 interface ShutdownOverlayProps {
   active: boolean; // Triggers the sequence
   onCancel?: () => void;
+  onPlayRebootSfx?: () => void;
 }
 
 type SequenceStep = 
@@ -19,7 +20,7 @@ type SequenceStep =
   | 'tv_off' 
   | 'silence';
 
-const ShutdownOverlay: React.FC<ShutdownOverlayProps> = ({ active, onCancel }) => {
+const ShutdownOverlay: React.FC<ShutdownOverlayProps> = ({ active, onCancel, onPlayRebootSfx }) => {
   const { t } = useLanguage();
   const [step, setStep] = useState<SequenceStep>('idle');
   
@@ -33,6 +34,12 @@ const ShutdownOverlay: React.FC<ShutdownOverlayProps> = ({ active, onCancel }) =
 
   const sequenceRef = useRef<boolean>(false);
   const timeoutsRef = useRef<number[]>([]);
+  
+  // Ref for callback to prevent effect dependency changes triggering restarts
+  const onPlayRebootSfxRef = useRef(onPlayRebootSfx);
+  useEffect(() => {
+      onPlayRebootSfxRef.current = onPlayRebootSfx;
+  }, [onPlayRebootSfx]);
 
   // Helper to manage timeouts cleanly
   const wait = (ms: number) => new Promise(resolve => {
@@ -55,6 +62,10 @@ const ShutdownOverlay: React.FC<ShutdownOverlayProps> = ({ active, onCancel }) =
       await wait(50); 
       setBgOpacity(1);
       await wait(1500); 
+
+      // TRIGGER AUDIO SYNC HERE
+      // Play sound right before the window starts to slide/appear
+      if (onPlayRebootSfxRef.current) onPlayRebootSfxRef.current();
 
       // 2. Smooth Window Slide (Width then Height)
       setStep('window_slide');
@@ -151,6 +162,9 @@ const ShutdownOverlay: React.FC<ShutdownOverlayProps> = ({ active, onCancel }) =
 
     return () => {
        timeoutsRef.current.forEach(window.clearTimeout);
+       // Reset sequence lock on cleanup to ensure we don't get stuck in "running" state
+       // if the component re-renders/unmounts
+       sequenceRef.current = false;
     };
   }, [active, t]);
 

@@ -1,9 +1,13 @@
 
+
+
 import React from 'react';
 import RangeControl from '../RangeControl';
 import CustomSelect from '../CustomSelect';
+import ToggleSwitch from '../ToggleSwitch';
 import { useLanguage } from '../../../contexts/LanguageContext';
 import { DvdConfig, EffectsConfig } from '../../../types';
+import { Volume2 } from 'lucide-react';
 
 const FPS_OPTIONS = [
   { value: 60, label: '60 FPS (OFF)' },
@@ -38,6 +42,26 @@ export const DvdSettings: React.FC<{ config: DvdConfig, update: (k: keyof DvdCon
     const { t } = useLanguage();
     return (
         <div className="pt-2">
+            <div className="mb-4">
+                <ToggleSwitch 
+                    label={t('sfx_enabled')} 
+                    icon={Volume2} 
+                    value={config.enableSfx} 
+                    onChange={(v) => update('enableSfx', v)} 
+                    color="blue"
+                />
+            </div>
+            
+            <CustomSelect 
+              label={t('dvd_logo_type')}
+              value={config.logoType || 'dvd'}
+              options={[
+                { value: 'dvd', label: t('logo_dvd') },
+                { value: 'neon_waves', label: t('logo_neon') }
+              ]}
+              onChange={v => update('logoType', v)}
+           />
+
             <RangeControl label={t('size')} value={config.size} min={60} max={300} step={10} onChange={v => update('size', v)} />
             <RangeControl label={t('speed')} value={config.speed} min={1} max={15} step={1} onChange={v => update('speed', v)} />
             <RangeControl label={t('opacity')} value={config.opacity} min={0} max={1} step={0.1} onChange={v => update('opacity', v)} />

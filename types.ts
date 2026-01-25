@@ -57,6 +57,8 @@ export interface DvdConfig {
   size: number;
   speed: number;
   opacity: number;
+  enableSfx: boolean;
+  logoType: 'dvd' | 'neon_waves';
 }
 
 export interface MarqueeConfig {

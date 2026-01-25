@@ -1,4 +1,5 @@
 
+
 export const ru = {
   system: "СИСТЕМА",
   modules: "МОДУЛИ",
@@ -43,6 +44,10 @@ export const ru = {
   msg_speed: "СКОР. ТЕКСТА",
   msg_interval: "ИНТЕРВАЛ (С)",
   hologram_incoming: "ВХОДЯЩЕЕ СООБЩЕНИЕ",
+  sfx_enabled: "SFX (BOING)",
+  dvd_logo_type: "ТИП ЛОГОТИПА",
+  logo_dvd: "КЛАССИКА DVD",
+  logo_neon: "NEON WAVES",
 
   // Hologram Categories
   cat_system: "СИСТЕМНЫЕ",

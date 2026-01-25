@@ -1,4 +1,5 @@
 
+
 export const en = {
   system: "SYSTEM",
   modules: "MODULES",
@@ -43,6 +44,10 @@ export const en = {
   msg_speed: "MSG SPEED",
   msg_interval: "INTERVAL (S)",
   hologram_incoming: "INCOMING TRANSMISSION",
+  sfx_enabled: "SFX (BOING)",
+  dvd_logo_type: "LOGO TYPE",
+  logo_dvd: "CLASSIC DVD",
+  logo_neon: "NEON WAVES",
   
   // Hologram Categories
   cat_system: "SYSTEM",

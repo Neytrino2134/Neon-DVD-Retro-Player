@@ -1,8 +1,9 @@
 
 import React, { useState } from 'react';
-import { Save, FolderOpen, Trash2, Edit2, Check, X } from 'lucide-react';
+import { Save, Trash2, Edit2, Check, X } from 'lucide-react';
 import { useLanguage } from '../../../contexts/LanguageContext';
 import { AppPreset } from '../../../types';
+import { Tooltip } from '../../ui/Tooltip';
 
 interface ConfigManagerProps {
   presets: AppPreset[];
@@ -14,30 +15,43 @@ interface ConfigManagerProps {
 
 const ConfigManager: React.FC<ConfigManagerProps> = ({ presets, onSave, onLoad, onDelete, onRename }) => {
   const { t } = useLanguage();
-  const [newName, setNewName] = useState('');
+  const [newName, setNewName] = useState('Preset_01');
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editName, setEditName] = useState('');
 
   const handleSave = () => {
     if (!newName.trim()) return;
     onSave(newName);
-    setNewName('');
+    setNewName('Preset_01');
   };
 
-  const startEditing = (preset: AppPreset) => {
+  const startEditing = (preset: AppPreset, e: React.MouseEvent) => {
+    e.stopPropagation();
     setEditingId(preset.id);
     setEditName(preset.name);
   };
 
-  const cancelEditing = () => {
+  const cancelEditing = (e?: React.MouseEvent) => {
+    e?.stopPropagation();
     setEditingId(null);
     setEditName('');
   };
 
-  const saveEditing = (id: string) => {
+  const saveEditing = (id: string, e?: React.MouseEvent) => {
+    e?.stopPropagation();
     if (!editName.trim()) return;
     onRename(id, editName);
     setEditingId(null);
+  };
+
+  const handleDelete = (id: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    onDelete(id);
+  };
+
+  const handleLoad = (id: string, e?: React.MouseEvent) => {
+    e?.stopPropagation();
+    onLoad(id);
   };
 
   return (
@@ -52,13 +66,15 @@ const ConfigManager: React.FC<ConfigManagerProps> = ({ presets, onSave, onLoad, 
           className="flex-1 bg-transparent border-b border-gray-600 focus:border-neon-blue outline-none text-xs font-mono text-white placeholder-gray-600 px-1"
           onKeyDown={(e) => e.key === 'Enter' && handleSave()}
         />
-        <button
-          onClick={handleSave}
-          disabled={!newName.trim()}
-          className="flex items-center gap-1 px-3 py-1 bg-neon-blue/10 border border-neon-blue text-neon-blue rounded text-[10px] font-bold tracking-wider hover:bg-neon-blue hover:text-black disabled:opacity-50 disabled:hover:bg-transparent disabled:hover:text-neon-blue transition-all"
-        >
-          <Save size={12} /> {t('save_preset')}
-        </button>
+        <Tooltip content={t('save_preset')} position="top">
+            <button
+            onClick={handleSave}
+            disabled={!newName.trim()}
+            className="flex items-center gap-1 px-3 py-1 bg-neon-blue/10 border border-neon-blue text-neon-blue rounded text-[10px] font-bold tracking-wider hover:bg-neon-blue hover:text-black disabled:opacity-50 disabled:hover:bg-transparent disabled:hover:text-neon-blue transition-all"
+            >
+            <Save size={12} /> {t('save_preset')}
+            </button>
+        </Tooltip>
       </div>
 
       {/* Preset List */}
@@ -72,10 +88,13 @@ const ConfigManager: React.FC<ConfigManagerProps> = ({ presets, onSave, onLoad, 
         {presets.map((preset) => (
           <div 
             key={preset.id} 
-            className="flex items-center justify-between p-2 bg-gray-800/40 border border-gray-700/50 rounded group hover:border-gray-600 transition-colors"
+            onClick={() => {
+                if (editingId !== preset.id) handleLoad(preset.id);
+            }}
+            className="flex items-center justify-between p-2 bg-gray-800/40 border border-gray-700/50 rounded group hover:border-gray-600 transition-colors cursor-pointer hover:bg-gray-800/80"
           >
             {editingId === preset.id ? (
-              <div className="flex flex-1 items-center gap-2 mr-2">
+              <div className="flex flex-1 items-center gap-2 mr-2" onClick={(e) => e.stopPropagation()}>
                 <input
                   type="text"
                   value={editName}
@@ -87,10 +106,10 @@ const ConfigManager: React.FC<ConfigManagerProps> = ({ presets, onSave, onLoad, 
                     if (e.key === 'Escape') cancelEditing();
                   }}
                 />
-                <button onClick={() => saveEditing(preset.id)} className="text-neon-green hover:scale-110">
+                <button onClick={(e) => saveEditing(preset.id, e)} className="text-neon-green hover:scale-110">
                   <Check size={14} />
                 </button>
-                <button onClick={cancelEditing} className="text-red-500 hover:scale-110">
+                <button onClick={(e) => cancelEditing(e)} className="text-red-500 hover:scale-110">
                   <X size={14} />
                 </button>
               </div>
@@ -107,27 +126,32 @@ const ConfigManager: React.FC<ConfigManagerProps> = ({ presets, onSave, onLoad, 
 
             {editingId !== preset.id && (
               <div className="flex items-center gap-1 opacity-60 group-hover:opacity-100 transition-opacity">
-                 <button 
-                  onClick={() => onLoad(preset.id)}
-                  title={t('load')}
-                  className="p-1.5 hover:bg-neon-green/20 hover:text-neon-green rounded transition-colors"
-                >
-                  <FolderOpen size={12} />
-                </button>
-                <button 
-                  onClick={() => startEditing(preset)}
-                  title={t('rename')}
-                  className="p-1.5 hover:bg-neon-purple/20 hover:text-neon-purple rounded transition-colors"
-                >
-                  <Edit2 size={12} />
-                </button>
-                <button 
-                  onClick={() => onDelete(preset.id)}
-                  title={t('delete')}
-                  className="p-1.5 hover:bg-red-500/20 hover:text-red-500 rounded transition-colors"
-                >
-                  <Trash2 size={12} />
-                </button>
+                 <Tooltip content={t('load')} position="top">
+                    <button 
+                    onClick={(e) => handleLoad(preset.id, e)}
+                    className="p-1.5 hover:bg-neon-green/20 hover:text-neon-green rounded transition-colors"
+                    >
+                    <Check size={12} />
+                    </button>
+                </Tooltip>
+                
+                <Tooltip content={t('rename')} position="top">
+                    <button 
+                    onClick={(e) => startEditing(preset, e)}
+                    className="p-1.5 hover:bg-neon-purple/20 hover:text-neon-purple rounded transition-colors"
+                    >
+                    <Edit2 size={12} />
+                    </button>
+                </Tooltip>
+
+                <Tooltip content={t('delete')} position="top">
+                    <button 
+                    onClick={(e) => handleDelete(preset.id, e)}
+                    className="p-1.5 hover:bg-red-500/20 hover:text-red-500 rounded transition-colors"
+                    >
+                    <Trash2 size={12} />
+                    </button>
+                </Tooltip>
               </div>
             )}
           </div>

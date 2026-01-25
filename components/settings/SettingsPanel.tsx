@@ -1,6 +1,6 @@
 
 import React, { useState } from 'react';
-import { Settings, Disc, Activity, Zap, Terminal, AlertTriangle, Tv, Type, Bug, Power, MessageSquare, AudioWaveform, HelpCircle, Save } from 'lucide-react';
+import { Settings, Disc, Activity, Zap, Terminal, AlertTriangle, Tv, Type, Bug, Power, MessageSquare, AudioWaveform, HelpCircle, Save, ChevronUp, Home } from 'lucide-react';
 import { VisualizerConfig, EffectsConfig, DvdConfig, MarqueeConfig, PatternConfig, BackgroundMedia, AppPreset } from '../../types';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { APP_VERSION } from '../../lib/version';
@@ -50,6 +50,7 @@ interface SettingsPanelProps {
   bgAutoplayInterval: number;
   setBgAutoplayInterval: (val: number) => void;
   onScheduleReload: () => void;
+  onGoHome: () => void;
   crossfadeDuration: number;
   setCrossfadeDuration: (val: number) => void;
   
@@ -59,6 +60,9 @@ interface SettingsPanelProps {
   loadPreset: (id: string) => void;
   deletePreset: (id: string) => void;
   renamePreset: (id: string, newName: string) => void;
+
+  // SFX Data
+  sfxMap: Record<string, string>;
 }
 
 const SettingsPanel: React.FC<SettingsPanelProps> = ({
@@ -66,12 +70,14 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
   visualizerConfig, setVisualizerConfig, dvdConfig, setDvdConfig,
   effectsConfig, setEffectsConfig, bgColor, setBgColor, bgPattern = 'none', setBgPattern, bgPatternConfig, setBgPatternConfig,
   onBgMediaUpload, onAudioUpload, onSfxUpload, bgMedia, bgList, currentBgIndex, onRemoveBg, onMoveBg, onSelectBg, onDeselectBg, onClearBgMedia, onExportConfig,
-  bgAutoplayInterval, setBgAutoplayInterval, onScheduleReload,
+  bgAutoplayInterval, setBgAutoplayInterval, onScheduleReload, onGoHome,
   crossfadeDuration, setCrossfadeDuration,
-  savedPresets, savePreset, loadPreset, deletePreset, renamePreset
+  savedPresets, savePreset, loadPreset, deletePreset, renamePreset,
+  sfxMap
 }) => {
   const [expandedState, setExpandedState] = useState<Record<string, boolean>>({ mixer: true });
   const [showHelp, setShowHelp] = useState(false);
+  const [showPresets, setShowPresets] = useState(false);
   const { language, setLanguage, t } = useLanguage();
 
   const toggleExpand = (id: string) => {
@@ -100,6 +106,15 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
           </div>
           
           <div className="flex items-center gap-2">
+            <Tooltip content="HOME" position="bottom">
+              <button 
+                onClick={onGoHome}
+                className="text-gray-500 hover:text-neon-blue transition-colors p-1"
+              >
+                <Home size={18} />
+              </button>
+            </Tooltip>
+
             <Tooltip content={t('help')} position="bottom">
               <button 
                 onClick={() => setShowHelp(true)}
@@ -198,18 +213,32 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
         <ModuleWrapper id="signal" label={t('signal_processor')} icon={Zap} isEnabled={true} isAlwaysOn={true} isExpanded={expandedState['signal']} onToggleExpand={() => toggleExpand('signal')} onToggleEnable={() => {}}>
             <SignalSettings config={effectsConfig} update={updateEffect} />
         </ModuleWrapper>
+      </div>
 
-        {/* PRESETS */}
-        <ModuleWrapper id="presets" label={t('config_manager')} icon={Save} isEnabled={true} isAlwaysOn={true} isExpanded={expandedState['presets']} onToggleExpand={() => toggleExpand('presets')} onToggleEnable={() => {}}>
-            <ConfigManager 
+      {/* Config Presets Panel */}
+      <div className="bg-gray-900 border-t border-gray-800 shrink-0 z-20">
+        <button 
+          onClick={() => setShowPresets(!showPresets)}
+          className="w-full flex items-center justify-between p-3 text-xs font-mono text-gray-400 hover:text-white hover:bg-gray-800 transition-colors"
+        >
+          <div className="flex items-center gap-2">
+            <Save size={14} className="text-neon-purple" />
+            <span className="font-bold tracking-widest uppercase">{t('config_manager')}</span>
+          </div>
+          <ChevronUp size={14} className={`transition-transform duration-300 ${showPresets ? 'rotate-180' : ''}`} />
+        </button>
+        
+        <div className={`transition-all duration-300 ease-in-out overflow-hidden bg-black/20 ${showPresets ? 'max-h-[300px] border-b border-gray-800' : 'max-h-0'}`}>
+          <div className="p-4">
+             <ConfigManager 
                 presets={savedPresets}
                 onSave={savePreset}
                 onLoad={loadPreset}
                 onDelete={deletePreset}
                 onRename={renamePreset}
             />
-        </ModuleWrapper>
-
+          </div>
+        </div>
       </div>
 
       <BackgroundSettings 
@@ -222,6 +251,7 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
         onRemoveBg={onRemoveBg} onMoveBg={onMoveBg} onSelectBg={onSelectBg} onDeselectBg={onDeselectBg}
         onClearBgMedia={onClearBgMedia} onExportConfig={onExportConfig}
         bgAutoplayInterval={bgAutoplayInterval} setBgAutoplayInterval={setBgAutoplayInterval}
+        sfxMap={sfxMap}
       />
       
       {showHelp && <HelpModal onClose={() => setShowHelp(false)} />}

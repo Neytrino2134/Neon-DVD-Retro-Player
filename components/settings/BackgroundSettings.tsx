@@ -1,10 +1,11 @@
 
 import React, { useRef, useState } from 'react';
-import { Layers, Palette, List, ChevronDown, ChevronUp, Timer, Trash2, Image as ImageIcon, Music, Download, FileArchive } from 'lucide-react';
+import { Layers, Palette, List, ChevronDown, ChevronUp, Timer, Trash2, Image as ImageIcon, Music, Download, FileArchive, Check, X } from 'lucide-react';
 import { BackgroundMedia, PatternConfig } from '../../types';
 import RangeControl from './RangeControl';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { Tooltip } from '../ui/Tooltip';
+import { REQUIRED_SFX_FILES } from '../../hooks/useSFX';
 
 interface BackgroundSettingsProps {
   bgColor: string;
@@ -27,6 +28,7 @@ interface BackgroundSettingsProps {
   onExportConfig: () => void;
   bgAutoplayInterval: number;
   setBgAutoplayInterval: (val: number) => void;
+  sfxMap?: Record<string, string>;
 }
 
 const BG_PALETTE = [
@@ -49,7 +51,7 @@ const PATTERNS = [
 const BackgroundSettings: React.FC<BackgroundSettingsProps> = ({
   bgColor, setBgColor, bgPattern, setBgPattern, bgPatternConfig, setBgPatternConfig,
   onBgMediaUpload, onAudioUpload, onSfxUpload, bgMedia, bgList, currentBgIndex, onRemoveBg, onMoveBg, onSelectBg, onDeselectBg,
-  onExportConfig, bgAutoplayInterval, setBgAutoplayInterval
+  onExportConfig, bgAutoplayInterval, setBgAutoplayInterval, sfxMap
 }) => {
   const { t } = useLanguage();
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -58,6 +60,48 @@ const BackgroundSettings: React.FC<BackgroundSettingsProps> = ({
   
   const [showBgList, setShowBgList] = useState(false);
   const [showBgSettings, setShowBgSettings] = useState(false);
+
+  const getSfxTooltipContent = () => {
+    if (!sfxMap) return t('load_sfx_zip');
+
+    // Check if any file in sfxMap starts with the required base name
+    const missingFiles = REQUIRED_SFX_FILES.filter(requiredBase => {
+        const found = Object.keys(sfxMap).some(uploadedFile => uploadedFile.startsWith(requiredBase));
+        return !found;
+    });
+
+    const isComplete = missingFiles.length === 0 && Object.keys(sfxMap).length > 0;
+    const isEmpty = Object.keys(sfxMap).length === 0;
+
+    return (
+      <div className="flex flex-col gap-2 min-w-[200px]">
+         <div className="flex items-center justify-between border-b border-gray-700 pb-1 mb-1">
+             <span className="text-gray-400">STATUS:</span>
+             <span className={`font-bold ${isComplete ? 'text-neon-green' : isEmpty ? 'text-gray-500' : 'text-yellow-500'}`}>
+                {isComplete ? 'ACTIVE' : isEmpty ? 'EMPTY' : 'PARTIAL'}
+             </span>
+         </div>
+         
+         <div className="space-y-1">
+            {REQUIRED_SFX_FILES.map(baseName => {
+                const isFound = Object.keys(sfxMap).some(k => k.startsWith(baseName));
+                return (
+                    <div key={baseName} className="flex items-center gap-2 text-[9px]">
+                        {isFound ? <Check size={10} className="text-neon-green" /> : <X size={10} className="text-red-500" />}
+                        <span className={isFound ? 'text-gray-300' : 'text-gray-500 line-through'}>{baseName}</span>
+                    </div>
+                );
+            })}
+         </div>
+
+         {!isComplete && (
+             <div className="text-[9px] text-gray-500 mt-1 italic border-t border-gray-800 pt-1">
+                 Required: wav/mp3/m4a with these names
+             </div>
+         )}
+      </div>
+    );
+  };
 
   return (
     <div className="p-4 bg-gray-900 border-t border-gray-800 z-10 shrink-0 space-y-3">
@@ -219,25 +263,23 @@ const BackgroundSettings: React.FC<BackgroundSettingsProps> = ({
               </div>
           )}
 
-          <div className="grid grid-cols-2 gap-2">
+          <div className="flex gap-2">
               <Tooltip content="LOAD IMAGE/VIDEO" position="top">
-                <button onClick={() => fileInputRef.current?.click()} className="w-full flex items-center justify-center gap-2 p-2 bg-gray-800 border border-gray-600 rounded text-gray-300 hover:text-white hover:border-neon-yellow transition-colors">
-                    <ImageIcon size={16} className="text-neon-yellow" /> <span className="font-mono text-xs">IMG/VID</span>
+                <button onClick={() => fileInputRef.current?.click()} className="flex-1 flex items-center justify-center gap-2 p-2 bg-gray-800 border border-gray-600 rounded text-gray-300 hover:text-white hover:border-neon-yellow transition-colors min-w-0">
+                    <ImageIcon size={16} className="text-neon-yellow shrink-0" /> <span className="font-mono text-[10px] md:text-xs truncate">IMG</span>
                 </button>
               </Tooltip>
               
               <Tooltip content="LOAD AUDIO" position="top">
-                <button onClick={() => audioInputRef.current?.click()} className="w-full flex items-center justify-center gap-2 p-2 bg-gray-800 border border-gray-600 rounded text-gray-300 hover:text-white hover:border-neon-green transition-colors">
-                    <Music size={16} className="text-neon-green" /> <span className="font-mono text-xs">AUDIO</span>
+                <button onClick={() => audioInputRef.current?.click()} className="flex-1 flex items-center justify-center gap-2 p-2 bg-gray-800 border border-gray-600 rounded text-gray-300 hover:text-white hover:border-neon-green transition-colors min-w-0">
+                    <Music size={16} className="text-neon-green shrink-0" /> <span className="font-mono text-[10px] md:text-xs truncate">AUDIO</span>
                 </button>
               </Tooltip>
-          </div>
-          
-          <div className="flex gap-2">
+              
               {onSfxUpload && (
-                <Tooltip content={t('load_sfx_zip')} position="top">
-                  <button onClick={() => sfxInputRef.current?.click()} className="flex-1 flex items-center justify-center gap-2 p-2 bg-gray-800 border border-gray-600 rounded text-gray-300 hover:text-white hover:border-neon-pink transition-colors">
-                      <FileArchive size={16} className="text-neon-pink" /> <span className="font-mono text-xs">SFX (ZIP)</span>
+                <Tooltip content={getSfxTooltipContent()} position="top">
+                  <button onClick={() => sfxInputRef.current?.click()} className="flex-1 flex items-center justify-center gap-2 p-2 bg-gray-800 border border-gray-600 rounded text-gray-300 hover:text-white hover:border-neon-pink transition-colors min-w-0">
+                      <FileArchive size={16} className="text-neon-pink shrink-0" /> <span className="font-mono text-[10px] md:text-xs truncate">SFX</span>
                   </button>
                 </Tooltip>
               )}

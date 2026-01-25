@@ -34,11 +34,11 @@ const MarqueeSettings: React.FC<MarqueeSettingsProps> = ({ config, update }) => 
             </div>
             <button
                 onClick={() => update('showProgress', !config.showProgress)}
-                className={`relative w-10 h-5 rounded-full transition-all duration-300 shadow-inner ml-2
-                ${config.showProgress ? 'bg-neon-purple shadow-[0_0_8px_rgba(188,19,254,0.5)]' : 'bg-gray-700'}
+                className={`relative w-10 h-5 rounded-sm transition-all duration-300 shadow-inner ml-2 border border-gray-600/50
+                ${config.showProgress ? 'bg-neon-purple shadow-[0_0_8px_rgba(188,19,254,0.5)]' : 'bg-gray-800'}
                 `}
             >
-                <div className={`absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full shadow-md transition-transform duration-300
+                <div className={`absolute top-0.5 left-0.5 w-3.5 h-3.5 bg-white rounded-sm shadow-md transition-transform duration-300
                 ${config.showProgress ? 'translate-x-5' : 'translate-x-0'}
                 `}></div>
             </button>

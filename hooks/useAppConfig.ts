@@ -17,6 +17,141 @@ const STORAGE_KEYS = {
   PRESETS: 'neon_config_presets'
 };
 
+const DEFAULT_PRESETS: AppPreset[] = [
+  {
+    id: 'default_system',
+    name: 'Default System',
+    createdAt: Date.now(),
+    config: {
+      visualizerConfig: {
+        style: 'blue', position: 'bottom', barCount: 128, sensitivity: 1.5, fillOpacity: 0.3,
+        strokeEnabled: true, strokeOpacity: 0.8, showTips: true, normalize: false, minFrequency: 0, maxFrequency: 100, 
+        barGap: 2, mirror: false, segmented: false, segmentHeight: 4, segmentGap: 2,
+        tipHeight: 2, tipSpeed: 15
+      },
+      dvdConfig: { size: 150, speed: 2, opacity: 0.7, enableSfx: false, logoType: 'neon_waves' },
+      effectsConfig: {
+        fps: 60, pixelation: 1, noise: 0, chromaticAberration: 0, vhsJitter: 0, scanlineEnabled: true, scanlineIntensity: 0.2, scanlineThickness: 4,
+        glitch: { enabled: false, intensity: 0.5, speed: 0.2, opacity: 1.0, variant: 'v1' },
+        cyberHack: { enabled: false, speed: 5, opacity: 0.7, density: 0.5, scale: 1.0, backgroundOpacity: 0.4 },
+        debugConsole: { enabled: false, opacity: 0.9, scale: 1.0 },
+        holograms: { 
+          enabled: false, opacity: 0.8, speed: 1.0, interval: 15, scale: 1.0,
+          categories: { system: true, interactive: true, music: true, motivational: true, philosophy: false, space: false }
+        }
+      },
+      marqueeConfig: {
+        enabled: true, showProgress: true, progressMode: 'blocks', progressHeight: 20, progressOpacity: 0.6,
+        speed: 1, opacity: 0.9, fontSize: 40
+      },
+      bgColor: '#0f172a',
+      bgPattern: 'none',
+      bgPatternConfig: { intensity: 0.25, scale: 1.0 },
+      showVisualizer: true,
+      showDvd: true,
+      bgAutoplayInterval: 5
+    }
+  },
+  {
+    id: 'middle_wave_bar',
+    name: 'Middle Wave Bar',
+    createdAt: Date.now(),
+    config: {
+      visualizerConfig: {
+        style: "blue",
+        position: "center",
+        barCount: 24,
+        sensitivity: 0.8,
+        fillOpacity: 0.2,
+        strokeEnabled: true,
+        strokeOpacity: 0.8,
+        showTips: true,
+        normalize: false,
+        minFrequency: 5,
+        maxFrequency: 81,
+        barGap: 8,
+        mirror: true,
+        segmented: true,
+        segmentHeight: 30,
+        segmentGap: 9,
+        tipHeight: 5,
+        tipSpeed: 6
+      },
+      dvdConfig: {
+        size: 180,
+        speed: 2,
+        opacity: 1,
+        enableSfx: false,
+        logoType: "neon_waves"
+      },
+      effectsConfig: {
+        fps: 60,
+        pixelation: 1,
+        noise: 0.05,
+        chromaticAberration: 1,
+        vhsJitter: 0.5,
+        scanlineEnabled: true,
+        scanlineIntensity: 0.25,
+        scanlineThickness: 9,
+        glitch: {
+          enabled: false,
+          intensity: 0.1,
+          speed: 0.15,
+          opacity: 0.35,
+          variant: "v2"
+        },
+        cyberHack: {
+          enabled: false,
+          speed: 6,
+          opacity: 0.7,
+          density: 0.5,
+          scale: 0.9,
+          backgroundOpacity: 0.1
+        },
+        debugConsole: {
+          enabled: false,
+          opacity: 0.9,
+          scale: 1.1
+        },
+        holograms: {
+          enabled: false,
+          opacity: 1,
+          speed: 1,
+          interval: 1,
+          scale: 1.3,
+          categories: {
+            system: true,
+            interactive: true,
+            music: true,
+            motivational: true,
+            philosophy: true,
+            space: true
+          }
+        }
+      },
+      bgColor: "#000000",
+      bgPattern: "dots",
+      bgPatternConfig: {
+        intensity: 1,
+        scale: 1
+      },
+      showVisualizer: true,
+      showDvd: false,
+      marqueeConfig: {
+        enabled: true,
+        showProgress: true,
+        progressMode: "blocks",
+        progressHeight: 20,
+        progressOpacity: 0.6,
+        speed: 1,
+        opacity: 0.6,
+        fontSize: 40
+      },
+      bgAutoplayInterval: 5
+    }
+  }
+];
+
 const getInitial = <T,>(key: string, defaultValue: T): T => {
   const saved = localStorage.getItem(key);
   if (!saved) return defaultValue;
@@ -65,7 +200,11 @@ export const useAppConfig = () => {
     }
   });
 
-  const [dvdConfig, setDvdConfig] = useState<DvdConfig>(() => getInitial(STORAGE_KEYS.DVD, { size: 120, speed: 2, opacity: 1.0 }));
+  const [dvdConfig, setDvdConfig] = useState<DvdConfig>(() => {
+    const defaults: DvdConfig = { size: 150, speed: 2, opacity: 0.7, enableSfx: false, logoType: 'neon_waves' };
+    const initial = getInitial(STORAGE_KEYS.DVD, defaults);
+    return { ...defaults, ...initial };
+  });
 
   const [effectsConfig, setEffectsConfig] = useState<EffectsConfig>(() => {
       const defaults: EffectsConfig = {
@@ -133,8 +272,22 @@ export const useAppConfig = () => {
   // Autoplay Interval in Minutes (default 5)
   const [bgAutoplayInterval, setBgAutoplayInterval] = useState<number>(() => getInitial(STORAGE_KEYS.BG_AUTOPLAY, 5));
 
-  // Saved Presets
-  const [savedPresets, setSavedPresets] = useState<AppPreset[]>(() => getInitial(STORAGE_KEYS.PRESETS, []));
+  // Saved Presets - Initialize with Defaults if empty
+  const [savedPresets, setSavedPresets] = useState<AppPreset[]>(() => {
+    const saved = localStorage.getItem(STORAGE_KEYS.PRESETS);
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        // If we have saved presets, use them. If array is empty (user deleted all), 
+        // we might want to restore defaults or respect the empty state. 
+        // For now, if it's empty, we restore defaults so the user always has a starting point.
+        return parsed.length > 0 ? parsed : DEFAULT_PRESETS;
+      } catch {
+        return DEFAULT_PRESETS;
+      }
+    }
+    return DEFAULT_PRESETS;
+  });
 
   // Persistence
   useEffect(() => {

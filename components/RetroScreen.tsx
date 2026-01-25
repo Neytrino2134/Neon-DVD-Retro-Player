@@ -1,4 +1,5 @@
 
+
 import React, { useRef, useEffect, forwardRef, useMemo, useState } from 'react';
 import { Upload, Minimize, Maximize, Monitor, Power } from 'lucide-react';
 import { AudioTrack, VisualizerConfig, EffectsConfig, DvdConfig, MarqueeConfig, PatternConfig } from '../types';
@@ -16,7 +17,9 @@ import TransitionEffect from './effects/TransitionEffect';
 import HologramEffect from './effects/HologramEffect';
 import Marquee from './Marquee';
 import ProgressBar from './ProgressBar';
+import NotificationOverlay from './ui/NotificationOverlay';
 import { useLanguage } from '../contexts/LanguageContext';
+import { useNotification } from '../contexts/NotificationContext';
 import { Tooltip } from './ui/Tooltip';
 import { useGestures } from '../hooks/useGestures';
 
@@ -64,6 +67,9 @@ interface RetroScreenProps {
   // Actions
   onScheduleReload: () => void;
   rebootPhase: 'idle' | 'waiting' | 'active';
+
+  // SFX
+  onPlaySfx?: (name: string) => void;
 }
 
 const RetroScreen = forwardRef<HTMLDivElement, RetroScreenProps>(({
@@ -72,42 +78,39 @@ const RetroScreen = forwardRef<HTMLDivElement, RetroScreenProps>(({
   progress = 0, currentTime, duration,
   focusMode, setFocusMode, isDragging,
   onDragOver, onDragEnter, onDragLeave, onDrop,
-  onScheduleReload, rebootPhase
+  onScheduleReload, rebootPhase,
+  onPlaySfx
 }, externalRef) => {
   
   const { t } = useLanguage();
+  const { notifications } = useNotification();
   const internalRef = useRef<HTMLDivElement>(null);
   const containerRef = (externalRef as React.RefObject<HTMLDivElement>) || internalRef;
   const signalLayerRef = useRef<HTMLDivElement>(null);
   const shakeRef = useRef<HTMLDivElement>(null);
 
+  const hasNotifications = notifications.length > 0;
+
   // Gesture Controls
   const gestureHandlers = useGestures({
     onDoubleTap: () => {
-        // Toggle Focus Mode (Cinema Mode) on double tap
         setFocusMode(!focusMode);
     },
-    // You could add onSwipeLeft/Right to change backgrounds here in the future
   });
 
   // Transition State
   const [activeMedia, setActiveMedia] = useState(bgMedia);
   const [transitionPhase, setTransitionPhase] = useState<'idle' | 'out' | 'in'>('idle');
 
-  // Handle Background Transition Logic
   useEffect(() => {
-    // If it's the very first load or explicit null to null, just sync
     if (activeMedia === bgMedia) return;
 
-    // Start Exit Animation (Fill with blocks)
     setTransitionPhase('out');
 
-    // Wait for screen to be sufficiently covered (800ms - Faster, but allows gradual fill)
     const timeout1 = setTimeout(() => {
-      setActiveMedia(bgMedia); // Swap the actual media behind the mask
-      setTransitionPhase('in'); // Start Reveal Animation (Remove blocks)
+      setActiveMedia(bgMedia); 
+      setTransitionPhase('in'); 
 
-      // Wait for reveal to finish (800ms)
       const timeout2 = setTimeout(() => {
         setTransitionPhase('idle');
       }, 800);
@@ -118,11 +121,10 @@ const RetroScreen = forwardRef<HTMLDivElement, RetroScreenProps>(({
     return () => clearTimeout(timeout1);
   }, [bgMedia]); 
 
-  // Screen Shake Loop (Combines VHS Jitter + Transition Shake)
+  // Screen Shake Loop
   useEffect(() => {
     let aid: number;
     const loop = () => {
-      // Base VHS Jitter
       let x = 0;
       let y = 0;
 
@@ -131,7 +133,6 @@ const RetroScreen = forwardRef<HTMLDivElement, RetroScreenProps>(({
         y += (Math.random()-0.5) * effectsConfig.vhsJitter * 2;
       }
 
-      // Transition Shake (subtle rumble during swap)
       if (transitionPhase !== 'idle') {
         const shakeIntensity = 8; 
         x += (Math.random() - 0.5) * shakeIntensity;
@@ -150,7 +151,6 @@ const RetroScreen = forwardRef<HTMLDivElement, RetroScreenProps>(({
 
   const aberrationValue = effectsConfig.chromaticAberration || 0;
 
-  // Prepare Marquee Text
   const marqueeText = useMemo(() => {
     const chars = ["@", "#", "$", "%", "&", "*", "!", "?", "0x", "ERR", "//"];
     const dots = ".........";
@@ -173,8 +173,8 @@ const RetroScreen = forwardRef<HTMLDivElement, RetroScreenProps>(({
     >
       <div 
         ref={shakeRef}
-        onDoubleClick={() => setFocusMode(!focusMode)} // Keep mouse double click
-        {...gestureHandlers} // Apply Touch Gestures
+        onDoubleClick={() => setFocusMode(!focusMode)} 
+        {...gestureHandlers} 
         className={`cursor-hide-center relative w-full h-full bg-gray-900 transition-all duration-700 ${focusMode ? 'rounded-none border-0' : 'rounded-2xl border-4'} ${isDragging ? 'border-neon-blue shadow-[0_0_30px_#00f3ff]' : 'border-gray-800'} overflow-hidden group touch-action-manipulation`}
         onDragOver={onDragOver}
         onDragEnter={onDragEnter}
@@ -182,6 +182,9 @@ const RetroScreen = forwardRef<HTMLDivElement, RetroScreenProps>(({
         onDrop={onDrop}
       >
          <div ref={containerRef} className="relative w-full h-full overflow-hidden bg-black">
+            {/* IN-SCREEN NOTIFICATION OVERLAY */}
+            <NotificationOverlay />
+
             {/* Screen Controls - Left (Reboot) */}
             <div className="absolute top-4 left-4 z-50 flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
               <Tooltip content={t('reboot')} position="right">
@@ -197,7 +200,6 @@ const RetroScreen = forwardRef<HTMLDivElement, RetroScreenProps>(({
             {/* Screen Controls - Right */}
             <div className="absolute top-4 right-4 z-50 flex items-center gap-4">
               
-              {/* Internal Scheduled Reboot Indicator */}
               {rebootPhase === 'waiting' && (
                 <div className="flex items-center gap-3 animate-slide-in-right pointer-events-none pr-2">
                   <div className="flex flex-col items-end">
@@ -217,7 +219,6 @@ const RetroScreen = forwardRef<HTMLDivElement, RetroScreenProps>(({
                 </div>
               )}
 
-              {/* Fullscreen Button */}
               <div className="opacity-0 group-hover:opacity-100 transition-opacity duration-300">
                 <Tooltip content={focusMode ? "EXIT FULL SCREEN" : "FULL SCREEN"} position="left">
                   <button 
@@ -230,7 +231,6 @@ const RetroScreen = forwardRef<HTMLDivElement, RetroScreenProps>(({
               </div>
             </div>
 
-            {/* Chromatic Filter Definition */}
             <ChromaticAberration intensity={aberrationValue} />
 
             <div 
@@ -238,22 +238,15 @@ const RetroScreen = forwardRef<HTMLDivElement, RetroScreenProps>(({
                 className="absolute inset-0 w-full h-full"
                 style={aberrationValue > 0 ? { filter: 'url(#chromatic-aberration-filter)' } : undefined}
             >
-                {/* 1. BACKGROUND LAYER (Z-0) */}
                 <MediaRenderer type={activeMedia ? activeMedia.type : 'color'} url={activeMedia?.url} bgColor={bgColor} effects={effectsConfig} />
                 
-                {/* 1.5 PATTERN OVERLAY (Z-1) */}
                 <PatternOverlay pattern={bgPattern} config={bgPatternConfig} />
                 
-                {/* 2. TRANSITION MASK LAYER (Z-5) */}
-                {/* Covers background but sits BEHIND visualizers */}
                 <TransitionEffect phase={transitionPhase} />
                 
-                {/* 3. VISUALIZATION & UI LAYERS (Z-10+) */}
-                {/* Force 120FPS for visualizer so it ignores the retro FPS limiter used elsewhere */}
                 {showVisualizer && <Visualizer analyser={analyser} isPlaying={isPlaying} config={visualizerConfig} fps={120} />}
-                {showDvd && <DvdLogo containerRef={containerRef} fps={effectsConfig.fps} effectsConfig={effectsConfig} config={dvdConfig} />}
+                {showDvd && <DvdLogo containerRef={containerRef} fps={effectsConfig.fps} effectsConfig={effectsConfig} config={dvdConfig} onPlaySfx={onPlaySfx} />}
                 
-                {/* Progress Bar (Retro Loading Style) */}
                 <ProgressBar 
                     progress={progress} 
                     visible={marqueeConfig.enabled && marqueeConfig.showProgress} 
@@ -263,7 +256,6 @@ const RetroScreen = forwardRef<HTMLDivElement, RetroScreenProps>(({
                     color="#00ff00"
                 />
 
-                {/* Marquee Overlay */}
                 {marqueeConfig.enabled && (
                    <div className="absolute top-8 left-0 w-full h-24 z-20 pointer-events-none mix-blend-screen flex items-center">
                      <Marquee 
@@ -284,9 +276,10 @@ const RetroScreen = forwardRef<HTMLDivElement, RetroScreenProps>(({
             <DebugConsoleEffect effects={effectsConfig} />
             <NoiseOverlay opacity={effectsConfig.noise} pixelation={effectsConfig.pixelation} />
             <ScanlineEffect config={effectsConfig} />
-            <div className="absolute inset-0 z-30 pointer-events-none flicker bg-white/5"></div>
+            
+            {/* Flicker Effect - Disabled when notifications are present to keep screen static */}
+            <div className={`absolute inset-0 z-30 pointer-events-none ${hasNotifications ? '' : 'flicker'} bg-white/5`}></div>
 
-            {/* Drag and Drop Overlay */}
             {isDragging && (
               <div className="absolute inset-0 z-50 flex items-center justify-center bg-neon-blue/20 backdrop-blur-sm pointer-events-none border-4 border-dashed border-neon-blue m-2 rounded-xl animate-pulse">
                 <div className="flex flex-col items-center gap-4 text-neon-blue font-mono drop-shadow-[0_0_10px_#00f3ff]">
@@ -299,7 +292,7 @@ const RetroScreen = forwardRef<HTMLDivElement, RetroScreenProps>(({
 
             {!isPlaying && !currentTrack && !isDragging && (
                 <div className="absolute inset-0 flex items-center justify-center z-20 pointer-events-none">
-                    <div className="text-neon-blue font-mono text-xl animate-pulse border-2 border-neon-blue px-8 py-4 rounded bg-black/50">INSERT DISK</div>
+                    <div className="text-neon-blue font-mono text-xl border border-neon-blue/50 px-8 py-4 rounded bg-black/20 backdrop-blur-[2px] shadow-[0_0_20px_rgba(0,243,255,0.1)]">INSERT DISK</div>
                 </div>
             )}
          </div>

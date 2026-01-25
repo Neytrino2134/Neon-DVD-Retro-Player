@@ -1,6 +1,8 @@
 
-import React, { useState, useRef, useEffect } from 'react';
+
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { LanguageProvider } from './contexts/LanguageContext';
+import { NotificationProvider, useNotification } from './contexts/NotificationContext';
 import SettingsPanel from './components/settings/SettingsPanel';
 import Controls from './components/Controls';
 import RetroScreen from './components/RetroScreen';
@@ -16,66 +18,79 @@ function AppContent() {
   const [focusMode, setFocusMode] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
   const appContainerRef = useRef<HTMLDivElement>(null);
+  const { addNotification } = useNotification();
   
   // Reload State Logic
   const [rebootPhase, setRebootPhase] = useState<'idle' | 'waiting' | 'active'>('idle');
   
   // Intro Animation Sequence State
-  // 0: Booting (Overlay visible, main app hidden/shifted)
-  // 1: Panels Slide In
-  // 2: Screen Appears
   const [introState, setIntroState] = useState<0 | 1 | 2>(0);
+  
+  // Track if we have already done the initial boot notification
+  const hasBootedRef = useRef(false);
+  
+  // Key to force remount of StartupOverlay
+  const [startupKey, setStartupKey] = useState(0);
 
   // Custom Hooks
   const player = useAudioPlayer();
   const config = useAppConfig();
-  const { playSFX, handleZipUpload } = useSFX();
-
-  // Play startup sound on mount
-  useEffect(() => {
-    // Attempt to play startup sound. Browser policy might block this if no interaction occurred,
-    // but often in a local/PWA context or if the user clicks quickly, it works.
-    // The useSFX hook handles errors gracefully.
-    playSFX('Binary_Code_Sound_Effects_Start.wav');
-  }, [playSFX]);
+  const { playSFX, handleZipUpload, stopAllSFX, sfxMap } = useSFX();
 
   // 1. Trigger or Cancel Reboot
   const handleScheduleReload = () => {
-    // If already scheduled, cancel it
     if (rebootPhase !== 'idle') {
         setRebootPhase('idle');
+        addNotification("Reboot Cancelled", "info");
         return;
     }
     
     // Check if playing audio
     if (player.isPlaying && Number.isFinite(player.duration) && player.duration > player.currentTime) {
         setRebootPhase('waiting');
+        addNotification("Reboot scheduled after track", "warning");
     } else {
-        // No audio playing, go straight to active shutdown
         setRebootPhase('active');
-        playSFX('Binary_Code_Sound_Effects_Reboot.wav');
+        // SFX is now triggered inside ShutdownOverlay for synchronization
         player.setIsPlaying(false);
     }
   };
 
-  const handleBootComplete = () => {
-      // Step 1: Slide panels in
-      setIntroState(1);
-      
-      // Step 2: Show screen after panels start moving
-      setTimeout(() => {
-          setIntroState(2);
-      }, 800);
+  // Called when StartupOverlay BEGINS to fade out.
+  // We turn on the main screen immediately so it's visible BEHIND the fading overlay.
+  const handleOverlayFadeOut = () => {
+      setIntroState(2);
   };
+
+  // Called when StartupOverlay is completely gone.
+  const handleBootComplete = () => {
+      // Only show notification on the very first boot of the session
+      if (!hasBootedRef.current) {
+          hasBootedRef.current = true;
+          setTimeout(() => {
+              addNotification("SYSTEM ONLINE", "success");
+          }, 500);
+      }
+  };
+
+  const handleGoHome = () => {
+      player.stop();
+      setIntroState(0);
+      setStartupKey(prev => prev + 1); // Force StartupOverlay to reset state
+      setFocusMode(false);
+  };
+  
+  // FIX: Memoize handler to prevent re-renders of ShutdownOverlay
+  const handlePlayRebootSfx = useCallback(() => {
+      playSFX('Binary_Code_Sound_Effects_Reboot.mp3');
+  }, [playSFX]);
 
   // Keyboard Shortcuts
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      // Ignore key presses if typing in an input field
       const target = e.target as HTMLElement;
       if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.tagName === 'SELECT') return;
 
-      // Prevent rapid toggling when holding down keys
       if (e.repeat) return;
 
       if (e.code === 'Space') {
@@ -87,7 +102,6 @@ function AppContent() {
         config.prevBg();
       } else if (e.code === 'KeyF') {
         if (e.shiftKey) {
-            // Shift + F: Browser Fullscreen
             if (!document.fullscreenElement) {
                 document.documentElement.requestFullscreen().catch(err => {
                     console.error(`Error attempting to enable full-screen mode: ${err.message}`);
@@ -96,8 +110,8 @@ function AppContent() {
                 document.exitFullscreen();
             }
         } else {
-            // F: App Focus Mode (Cinema Mode)
             setFocusMode(prev => !prev);
+            addNotification(focusMode ? "UI restored" : "Cinema Mode Active", "info");
         }
       } else if (e.code === 'Pause') {
         handleScheduleReload();
@@ -106,7 +120,7 @@ function AppContent() {
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [player, config, setFocusMode, handleScheduleReload]);
+  }, [player, config, setFocusMode, handleScheduleReload, focusMode]);
 
   // Drag and Drop Logic
   const onDragOver = (e: React.DragEvent) => {
@@ -124,8 +138,6 @@ function AppContent() {
   const onDragLeave = (e: React.DragEvent) => {
     e.preventDefault();
     e.stopPropagation();
-    
-    // Check if we are leaving the app container
     if (appContainerRef.current && !appContainerRef.current.contains(e.relatedTarget as Node)) {
        setIsDragging(false);
     }
@@ -143,6 +155,7 @@ function AppContent() {
     const nrpFiles = droppedFiles.filter(f => f.name.toLowerCase().endsWith('.nrp'));
     if (nrpFiles.length > 0) {
       config.importConfig(nrpFiles[0]);
+      addNotification("Configuration Loaded", "success");
     }
 
     // Handle Media
@@ -151,31 +164,35 @@ function AppContent() {
     // Handle Zip (SFX)
     const zipFiles = droppedFiles.filter(f => f.name.toLowerCase().endsWith('.zip'));
 
-    if (audioFiles.length > 0) await player.processAudioFiles(audioFiles);
-    if (mediaFiles.length > 0) await config.handleBgUpload(mediaFiles);
-    if (zipFiles.length > 0) await handleZipUpload(zipFiles[0]);
+    if (audioFiles.length > 0) {
+        await player.processAudioFiles(audioFiles);
+        addNotification(`${audioFiles.length} tracks added`, "success");
+    }
+    if (mediaFiles.length > 0) {
+        await config.handleBgUpload(mediaFiles);
+        addNotification(`${mediaFiles.length} backgrounds added`, "success");
+    }
+    if (zipFiles.length > 0) {
+        await handleZipUpload(zipFiles[0]);
+    }
   };
 
   const handleFilesSelected = async (fileList: FileList) => {
     await player.processAudioFiles(Array.from(fileList));
+    addNotification(`${fileList.length} tracks added`, "success");
   };
 
   const handleTrackEnded = () => {
-    // If we were waiting for the track to end to reboot
     if (rebootPhase === 'waiting') {
-        player.setIsPlaying(false); // Silence
-        setRebootPhase('active'); // Start shutdown sequence
-        playSFX('Binary_Code_Sound_Effects_Reboot.wav');
+        player.setIsPlaying(false);
+        setRebootPhase('active');
+        // SFX triggered via overlay props
     } else {
-        // Normal behavior:
         player.nextTrack();
     }
   };
 
-  // Wrapper for time update to inject logic control
   const handleTimeUpdate = (e: any) => {
-      // If we are waiting for a reboot, we want the track to play to the bitter end (onEnded)
-      // and NOT trigger the auto-mix/crossfade logic in the hook.
       const preventAutoMix = rebootPhase === 'waiting';
       
       if (player.activeDeck === 'A') {
@@ -185,7 +202,6 @@ function AppContent() {
       }
   };
 
-  // Calculate percentage for the new progress bar
   const playbackPercentage = (player.duration > 0) ? (player.currentTime / player.duration) * 100 : 0;
 
   return (
@@ -197,11 +213,24 @@ function AppContent() {
       onDragLeave={onDragLeave}
       onDrop={onDrop}
     >
-      <StartupOverlay onComplete={handleBootComplete} />
-      <ShutdownOverlay active={rebootPhase === 'active'} onCancel={() => setRebootPhase('idle')} />
+      <StartupOverlay 
+        key={startupKey}
+        onFadeOut={handleOverlayFadeOut}
+        onComplete={handleBootComplete} 
+        onPlaySfx={playSFX} 
+        onStopSfx={stopAllSFX}
+      />
+      <ShutdownOverlay 
+        active={rebootPhase === 'active'} 
+        onPlayRebootSfx={handlePlayRebootSfx}
+        onCancel={() => {
+            setRebootPhase('idle');
+            stopAllSFX();
+            addNotification("Reboot Cancelled", "info");
+        }} 
+      />
       
       {/* DUAL DECK AUDIO SYSTEM */}
-      {/* Deck A */}
       <audio 
         ref={player.audioRefA} 
         onEnded={player.activeDeck === 'A' ? handleTrackEnded : undefined} 
@@ -211,7 +240,6 @@ function AppContent() {
         onPause={player.onAudioPause}
         crossOrigin="anonymous" 
       />
-      {/* Deck B */}
       <audio 
         ref={player.audioRefB} 
         onEnded={player.activeDeck === 'B' ? handleTrackEnded : undefined} 
@@ -240,7 +268,7 @@ function AppContent() {
              bgColor={config.bgColor} setBgColor={config.setBgColor}
              bgPattern={config.bgPattern} setBgPattern={config.setBgPattern}
              bgPatternConfig={config.bgPatternConfig} setBgPatternConfig={config.setBgPatternConfig}
-             onBgMediaUpload={config.handleBgUpload} 
+             onBgMediaUpload={(f) => { config.handleBgUpload(f); addNotification(`${f.length} backgrounds added`, "success"); }} 
              bgMedia={config.bgMedia} 
              bgList={config.bgList}
              currentBgIndex={config.currentBgIndex}
@@ -253,23 +281,22 @@ function AppContent() {
              bgAutoplayInterval={config.bgAutoplayInterval}
              setBgAutoplayInterval={config.setBgAutoplayInterval}
              onScheduleReload={handleScheduleReload}
+             onGoHome={handleGoHome}
              onAudioUpload={handleFilesSelected}
-             // Audio Props
              crossfadeDuration={player.crossfadeDuration}
              setCrossfadeDuration={player.setCrossfadeDuration}
-             // Preset Management
              savedPresets={config.savedPresets}
-             savePreset={config.savePreset}
-             loadPreset={config.loadPreset}
+             savePreset={(n) => { config.savePreset(n); addNotification(`Preset "${n}" saved`, "success"); }}
+             loadPreset={(id) => { config.loadPreset(id); addNotification("Preset loaded", "success"); }}
              deletePreset={config.deletePreset}
              renamePreset={config.renamePreset}
-             // SFX Upload
              onSfxUpload={handleZipUpload}
+             sfxMap={sfxMap}
            />
         </div>
       </div>
 
-      {/* Main Screen - Center (Transitioned with scale and opacity) */}
+      {/* Main Screen - Center */}
       <div className={`flex-grow flex flex-col relative transition-all duration-1000 ease-out overflow-hidden
         ${introState >= 2 ? 'scale-100 opacity-100' : 'scale-75 opacity-0'}
       `}>
@@ -289,7 +316,7 @@ function AppContent() {
             marqueeConfig={config.marqueeConfig}
             progress={playbackPercentage}
             focusMode={focusMode}
-            setFocusMode={setFocusMode}
+            setFocusMode={(v) => { setFocusMode(v); addNotification(v ? "Cinema Mode Active" : "UI Restored", "info"); }}
             isDragging={isDragging}
             onDragOver={onDragOver}
             onDragEnter={onDragEnter}
@@ -299,6 +326,7 @@ function AppContent() {
             rebootPhase={rebootPhase}
             currentTime={player.currentTime}
             duration={player.duration}
+            onPlaySfx={playSFX}
           />
       </div>
       
@@ -326,9 +354,9 @@ function AppContent() {
               onPrev={player.prevTrack} 
               onTrackSelect={player.selectTrack} 
               onFilesSelected={handleFilesSelected}
-              onClearPlaylist={player.clearPlaylist}
-              onSort={player.sortTracks}
-              onShuffle={player.shuffleTracks}
+              onClearPlaylist={() => { player.clearPlaylist(); addNotification("Playlist cleared", "warning"); }}
+              onSort={() => { player.sortTracks(); addNotification("Playlist sorted A-Z", "info"); }}
+              onShuffle={() => { player.shuffleTracks(); addNotification("Playlist shuffled", "info"); }}
             />
         </div>
       </div>
@@ -347,10 +375,12 @@ function AppContent() {
 
 function App() {
   return (
-    <LanguageProvider>
-      <CustomCursor />
-      <AppContent />
-    </LanguageProvider>
+    <NotificationProvider>
+      <LanguageProvider>
+        <CustomCursor />
+        <AppContent />
+      </LanguageProvider>
+    </NotificationProvider>
   );
 }
 
