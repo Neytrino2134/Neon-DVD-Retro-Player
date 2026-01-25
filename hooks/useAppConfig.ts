@@ -1,6 +1,6 @@
 
 import { useState, useEffect, useCallback } from 'react';
-import { VisualizerConfig, DvdConfig, EffectsConfig, MarqueeConfig, BackgroundMedia, PatternConfig } from '../types';
+import { VisualizerConfig, DvdConfig, EffectsConfig, MarqueeConfig, BackgroundMedia, PatternConfig, AppPreset } from '../types';
 import { getAllBackgrounds, saveBackground, clearBackgrounds, deleteBackground } from '../lib/db';
 
 const STORAGE_KEYS = {
@@ -13,7 +13,8 @@ const STORAGE_KEYS = {
   SHOW_VISUALIZER: 'neon_show_visualizer',
   SHOW_DVD: 'neon_show_dvd',
   MARQUEE: 'neon_marquee_config',
-  BG_AUTOPLAY: 'neon_bg_autoplay_interval'
+  BG_AUTOPLAY: 'neon_bg_autoplay_interval',
+  PRESETS: 'neon_config_presets'
 };
 
 const getInitial = <T,>(key: string, defaultValue: T): T => {
@@ -48,19 +49,18 @@ export const useAppConfig = () => {
   });
 
   const [visualizerConfig, setVisualizerConfig] = useState<VisualizerConfig>(() => {
-    const initial = getInitial(STORAGE_KEYS.VISUALIZER, {
+    const defaults: VisualizerConfig = {
       style: 'blue', position: 'bottom', barCount: 128, sensitivity: 1.5, fillOpacity: 0.3,
       strokeEnabled: true, strokeOpacity: 0.8, showTips: true, normalize: false, minFrequency: 0, maxFrequency: 100, 
       barGap: 2, mirror: false, segmented: false, segmentHeight: 4, segmentGap: 2,
       tipHeight: 2, tipSpeed: 15
-    });
+    };
+
+    const initial = getInitial(STORAGE_KEYS.VISUALIZER, defaults);
 
     // Merge for backward compatibility
     return {
-        style: 'blue', position: 'bottom', barCount: 128, sensitivity: 1.5, fillOpacity: 0.3,
-        strokeEnabled: true, strokeOpacity: 0.8, showTips: true, normalize: false, minFrequency: 0, maxFrequency: 100, 
-        barGap: 2, mirror: false, segmented: false, segmentHeight: 4, segmentGap: 2,
-        tipHeight: 2, tipSpeed: 15,
+        ...defaults,
         ...initial
     }
   });
@@ -68,7 +68,7 @@ export const useAppConfig = () => {
   const [dvdConfig, setDvdConfig] = useState<DvdConfig>(() => getInitial(STORAGE_KEYS.DVD, { size: 120, speed: 2, opacity: 1.0 }));
 
   const [effectsConfig, setEffectsConfig] = useState<EffectsConfig>(() => {
-      const initial = getInitial(STORAGE_KEYS.EFFECTS, {
+      const defaults: EffectsConfig = {
         fps: 60, pixelation: 1, noise: 0, chromaticAberration: 0, vhsJitter: 0, scanlineEnabled: true, scanlineIntensity: 0.2, scanlineThickness: 4,
         glitch: { enabled: false, intensity: 0.5, speed: 0.2, opacity: 1.0, variant: 'v1' },
         cyberHack: { enabled: false, speed: 5, opacity: 0.7, density: 0.5, scale: 1.0, backgroundOpacity: 0.4 },
@@ -88,28 +88,36 @@ export const useAppConfig = () => {
             space: false
           }
         }
-      });
+      };
+      const initial = getInitial(STORAGE_KEYS.EFFECTS, defaults);
+      
+      const hologramDefaults = {
+        enabled: false,
+        opacity: 0.8,
+        speed: 1.0,
+        interval: 15,
+        scale: 1.0
+      };
+
+      const savedCategories = (initial.holograms?.categories || {}) as any;
+      const mergedCategories = {
+          system: savedCategories.system ?? true,
+          interactive: savedCategories.interactive ?? true,
+          music: savedCategories.music ?? true,
+          motivational: savedCategories.motivational ?? true,
+          philosophy: savedCategories.philosophy ?? false,
+          space: savedCategories.space ?? false
+      };
+
       // Ensure new properties exist for old saves
       return {
           ...initial,
           debugConsole: initial.debugConsole || { enabled: false, opacity: 0.9, scale: 1.0 },
           holograms: { 
-            enabled: false, 
-            opacity: 0.8, 
-            speed: 1.0, 
-            interval: 15, 
-            scale: 1.0, 
-            ...initial.holograms,
-            // Deep merge categories to ensure new ones appear if config is old
-            categories: {
-                system: true,
-                interactive: true,
-                music: true,
-                motivational: true,
-                philosophy: false,
-                space: false,
-                ...(initial.holograms?.categories || {})
-            }
+            // Merge defaults first, then initial, then merge specific nested props
+            ...hologramDefaults,
+            ...(initial.holograms || {}),
+            categories: mergedCategories
           }
       }
   });
@@ -125,6 +133,9 @@ export const useAppConfig = () => {
   // Autoplay Interval in Minutes (default 5)
   const [bgAutoplayInterval, setBgAutoplayInterval] = useState<number>(() => getInitial(STORAGE_KEYS.BG_AUTOPLAY, 5));
 
+  // Saved Presets
+  const [savedPresets, setSavedPresets] = useState<AppPreset[]>(() => getInitial(STORAGE_KEYS.PRESETS, []));
+
   // Persistence
   useEffect(() => {
     localStorage.setItem(STORAGE_KEYS.VISUALIZER, JSON.stringify(visualizerConfig));
@@ -138,6 +149,11 @@ export const useAppConfig = () => {
     localStorage.setItem(STORAGE_KEYS.MARQUEE, JSON.stringify(marqueeConfig));
     localStorage.setItem(STORAGE_KEYS.BG_AUTOPLAY, JSON.stringify(bgAutoplayInterval));
   }, [visualizerConfig, dvdConfig, effectsConfig, bgColor, bgPattern, bgPatternConfig, showVisualizer, showDvd, marqueeConfig, bgAutoplayInterval]);
+
+  // Persist Presets
+  useEffect(() => {
+    localStorage.setItem(STORAGE_KEYS.PRESETS, JSON.stringify(savedPresets));
+  }, [savedPresets]);
 
   // Load Backgrounds from DB
   useEffect(() => {
@@ -258,6 +274,60 @@ export const useAppConfig = () => {
     return () => clearInterval(intervalId);
   }, [bgList.length, bgAutoplayInterval, nextBg]);
 
+  // --- PRESET MANAGEMENT ---
+
+  const savePreset = (name: string) => {
+    const newPreset: AppPreset = {
+      id: crypto.randomUUID(),
+      name,
+      createdAt: Date.now(),
+      config: {
+        visualizerConfig,
+        dvdConfig,
+        effectsConfig,
+        marqueeConfig,
+        bgColor,
+        bgPattern,
+        bgPatternConfig,
+        showVisualizer,
+        showDvd,
+        bgAutoplayInterval
+      }
+    };
+    setSavedPresets(prev => [...prev, newPreset]);
+  };
+
+  const loadPreset = (id: string) => {
+    const preset = savedPresets.find(p => p.id === id);
+    if (!preset) return;
+
+    const { config } = preset;
+    
+    // Apply all settings
+    setVisualizerConfig(config.visualizerConfig);
+    setDvdConfig(config.dvdConfig);
+    setEffectsConfig(config.effectsConfig);
+    setMarqueeConfig(config.marqueeConfig);
+    setBgColor(config.bgColor);
+    setBgPattern(config.bgPattern);
+    setBgPatternConfig(config.bgPatternConfig);
+    setShowVisualizer(config.showVisualizer);
+    setShowDvd(config.showDvd);
+    setBgAutoplayInterval(config.bgAutoplayInterval);
+  };
+
+  const deletePreset = (id: string) => {
+    setSavedPresets(prev => prev.filter(p => p.id !== id));
+  };
+
+  const renamePreset = (id: string, newName: string) => {
+    setSavedPresets(prev => prev.map(p => 
+      p.id === id ? { ...p, name: newName } : p
+    ));
+  };
+
+  // --- EXPORT / IMPORT ---
+
   const exportConfig = () => {
     const config = {
       visualizerConfig, dvdConfig, effectsConfig, bgColor, bgPattern, bgPatternConfig, showVisualizer, showDvd, marqueeConfig, bgAutoplayInterval, version: '1.0'
@@ -313,6 +383,13 @@ export const useAppConfig = () => {
     removeBg, moveBg, selectBg, deselectBg,
     nextBg, prevBg,
     bgCount: bgList.length,
-    exportConfig, importConfig
+    exportConfig, importConfig,
+    
+    // Preset Manager
+    savedPresets,
+    savePreset,
+    loadPreset,
+    deletePreset,
+    renamePreset
   };
 };

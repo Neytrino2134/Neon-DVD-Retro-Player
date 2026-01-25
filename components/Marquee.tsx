@@ -76,7 +76,7 @@ const Marquee: React.FC<MarqueeProps> = ({ text, speed, opacity, fontSize, class
       const isSecondHalf = progress > 0.5;
       const baseStr = isSecondHalf ? newText : oldText;
 
-      const glitched = baseStr.split('').map((char, i) => {
+      const glitched = baseStr.split('').map((char) => {
         // Space usually stays space to preserve word structure, 
         // but at high chaos, even spaces get corrupted for "rectangular" look
         if (char === ' ' && chaos < 0.8) return ' ';

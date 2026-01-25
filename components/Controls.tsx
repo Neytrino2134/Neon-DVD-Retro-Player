@@ -1,9 +1,9 @@
 
-
 import React, { useRef, useState } from 'react';
 import { Play, Pause, Square, SkipBack, SkipForward, FolderOpen, Music, Volume2, VolumeX, Trash2, AlertTriangle, ArrowDownAZ, Shuffle } from 'lucide-react';
 import { AudioTrack } from '../types';
 import { useLanguage } from '../contexts/LanguageContext';
+import { Tooltip } from './ui/Tooltip';
 
 interface ControlsProps {
   tracks: AudioTrack[];
@@ -21,7 +21,6 @@ interface ControlsProps {
   onPrev: () => void;
   onTrackSelect: (index: number) => void;
   onFilesSelected: (files: FileList) => void;
-  onToggleCinema: () => void;
   onClearPlaylist: () => void;
   onSort: () => void;
   onShuffle: () => void;
@@ -75,7 +74,6 @@ const Controls: React.FC<ControlsProps> = ({
   onPrev,
   onTrackSelect,
   onFilesSelected,
-  onToggleCinema,
   onClearPlaylist,
   onSort,
   onShuffle
@@ -148,13 +146,15 @@ const Controls: React.FC<ControlsProps> = ({
         </h2>
         
         <div className="flex items-center gap-2 ml-auto">
-          <button
-            onClick={() => fileInputRef.current?.click()}
-            className="flex items-center gap-2 px-3 py-2 bg-gray-800 border border-neon-green text-neon-green rounded hover:bg-neon-green hover:text-black transition-colors"
-          >
-            <FolderOpen size={18} />
-            <span className="font-mono text-sm hidden lg:inline">LOAD</span>
-          </button>
+          <Tooltip content="LOAD FILES" position="bottom">
+            <button
+                onClick={() => fileInputRef.current?.click()}
+                className="flex items-center gap-2 px-3 py-2 bg-gray-800 border border-neon-green text-neon-green rounded hover:bg-neon-green hover:text-black transition-colors"
+            >
+                <FolderOpen size={18} />
+                <span className="font-mono text-sm hidden lg:inline">LOAD</span>
+            </button>
+          </Tooltip>
         </div>
 
         <input
@@ -178,13 +178,14 @@ const Controls: React.FC<ControlsProps> = ({
           </div>
         </div>
         <div className="flex items-center gap-3">
-            <button
-                onClick={onStop}
-                className="p-2 border border-neon-blue text-neon-blue rounded hover:bg-neon-blue hover:text-black transition-all shadow-[0_0_5px_#00f3ff] hover:shadow-[0_0_15px_#00f3ff] active:scale-95 shrink-0"
-                title="Stop"
-            >
-                <Square size={14} fill="currentColor" />
-            </button>
+            <Tooltip content="STOP PLAYBACK" position="top">
+                <button
+                    onClick={onStop}
+                    className="p-2 border border-neon-blue text-neon-blue rounded hover:bg-neon-blue hover:text-black transition-all shadow-[0_0_5px_#00f3ff] hover:shadow-[0_0_15px_#00f3ff] active:scale-95 shrink-0"
+                >
+                    <Square size={14} fill="currentColor" />
+                </button>
+            </Tooltip>
             <input
                 type="range"
                 min="0"
@@ -198,23 +199,31 @@ const Controls: React.FC<ControlsProps> = ({
 
       {/* Main Buttons */}
       <div className="grid grid-cols-3 gap-4 mb-6 justify-items-center items-center">
-        <NeonButton onClick={onPrev} color="blue">
-          <SkipBack size={24} />
-        </NeonButton>
+        <Tooltip content="PREVIOUS TRACK" position="top">
+            <NeonButton onClick={onPrev} color="blue">
+                <SkipBack size={24} />
+            </NeonButton>
+        </Tooltip>
         
         {isPlaying ? (
-          <NeonButton onClick={onPause} color="pink" className="w-16 h-16">
-            <Pause size={32} />
-          </NeonButton>
+          <Tooltip content="PAUSE" position="top">
+            <NeonButton onClick={onPause} color="pink" className="w-16 h-16">
+                <Pause size={32} />
+            </NeonButton>
+          </Tooltip>
         ) : (
-          <NeonButton onClick={onPlay} color="purple" className="w-16 h-16">
-            <Play size={32} />
-          </NeonButton>
+          <Tooltip content="PLAY" position="top">
+            <NeonButton onClick={onPlay} color="purple" className="w-16 h-16">
+                <Play size={32} />
+            </NeonButton>
+          </Tooltip>
         )}
 
-        <NeonButton onClick={onNext} color="blue">
-          <SkipForward size={24} />
-        </NeonButton>
+        <Tooltip content="NEXT TRACK" position="top">
+            <NeonButton onClick={onNext} color="blue">
+                <SkipForward size={24} />
+            </NeonButton>
+        </Tooltip>
       </div>
 
       {/* Volume Control */}
@@ -260,28 +269,31 @@ const Controls: React.FC<ControlsProps> = ({
             </div>
             {tracks.length > 0 && (
                 <div className="flex items-center gap-3">
-                    <button 
-                        onClick={onSort} 
-                        className="text-gray-400 hover:text-neon-blue transition-colors"
-                        title={t('sort_az')}
-                    >
-                        <ArrowDownAZ size={16} />
-                    </button>
-                    <button 
-                        onClick={onShuffle} 
-                        className="text-gray-400 hover:text-neon-purple transition-colors"
-                        title={t('shuffle')}
-                    >
-                        <Shuffle size={16} />
-                    </button>
-                    <button 
-                      type="button"
-                      onClick={requestClear} 
-                      className="text-red-500 hover:text-red-400 transition-colors ml-1"
-                      title={t('clear_playlist')}
-                    >
-                        <Trash2 size={16} />
-                    </button>
+                    <Tooltip content={t('sort_az')} position="top">
+                        <button 
+                            onClick={onSort} 
+                            className="text-gray-400 hover:text-neon-blue transition-colors"
+                        >
+                            <ArrowDownAZ size={16} />
+                        </button>
+                    </Tooltip>
+                    <Tooltip content={t('shuffle')} position="top">
+                        <button 
+                            onClick={onShuffle} 
+                            className="text-gray-400 hover:text-neon-purple transition-colors"
+                        >
+                            <Shuffle size={16} />
+                        </button>
+                    </Tooltip>
+                    <Tooltip content={t('clear_playlist')} position="top">
+                        <button 
+                            type="button"
+                            onClick={requestClear} 
+                            className="text-red-500 hover:text-red-400 transition-colors ml-1"
+                        >
+                            <Trash2 size={16} />
+                        </button>
+                    </Tooltip>
                 </div>
             )}
         </div>

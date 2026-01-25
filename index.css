@@ -11,6 +11,11 @@
   user-select: none;
 }
 
+/* Touch optimization */
+html {
+  touch-action: manipulation; /* Improves click delay */
+}
+
 /* Allow text selection only in text inputs and textareas if they are used */
 input[type="text"], 
 input[type="password"], 
@@ -160,6 +165,12 @@ input[type=range]:focus {
 /* Custom Cursor Support */
 body, button, a, input, select, textarea, [role="button"], .cursor-pointer {
   cursor: none !important;
+}
+
+/* Restore cursor for touch devices if needed, or rely on visual feedback */
+@media (hover: none) and (pointer: coarse) {
+    /* Optional: Show system cursor on touch devices if 'none' causes confusion, 
+       though usually cursor:none is ignored on touch anyway */
 }
 
 /* Ensure range inputs obey */

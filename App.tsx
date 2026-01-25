@@ -1,15 +1,16 @@
 
-
 import React, { useState, useRef, useEffect } from 'react';
-import { LanguageProvider, useLanguage } from './contexts/LanguageContext';
-import SettingsPanel from './components/SettingsPanel';
+import { LanguageProvider } from './contexts/LanguageContext';
+import SettingsPanel from './components/settings/SettingsPanel';
 import Controls from './components/Controls';
 import RetroScreen from './components/RetroScreen';
 import CustomCursor from './components/CustomCursor';
 import ContextMenu from './components/ContextMenu';
+import StartupOverlay from './components/StartupOverlay';
+import ShutdownOverlay from './components/ShutdownOverlay';
 import { useAudioPlayer } from './hooks/useAudioPlayer';
 import { useAppConfig } from './hooks/useAppConfig';
-import ProgressBar from './components/ProgressBar'; // Explicitly imported for reference if needed, though used in RetroScreen
+import { useSFX } from './hooks/useSFX';
 
 function AppContent() {
   const [focusMode, setFocusMode] = useState(false);
@@ -17,19 +18,32 @@ function AppContent() {
   const appContainerRef = useRef<HTMLDivElement>(null);
   
   // Reload State Logic
-  const [rebootPhase, setRebootPhase] = useState<'idle' | 'waiting' | 'countdown' | 'blackout'>('idle');
-  const [finalTimer, setFinalTimer] = useState(5);
+  const [rebootPhase, setRebootPhase] = useState<'idle' | 'waiting' | 'active'>('idle');
+  
+  // Intro Animation Sequence State
+  // 0: Booting (Overlay visible, main app hidden/shifted)
+  // 1: Panels Slide In
+  // 2: Screen Appears
+  const [introState, setIntroState] = useState<0 | 1 | 2>(0);
 
   // Custom Hooks
   const player = useAudioPlayer();
   const config = useAppConfig();
+  const { playSFX, handleZipUpload } = useSFX();
+
+  // Play startup sound on mount
+  useEffect(() => {
+    // Attempt to play startup sound. Browser policy might block this if no interaction occurred,
+    // but often in a local/PWA context or if the user clicks quickly, it works.
+    // The useSFX hook handles errors gracefully.
+    playSFX('Binary_Code_Sound_Effects_Start.wav');
+  }, [playSFX]);
 
   // 1. Trigger or Cancel Reboot
   const handleScheduleReload = () => {
     // If already scheduled, cancel it
     if (rebootPhase !== 'idle') {
         setRebootPhase('idle');
-        setFinalTimer(5);
         return;
     }
     
@@ -37,35 +51,22 @@ function AppContent() {
     if (player.isPlaying && Number.isFinite(player.duration) && player.duration > player.currentTime) {
         setRebootPhase('waiting');
     } else {
-        // No audio playing, go straight to critical countdown
-        setRebootPhase('countdown');
+        // No audio playing, go straight to active shutdown
+        setRebootPhase('active');
+        playSFX('Binary_Code_Sound_Effects_Reboot.wav');
         player.setIsPlaying(false);
     }
   };
 
-  // 3. Final Countdown Effect
-  useEffect(() => {
-    if (rebootPhase === 'countdown') {
-        if (finalTimer <= 0) {
-            // Trigger blackout phase instead of immediate reload
-            setRebootPhase('blackout');
-            return;
-        }
-
-        const interval = setInterval(() => {
-            setFinalTimer(prev => prev - 1);
-        }, 1000);
-
-        return () => clearInterval(interval);
-    } else if (rebootPhase === 'blackout') {
-        // Wait 5 seconds in darkness before actual reload
-        const timeout = setTimeout(() => {
-            window.location.reload();
-        }, 5000);
-        return () => clearTimeout(timeout);
-    }
-  }, [rebootPhase, finalTimer]);
-
+  const handleBootComplete = () => {
+      // Step 1: Slide panels in
+      setIntroState(1);
+      
+      // Step 2: Show screen after panels start moving
+      setTimeout(() => {
+          setIntroState(2);
+      }, 800);
+  };
 
   // Keyboard Shortcuts
   useEffect(() => {
@@ -73,6 +74,9 @@ function AppContent() {
       // Ignore key presses if typing in an input field
       const target = e.target as HTMLElement;
       if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.tagName === 'SELECT') return;
+
+      // Prevent rapid toggling when holding down keys
+      if (e.repeat) return;
 
       if (e.code === 'Space') {
         e.preventDefault();
@@ -144,9 +148,12 @@ function AppContent() {
     // Handle Media
     const audioFiles = droppedFiles.filter(f => f.type.startsWith('audio/'));
     const mediaFiles = droppedFiles.filter(f => f.type.startsWith('image/') || f.type.startsWith('video/'));
+    // Handle Zip (SFX)
+    const zipFiles = droppedFiles.filter(f => f.name.toLowerCase().endsWith('.zip'));
 
     if (audioFiles.length > 0) await player.processAudioFiles(audioFiles);
     if (mediaFiles.length > 0) await config.handleBgUpload(mediaFiles);
+    if (zipFiles.length > 0) await handleZipUpload(zipFiles[0]);
   };
 
   const handleFilesSelected = async (fileList: FileList) => {
@@ -157,11 +164,10 @@ function AppContent() {
     // If we were waiting for the track to end to reboot
     if (rebootPhase === 'waiting') {
         player.setIsPlaying(false); // Silence
-        setRebootPhase('countdown'); // Start 5s timer
+        setRebootPhase('active'); // Start shutdown sequence
+        playSFX('Binary_Code_Sound_Effects_Reboot.wav');
     } else {
         // Normal behavior:
-        // If crossfade is 0, automatic transition happens here.
-        // If crossfade > 0, it likely happened in timeUpdate, but this is a fallback.
         player.nextTrack();
     }
   };
@@ -191,6 +197,9 @@ function AppContent() {
       onDragLeave={onDragLeave}
       onDrop={onDrop}
     >
+      <StartupOverlay onComplete={handleBootComplete} />
+      <ShutdownOverlay active={rebootPhase === 'active'} onCancel={() => setRebootPhase('idle')} />
+      
       {/* DUAL DECK AUDIO SYSTEM */}
       {/* Deck A */}
       <audio 
@@ -213,8 +222,13 @@ function AppContent() {
         crossOrigin="anonymous" 
       />
       
-      {/* Settings Panel */}
-      <div className={`shrink-0 z-20 transition-all duration-500 ease-in-out border-r border-gray-800 ${focusMode ? 'w-0 opacity-0 overflow-hidden' : 'w-full md:w-[400px]'}`}>
+      {/* Settings Panel - Left Side */}
+      <div 
+        className={`shrink-0 z-20 transition-all duration-700 ease-out border-r border-gray-800 
+          ${(focusMode || introState < 1) ? '-translate-x-full opacity-0' : 'translate-x-0 opacity-100'}
+          ${focusMode ? 'w-0 overflow-hidden border-none' : 'w-full md:w-[400px]'}
+        `}
+      >
         <div className="w-full h-full md:w-[400px]">
            <SettingsPanel 
              showVisualizer={config.showVisualizer} setShowVisualizer={config.setShowVisualizer}
@@ -243,40 +257,58 @@ function AppContent() {
              // Audio Props
              crossfadeDuration={player.crossfadeDuration}
              setCrossfadeDuration={player.setCrossfadeDuration}
+             // Preset Management
+             savedPresets={config.savedPresets}
+             savePreset={config.savePreset}
+             loadPreset={config.loadPreset}
+             deletePreset={config.deletePreset}
+             renamePreset={config.renamePreset}
+             // SFX Upload
+             onSfxUpload={handleZipUpload}
            />
         </div>
       </div>
 
-      {/* Main Screen */}
-      <RetroScreen 
-        analyser={player.analyser}
-        isPlaying={player.isPlaying}
-        currentTrack={player.tracks[player.currentTrackIndex]}
-        bgMedia={config.bgMedia}
-        bgColor={config.bgColor}
-        bgPattern={config.bgPattern}
-        bgPatternConfig={config.bgPatternConfig}
-        visualizerConfig={config.visualizerConfig}
-        showVisualizer={config.showVisualizer}
-        dvdConfig={config.dvdConfig}
-        showDvd={config.showDvd}
-        effectsConfig={config.effectsConfig}
-        marqueeConfig={config.marqueeConfig}
-        rebootPhase={rebootPhase}
-        trackRemaining={Math.max(0, player.duration - player.currentTime)}
-        finalTimer={finalTimer}
-        progress={playbackPercentage}
-        focusMode={focusMode}
-        setFocusMode={setFocusMode}
-        isDragging={isDragging}
-        onDragOver={onDragOver}
-        onDragEnter={onDragEnter}
-        onDragLeave={onDragLeave}
-        onDrop={onDrop}
-      />
+      {/* Main Screen - Center (Transitioned with scale and opacity) */}
+      <div className={`flex-grow flex flex-col relative transition-all duration-1000 ease-out overflow-hidden
+        ${introState >= 2 ? 'scale-100 opacity-100' : 'scale-75 opacity-0'}
+      `}>
+          <RetroScreen 
+            analyser={player.analyser}
+            isPlaying={player.isPlaying}
+            currentTrack={player.tracks[player.currentTrackIndex]}
+            bgMedia={config.bgMedia}
+            bgColor={config.bgColor}
+            bgPattern={config.bgPattern}
+            bgPatternConfig={config.bgPatternConfig}
+            visualizerConfig={config.visualizerConfig}
+            showVisualizer={config.showVisualizer}
+            dvdConfig={config.dvdConfig}
+            showDvd={config.showDvd}
+            effectsConfig={config.effectsConfig}
+            marqueeConfig={config.marqueeConfig}
+            progress={playbackPercentage}
+            focusMode={focusMode}
+            setFocusMode={setFocusMode}
+            isDragging={isDragging}
+            onDragOver={onDragOver}
+            onDragEnter={onDragEnter}
+            onDragLeave={onDragLeave}
+            onDrop={onDrop}
+            onScheduleReload={handleScheduleReload}
+            rebootPhase={rebootPhase}
+            currentTime={player.currentTime}
+            duration={player.duration}
+          />
+      </div>
       
-      {/* Controls Panel */}
-      <div className={`shrink-0 z-20 transition-all duration-500 ease-in-out border-l border-gray-800 ${focusMode ? 'w-0 opacity-0 overflow-hidden' : 'w-full md:w-72 lg:w-80'}`}>
+      {/* Controls Panel - Right Side */}
+      <div 
+        className={`shrink-0 z-20 transition-all duration-700 ease-out border-l border-gray-800
+           ${(introState < 1) ? 'translate-x-full opacity-0' : 'translate-x-0 opacity-100'}
+           ${focusMode ? 'w-0 overflow-hidden border-none' : 'w-full md:w-72 lg:w-80'}
+        `}
+      >
         <div className="w-full h-full md:w-72 lg:w-80">
             <Controls 
               tracks={player.tracks} 
@@ -294,7 +326,6 @@ function AppContent() {
               onPrev={player.prevTrack} 
               onTrackSelect={player.selectTrack} 
               onFilesSelected={handleFilesSelected}
-              onToggleCinema={() => setFocusMode(!focusMode)} 
               onClearPlaylist={player.clearPlaylist}
               onSort={player.sortTracks}
               onShuffle={player.shuffleTracks}

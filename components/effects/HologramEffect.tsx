@@ -3,7 +3,7 @@ import React, { useEffect, useState, useRef } from 'react';
 import { EffectsConfig, HologramCategory } from '../../types';
 import { messagesEn, messagesRu } from '../../data/messages';
 import { useLanguage } from '../../contexts/LanguageContext';
-import { MessageSquare, Terminal } from 'lucide-react';
+import { MessageSquare } from 'lucide-react';
 
 interface HologramEffectProps {
   effects: EffectsConfig;

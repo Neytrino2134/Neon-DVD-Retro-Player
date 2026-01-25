@@ -1,0 +1,115 @@
+
+import React from 'react';
+import RangeControl from '../RangeControl';
+import CustomSelect from '../CustomSelect';
+import { useLanguage } from '../../../contexts/LanguageContext';
+import { DvdConfig, EffectsConfig } from '../../../types';
+
+const FPS_OPTIONS = [
+  { value: 60, label: '60 FPS (OFF)' },
+  { value: 30, label: '30 FPS' },
+  { value: 25, label: '25 FPS (PAL)' },
+  { value: 24, label: '24 FPS (CINEMA)' },
+  { value: 12, label: '12 FPS (RETRO)' },
+];
+
+export const MixerSettings: React.FC<{ crossfadeDuration: number, setCrossfadeDuration: (v: number) => void }> = ({ crossfadeDuration, setCrossfadeDuration }) => {
+    const { t } = useLanguage();
+    return (
+        <div className="pt-2">
+            <div className="p-3 bg-black/40 border border-gray-700 rounded mb-2">
+                <RangeControl 
+                    label={t('crossfade_duration')} 
+                    value={crossfadeDuration} 
+                    min={0} max={15} step={0.5} 
+                    onChange={setCrossfadeDuration} 
+                    className="mb-0"
+                />
+                <div className="mt-2 text-[10px] text-gray-500 font-mono flex items-start gap-1">
+                    <div className="text-neon-blue">*</div>
+                    <span>{t('constant_power_hint')}</span>
+                </div>
+            </div>
+        </div>
+    );
+};
+
+export const DvdSettings: React.FC<{ config: DvdConfig, update: (k: keyof DvdConfig, v: any) => void }> = ({ config, update }) => {
+    const { t } = useLanguage();
+    return (
+        <div className="pt-2">
+            <RangeControl label={t('size')} value={config.size} min={60} max={300} step={10} onChange={v => update('size', v)} />
+            <RangeControl label={t('speed')} value={config.speed} min={1} max={15} step={1} onChange={v => update('speed', v)} />
+            <RangeControl label={t('opacity')} value={config.opacity} min={0} max={1} step={0.1} onChange={v => update('opacity', v)} />
+        </div>
+    );
+};
+
+export const DebugSettings: React.FC<{ config: EffectsConfig['debugConsole'], update: (v: EffectsConfig['debugConsole']) => void }> = ({ config, update }) => {
+    const { t } = useLanguage();
+    return (
+        <div className="pt-2">
+           <RangeControl label={t('opacity')} value={config.opacity} min={0.1} max={1} step={0.1} onChange={v => update({ ...config, opacity: v })} />
+           <RangeControl label={t('scale')} value={config.scale} min={0.5} max={1.5} step={0.1} onChange={v => update({ ...config, scale: v })} />
+        </div>
+    );
+};
+
+export const ScanlineSettings: React.FC<{ config: EffectsConfig, update: (k: keyof EffectsConfig, v: any) => void }> = ({ config, update }) => {
+    const { t } = useLanguage();
+    return (
+        <div className="pt-2">
+          <RangeControl label={t('intensity')} value={config.scanlineIntensity} min={0} max={0.8} step={0.05} onChange={v => update('scanlineIntensity', v)} />
+          <RangeControl label={t('thickness')} value={config.scanlineThickness} min={2} max={16} step={1} onChange={v => update('scanlineThickness', v)} />
+        </div>
+    );
+};
+
+export const CyberSettings: React.FC<{ config: EffectsConfig['cyberHack'], update: (v: EffectsConfig['cyberHack']) => void }> = ({ config, update }) => {
+    const { t } = useLanguage();
+    return (
+        <div className="pt-2">
+           <RangeControl label={t('print_speed')} value={config.speed} min={1} max={10} step={1} onChange={v => update({ ...config, speed: v })} />
+           <RangeControl label={t('scale')} value={config.scale} min={0.5} max={3.0} step={0.1} onChange={v => update({ ...config, scale: v })} />
+           <RangeControl label={t('bg_opacity')} value={config.backgroundOpacity} min={0} max={1} step={0.05} onChange={v => update({ ...config, backgroundOpacity: v })} />
+        </div>
+    );
+};
+
+export const GlitchSettings: React.FC<{ config: EffectsConfig['glitch'], update: (v: EffectsConfig['glitch']) => void }> = ({ config, update }) => {
+    const { t } = useLanguage();
+    return (
+        <div className="pt-2">
+           <CustomSelect 
+              label={t('glitch_variant')}
+              value={config.variant}
+              options={[
+                { value: 'v1', label: t('variant_v1') },
+                { value: 'v2', label: t('variant_v2') }
+              ]}
+              onChange={v => update({ ...config, variant: v })}
+           />
+           <RangeControl label={t('intensity')} value={config.intensity} min={0.05} max={1.0} step={0.05} onChange={v => update({ ...config, intensity: v })} />
+           <RangeControl label={t('speed')} value={config.speed} min={0.05} max={1.0} step={0.05} onChange={v => update({ ...config, speed: v })} />
+           <RangeControl label={t('opacity')} value={config.opacity ?? 1.0} min={0} max={1} step={0.05} onChange={v => update({ ...config, opacity: v })} />
+        </div>
+    );
+};
+
+export const SignalSettings: React.FC<{ config: EffectsConfig, update: (k: keyof EffectsConfig, v: any) => void }> = ({ config, update }) => {
+    const { t } = useLanguage();
+    return (
+        <div className="pt-2">
+            <CustomSelect 
+              label={t('fps_limit')} 
+              value={config.fps} 
+              options={FPS_OPTIONS} 
+              onChange={(v) => update('fps', v)} 
+            />
+            <RangeControl label={t('pixelation')} value={config.pixelation} min={1} max={20} step={1} onChange={v => update('pixelation', v)} />
+            <RangeControl label={t('chromatic_aberration')} value={config.chromaticAberration ?? 0} min={0} max={20} step={0.5} onChange={v => update('chromaticAberration', v)} />
+            <RangeControl label={t('static_noise')} value={config.noise} min={0} max={0.5} step={0.01} onChange={v => update('noise', v)} />
+            <RangeControl label={t('vhs_jitter')} value={config.vhsJitter} min={0} max={10} step={0.5} onChange={v => update('vhsJitter', v)} />
+        </div>
+    );
+};

@@ -1,5 +1,4 @@
 
-
 import { useState, useRef, useEffect, useCallback, SyntheticEvent } from 'react';
 import { AudioTrack } from '../types';
 import { getAllTracks, saveTrack, clearTracks } from '../lib/db';
@@ -431,7 +430,7 @@ export const useAudioPlayer = () => {
   // --- AUTOMATION LOOP ---
   // We use handleTimeUpdate to detect when to crossfade
   // Added preventAutoMix flag to support reboot logic
-  const handleTimeUpdate = (e: any, preventAutoMix = false) => {
+  const handleTimeUpdate = (_e: any, preventAutoMix = false) => {
       const active = activeDeckRef.current === 'A' ? audioRefA.current : audioRefB.current;
       if (active) {
           const ct = active.currentTime;

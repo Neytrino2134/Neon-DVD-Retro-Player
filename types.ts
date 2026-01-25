@@ -1,4 +1,5 @@
 
+
 export interface AudioTrack {
   id: string;
   name: string;
@@ -118,4 +119,22 @@ export interface CrossfadeConfig {
 export interface PatternConfig {
   intensity: number;
   scale: number;
+}
+
+export interface AppPreset {
+  id: string;
+  name: string;
+  createdAt: number;
+  config: {
+    visualizerConfig: VisualizerConfig;
+    dvdConfig: DvdConfig;
+    effectsConfig: EffectsConfig;
+    marqueeConfig: MarqueeConfig;
+    bgColor: string;
+    bgPattern: string;
+    bgPatternConfig: PatternConfig;
+    showVisualizer: boolean;
+    showDvd: boolean;
+    bgAutoplayInterval: number;
+  }
 }

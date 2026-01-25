@@ -1,4 +1,5 @@
 
+
 import React, { createContext, useContext, useState, ReactNode } from 'react';
 import { en } from '../locales/en';
 import { ru } from '../locales/ru';
@@ -19,8 +20,22 @@ const translations = {
   ru
 };
 
+const STORAGE_KEY = 'neon_language';
+
 export const LanguageProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
-  const [language, setLanguage] = useState<Language>('en');
+  const [language, setLanguageState] = useState<Language>(() => {
+    try {
+      const saved = localStorage.getItem(STORAGE_KEY);
+      return (saved === 'en' || saved === 'ru') ? saved : 'en';
+    } catch {
+      return 'en';
+    }
+  });
+
+  const setLanguage = (lang: Language) => {
+    setLanguageState(lang);
+    localStorage.setItem(STORAGE_KEY, lang);
+  };
 
   const t = (key: keyof Translations) => {
     return translations[language][key] || key;

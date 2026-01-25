@@ -19,10 +19,12 @@ export const ru = {
   signal_processor: "ОБРАБОТКА СИГНАЛА",
   background: "ФОНОВЫЙ РЕЖИМ",
   load_img: "ЗАГРУЗИТЬ ФОН",
+  load_sfx_zip: "SFX АРХИВ (ZIP)",
   export_config: "ЭКСПОРТ КОНФИГА",
   mixer_deck: "DJ МИКШЕР",
   crossfade_duration: "КРОССФЕЙД (СЕК)",
   constant_power_hint: "Использует кривую постоянной мощности для плавности.",
+  config_manager: "СОХРАНЕННЫЕ ПРЕСЕТЫ",
   
   // Controls
   size: "РАЗМЕР",
@@ -105,12 +107,28 @@ export const ru = {
   // Background
   auto_timer: "АВТО-СМЕНА (МИН)",
 
+  // Config Manager
+  save_preset: "СОХРАНИТЬ",
+  preset_name: "ИМЯ ПРЕСЕТА",
+  load: "ЗАГРУЗИТЬ",
+  delete: "УДАЛИТЬ",
+  rename: "ПЕРЕИМ.",
+  no_presets: "НЕТ СОХРАНЕНИЙ",
+
   // System
   system_down: "СИСТЕМА ОТКЛЮЧИТСЯ ЧЕРЕЗ",
   reboot: "ТАЙМЕР ПЕРЕЗАГРУЗКИ",
   reboot_scheduled: "ПЕРЕЗАГРУЗКА ЗАПЛАНИРОВАНА",
   waiting_stream: "ОЖИДАНИЕ КОНЦА ТРЕКА",
   system_critical: "Critical! System will down NOW!",
+
+  // Help
+  help: "СПРАВКА",
+  hotkeys: "ГОРЯЧИЕ КЛАВИШИ",
+  author: "АВТОР",
+  contact: "КОНТАКТЫ",
+  repo: "РЕПОЗИТОРИЙ",
+  close: "ЗАКРЫТЬ",
 
   // Context Menu
   ctx_actions: "БЫСТРОЕ МЕНЮ",
@@ -122,4 +140,13 @@ export const ru = {
   ctx_next_bg: "СЛЕД. ФОН",
   ctx_prev_bg: "ПРЕД. ФОН",
   ctx_fullscreen: "НА ВЕСЬ ЭКРАН",
+
+  // Shutdown
+  shutdown_instructions_title: "СИСТЕМНЫЕ ИНСТРУКЦИИ:",
+  shutdown_inst_1: "1. Поставьте лайк",
+  shutdown_inst_2: "2. Подпишитесь на Neon Waves",
+  shutdown_inst_3: "3. Отправьте отчет на meowmasterart@gmail.com",
+  critical_error: "КРИТИЧЕСКАЯ ОШИБКА",
+  system_halted: "СИСТЕМА ОСТАНОВЛЕНА",
+  initiating_dump: "ИНИЦИАЛИЗАЦИЯ ДАМПА ПАМЯТИ...",
 };

@@ -19,10 +19,12 @@ export const en = {
   signal_processor: "SIGNAL PROCESSOR",
   background: "BACKGROUND",
   load_img: "LOAD IMG/VIDEO",
+  load_sfx_zip: "LOAD SFX (ZIP)",
   export_config: "EXPORT NRP CONFIG",
   mixer_deck: "DJ MIXER DECK",
   crossfade_duration: "CROSSFADE (SEC)",
   constant_power_hint: "Uses Constant Power curve for smooth transitions.",
+  config_manager: "CONFIG PRESETS",
   
   // Controls
   size: "SIZE",
@@ -105,12 +107,28 @@ export const en = {
   // Background
   auto_timer: "AUTO SWAP (MIN)",
 
+  // Config Manager
+  save_preset: "SAVE CURRENT",
+  preset_name: "PRESET NAME",
+  load: "LOAD",
+  delete: "DEL",
+  rename: "REN",
+  no_presets: "NO SAVED PRESETS",
+
   // System
   system_down: "SYSTEM WILL DOWN AFTER",
   reboot: "SCHEDULE REBOOT",
   reboot_scheduled: "REBOOT SCHEDULED",
   waiting_stream: "WAITING FOR STREAM END",
   system_critical: "Critical! System will down NOW!",
+
+  // Help
+  help: "HELP",
+  hotkeys: "HOTKEYS",
+  author: "AUTHOR",
+  contact: "CONTACT",
+  repo: "REPOSITORY",
+  close: "CLOSE",
 
   // Context Menu
   ctx_actions: "CONTEXT ACTIONS",
@@ -122,4 +140,13 @@ export const en = {
   ctx_next_bg: "NEXT BG",
   ctx_prev_bg: "PREV BG",
   ctx_fullscreen: "TOGGLE FULLSCREEN",
+
+  // Shutdown
+  shutdown_instructions_title: "SYSTEM INSTRUCTIONS:",
+  shutdown_inst_1: "1. Leave a like",
+  shutdown_inst_2: "2. Subscribe to channel Neon Waves",
+  shutdown_inst_3: "3. Send report to meowmasterart@gmail.com",
+  critical_error: "CRITICAL ERROR DETECTED",
+  system_halted: "SYSTEM HALTED",
+  initiating_dump: "INITIATING CORE DUMP...",
 };

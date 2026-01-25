@@ -1,7 +1,6 @@
 
-
 import React, { useRef, useEffect, forwardRef, useMemo, useState } from 'react';
-import { Upload, Minimize, Maximize, Monitor, AlertTriangle, Power } from 'lucide-react';
+import { Upload, Minimize, Maximize, Monitor, Power } from 'lucide-react';
 import { AudioTrack, VisualizerConfig, EffectsConfig, DvdConfig, MarqueeConfig, PatternConfig } from '../types';
 import DvdLogo from './DvdLogo';
 import Visualizer from './Visualizer';
@@ -18,147 +17,16 @@ import HologramEffect from './effects/HologramEffect';
 import Marquee from './Marquee';
 import ProgressBar from './ProgressBar';
 import { useLanguage } from '../contexts/LanguageContext';
+import { Tooltip } from './ui/Tooltip';
+import { useGestures } from '../hooks/useGestures';
 
-interface ReloadOverlayProps {
-  phase: 'idle' | 'waiting' | 'countdown' | 'blackout';
-  trackRemaining: number;
-  finalSeconds: number;
-}
-
-function ReloadOverlay({ phase, trackRemaining, finalSeconds }: ReloadOverlayProps) {
-  const { t } = useLanguage();
-  const [animState, setAnimState] = useState<'spawn' | 'expandX' | 'expandY' | 'content'>('spawn');
-  
-  // Reset animation state when entering countdown
-  useEffect(() => {
-    if (phase === 'countdown') {
-        setAnimState('spawn');
-        
-        const t1 = setTimeout(() => setAnimState('expandX'), 500);
-        const t2 = setTimeout(() => setAnimState('expandY'), 1000);
-        const t3 = setTimeout(() => setAnimState('content'), 1500);
-        
-        return () => {
-            clearTimeout(t1);
-            clearTimeout(t2);
-            clearTimeout(t3);
-        };
-    }
-  }, [phase]);
-
-  if (phase === 'idle') return null;
-
-  // 1. REBOOT SCHEDULED (Waiting)
-  if (phase === 'waiting') {
-    return (
-       <div className="absolute top-6 right-16 z-[60] flex flex-col items-end pointer-events-none animate-slide-in-right">
-          <div className="flex flex-col items-end">
-              <div className="flex items-center gap-2 mb-1">
-                  <div className="w-2 h-2 rounded-full bg-neon-green animate-pulse shadow-[0_0_5px_#00ff00]"></div>
-                  <span className="font-mono font-bold text-xs text-neon-green tracking-widest uppercase drop-shadow-[0_0_5px_rgba(0,255,0,0.5)]">
-                      {t('reboot_scheduled')}
-                  </span>
-              </div>
-              <div className="font-mono text-[10px] text-gray-400 tracking-wider">
-                  {t('waiting_stream')}
-              </div>
-          </div>
-       </div>
-    );
-  }
-
-  // 2. SYSTEM CRITICAL (Countdown) - Hologram Style with Full Overlay
-  if (phase === 'countdown') {
-    // Dynamic sizes for animation steps
-    let width = '40px';
-    let height = '40px';
-    let opacity = 0;
-    
-    if (animState === 'spawn') {
-        opacity = 1;
-    } else if (animState === 'expandX') {
-        opacity = 1;
-        width = '400px';
-    } else if (animState === 'expandY' || animState === 'content') {
-        opacity = 1;
-        width = '400px';
-        height = 'auto'; // Let content dictate or set fixed
-    }
-
-    return (
-      <div className="fixed inset-0 z-[9999] bg-black flex items-center justify-center">
-          {/* Noise/Effect Layer on black bg */}
-          <div className="absolute inset-0 bg-white/5 opacity-10 pointer-events-none scanlines"></div>
-          
-          {/* Hologram Container */}
-          <div 
-            className="relative bg-black border-2 border-red-600 shadow-[0_0_50px_rgba(220,38,38,0.5)] overflow-hidden transition-all duration-500 ease-out"
-            style={{ 
-                width: width, 
-                minHeight: height === 'auto' ? '250px' : height,
-                height: height === 'auto' ? 'auto' : height,
-                opacity: opacity 
-            }}
-          >
-              {/* Background Grid inside box */}
-              <div className="absolute inset-0 bg-[linear-gradient(rgba(255,0,0,0.1)_1px,transparent_1px)] bg-[length:100%_4px] pointer-events-none"></div>
-
-              {/* Decorative Corners */}
-              <div className="absolute top-0 left-0 w-4 h-4 border-t-2 border-l-2 border-red-500"></div>
-              <div className="absolute top-0 right-0 w-4 h-4 border-t-2 border-r-2 border-red-500"></div>
-              <div className="absolute bottom-0 left-0 w-4 h-4 border-b-2 border-l-2 border-red-500"></div>
-              <div className="absolute bottom-0 right-0 w-4 h-4 border-b-2 border-r-2 border-red-500"></div>
-
-              {/* Header - Always visible once expanded X */}
-              <div className={`bg-red-600/20 border-b border-red-600/50 p-2 flex items-center justify-between transition-opacity duration-300 ${animState !== 'spawn' ? 'opacity-100' : 'opacity-0'}`}>
-                  <div className="flex items-center gap-2 text-red-500">
-                      <AlertTriangle size={16} className="animate-pulse" />
-                      <span className="font-mono text-xs font-bold tracking-widest uppercase">SYSTEM FAILURE</span>
-                  </div>
-                  <div className="flex gap-1">
-                      <div className="w-1.5 h-1.5 bg-red-600 rounded-full"></div>
-                      <div className="w-1.5 h-1.5 bg-red-600/50 rounded-full"></div>
-                  </div>
-              </div>
-
-              {/* Content - Only visible in final state */}
-              <div className={`p-6 flex flex-col items-center justify-center text-center space-y-4 transition-opacity duration-500 ${animState === 'content' ? 'opacity-100' : 'opacity-0'}`}>
-                  <div className="font-mono text-red-500 font-bold text-sm tracking-[0.2em] animate-pulse border-b border-red-500/30 pb-2">
-                      CRITICAL ERROR DETECTED
-                  </div>
-                  
-                  <div className="text-7xl font-mono font-black text-red-600 animate-pulse tabular-nums drop-shadow-[0_0_10px_rgba(255,0,0,0.8)]">
-                      00:0{finalSeconds}
-                  </div>
-
-                  <div className="font-mono text-[10px] text-red-400/70 max-w-[250px] leading-relaxed uppercase">
-                      System integrity compromised.<br/>Initiating emergency shutdown protocol.
-                  </div>
-              </div>
-
-              {/* Footer */}
-              <div className={`absolute bottom-0 left-0 w-full border-t border-red-600/30 p-2 bg-red-900/10 flex justify-between items-center font-mono text-[9px] text-red-500/50 transition-opacity duration-300 ${animState === 'content' ? 'opacity-100' : 'opacity-0'}`}>
-                  <span>ERR_CODE: 0xDEADBEEF</span>
-                  <span>CORE_DUMP...</span>
-              </div>
-          </div>
-      </div>
-    );
-  }
-
-  // 3. BLACKOUT (TV Turn Off)
-  if (phase === 'blackout') {
-      return (
-          <div className="fixed inset-0 z-[10000] bg-black overflow-hidden pointer-events-none">
-              <div className="tv-off-container">
-                  <div className="tv-off-flash-overlay"></div>
-              </div>
-          </div>
-      );
-  }
-
-  return null;
-}
+const formatTime = (seconds: number) => {
+  if (!seconds || isNaN(seconds) || seconds < 0) return "00:00";
+  const totalSeconds = Math.floor(seconds);
+  const mins = Math.floor(totalSeconds / 60);
+  const secs = totalSeconds % 60;
+  return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+};
 
 interface RetroScreenProps {
   analyser: AnalyserNode | null;
@@ -177,13 +45,10 @@ interface RetroScreenProps {
   effectsConfig: EffectsConfig;
   marqueeConfig: MarqueeConfig;
   
-  // Reboot State
-  rebootPhase: 'idle' | 'waiting' | 'countdown' | 'blackout';
-  trackRemaining: number;
-  finalTimer: number;
-  
   // Progress
   progress?: number;
+  currentTime: number;
+  duration: number;
 
   // UI State
   focusMode: boolean;
@@ -195,20 +60,35 @@ interface RetroScreenProps {
   onDragEnter: (e: React.DragEvent) => void;
   onDragLeave: (e: React.DragEvent) => void;
   onDrop: (e: React.DragEvent) => void;
+
+  // Actions
+  onScheduleReload: () => void;
+  rebootPhase: 'idle' | 'waiting' | 'active';
 }
 
 const RetroScreen = forwardRef<HTMLDivElement, RetroScreenProps>(({
   analyser, isPlaying, currentTrack, bgMedia, bgColor, bgPattern = 'none', bgPatternConfig,
   visualizerConfig, showVisualizer, dvdConfig, showDvd, effectsConfig, marqueeConfig,
-  rebootPhase, trackRemaining, finalTimer, progress = 0,
+  progress = 0, currentTime, duration,
   focusMode, setFocusMode, isDragging,
-  onDragOver, onDragEnter, onDragEnter: onDragEnterProp, onDragLeave, onDrop
+  onDragOver, onDragEnter, onDragLeave, onDrop,
+  onScheduleReload, rebootPhase
 }, externalRef) => {
   
+  const { t } = useLanguage();
   const internalRef = useRef<HTMLDivElement>(null);
   const containerRef = (externalRef as React.RefObject<HTMLDivElement>) || internalRef;
   const signalLayerRef = useRef<HTMLDivElement>(null);
   const shakeRef = useRef<HTMLDivElement>(null);
+
+  // Gesture Controls
+  const gestureHandlers = useGestures({
+    onDoubleTap: () => {
+        // Toggle Focus Mode (Cinema Mode) on double tap
+        setFocusMode(!focusMode);
+    },
+    // You could add onSwipeLeft/Right to change backgrounds here in the future
+  });
 
   // Transition State
   const [activeMedia, setActiveMedia] = useState(bgMedia);
@@ -293,32 +173,63 @@ const RetroScreen = forwardRef<HTMLDivElement, RetroScreenProps>(({
     >
       <div 
         ref={shakeRef}
-        onDoubleClick={() => setFocusMode(!focusMode)}
-        className={`cursor-hide-center relative w-full h-full bg-gray-900 transition-all duration-700 ${focusMode ? 'rounded-none border-0' : 'rounded-2xl border-4'} ${isDragging ? 'border-neon-blue shadow-[0_0_30px_#00f3ff]' : 'border-gray-800'} overflow-hidden group`}
+        onDoubleClick={() => setFocusMode(!focusMode)} // Keep mouse double click
+        {...gestureHandlers} // Apply Touch Gestures
+        className={`cursor-hide-center relative w-full h-full bg-gray-900 transition-all duration-700 ${focusMode ? 'rounded-none border-0' : 'rounded-2xl border-4'} ${isDragging ? 'border-neon-blue shadow-[0_0_30px_#00f3ff]' : 'border-gray-800'} overflow-hidden group touch-action-manipulation`}
         onDragOver={onDragOver}
         onDragEnter={onDragEnter}
         onDragLeave={onDragLeave}
         onDrop={onDrop}
       >
          <div ref={containerRef} className="relative w-full h-full overflow-hidden bg-black">
-            {/* Screen Controls */}
-            <div className="absolute top-4 right-4 z-50 flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
-              <button 
-                onClick={() => setFocusMode(!focusMode)} 
-                className="text-neon-green p-2 bg-transparent rounded-full transition-all border border-transparent hover:bg-neon-green/20 hover:shadow-[0_0_15px_rgba(0,255,0,0.5)]"
-                title={focusMode ? "Exit Full Screen" : "Full Screen"}
-              >
-                  {focusMode ? <Minimize size={20} /> : <Maximize size={20} />}
-              </button>
+            {/* Screen Controls - Left (Reboot) */}
+            <div className="absolute top-4 left-4 z-50 flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+              <Tooltip content={t('reboot')} position="right">
+                <button 
+                  onClick={onScheduleReload} 
+                  className="text-gray-500 opacity-50 p-2 bg-transparent rounded-full transition-all border border-transparent hover:text-red-500 hover:opacity-100 hover:bg-red-500/20 hover:shadow-[0_0_15px_rgba(255,0,0,0.5)] active:scale-95"
+                >
+                    <Power size={20} />
+                </button>
+              </Tooltip>
             </div>
 
-            {/* Reload Overlay (Handles Waiting, Countdown, and Blackout phases) */}
-            <ReloadOverlay 
-              phase={rebootPhase} 
-              trackRemaining={trackRemaining} 
-              finalSeconds={finalTimer} 
-            />
-            
+            {/* Screen Controls - Right */}
+            <div className="absolute top-4 right-4 z-50 flex items-center gap-4">
+              
+              {/* Internal Scheduled Reboot Indicator */}
+              {rebootPhase === 'waiting' && (
+                <div className="flex items-center gap-3 animate-slide-in-right pointer-events-none pr-2">
+                  <div className="flex flex-col items-end">
+                     <div className="flex items-center gap-2">
+                       <span className="text-[10px] font-mono font-bold text-neon-green tracking-widest leading-none drop-shadow-[0_0_5px_rgba(0,255,0,0.8)]">
+                         {t('reboot_scheduled')}
+                       </span>
+                       <div className="w-1.5 h-1.5 bg-neon-green rounded-full shadow-[0_0_5px_#00ff00] animate-pulse"></div>
+                     </div>
+                     <span className="text-[8px] font-mono text-neon-green/70 tracking-wider leading-none mt-1 animate-pulse">
+                       {t('waiting_stream')}
+                     </span>
+                  </div>
+                  <div className="text-3xl font-mono font-bold text-neon-green tabular-nums leading-none drop-shadow-[0_0_8px_rgba(0,255,0,0.6)]">
+                    -{formatTime(Math.max(0, duration - currentTime))}
+                  </div>
+                </div>
+              )}
+
+              {/* Fullscreen Button */}
+              <div className="opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+                <Tooltip content={focusMode ? "EXIT FULL SCREEN" : "FULL SCREEN"} position="left">
+                  <button 
+                    onClick={() => setFocusMode(!focusMode)} 
+                    className="text-neon-green p-2 bg-transparent rounded-full transition-all border border-transparent hover:bg-neon-green/20 hover:shadow-[0_0_15px_rgba(0,255,0,0.5)] active:scale-95"
+                  >
+                      {focusMode ? <Minimize size={20} /> : <Maximize size={20} />}
+                  </button>
+                </Tooltip>
+              </div>
+            </div>
+
             {/* Chromatic Filter Definition */}
             <ChromaticAberration intensity={aberrationValue} />
 

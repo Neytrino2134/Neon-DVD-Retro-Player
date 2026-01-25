@@ -3,23 +3,27 @@
  * Simple IndexedDB wrapper for storing File/Blob objects
  */
 const DB_NAME = 'NeonPlayerDB';
-const DB_VERSION = 1;
+const DB_VERSION = 2; // Incremented version for schema change
 const STORES = {
   TRACKS: 'tracks',
-  BACKGROUND: 'background'
+  BACKGROUND: 'background',
+  SFX: 'sfx'
 };
 
 export const initDB = (): Promise<IDBDatabase> => {
   return new Promise((resolve, reject) => {
     const request = indexedDB.open(DB_NAME, DB_VERSION);
 
-    request.onupgradeneeded = () => {
+    request.onupgradeneeded = (_e) => {
       const db = request.result;
       if (!db.objectStoreNames.contains(STORES.TRACKS)) {
         db.createObjectStore(STORES.TRACKS, { keyPath: 'id' });
       }
       if (!db.objectStoreNames.contains(STORES.BACKGROUND)) {
         db.createObjectStore(STORES.BACKGROUND, { keyPath: 'id' });
+      }
+      if (!db.objectStoreNames.contains(STORES.SFX)) {
+        db.createObjectStore(STORES.SFX, { keyPath: 'id' });
       }
     };
 
@@ -104,6 +108,30 @@ export const clearBackgrounds = async () => {
     const store = transaction.objectStore(STORES.BACKGROUND);
     const request = store.clear();
     request.onsuccess = () => resolve();
+    request.onerror = () => reject(request.error);
+  });
+};
+
+// --- SFX FUNCTIONS ---
+
+export const saveSFX = async (sfx: { id: string; blob: Blob }) => {
+  const db = await initDB();
+  return new Promise<void>((resolve, reject) => {
+    const transaction = db.transaction(STORES.SFX, 'readwrite');
+    const store = transaction.objectStore(STORES.SFX);
+    const request = store.put(sfx);
+    request.onsuccess = () => resolve();
+    request.onerror = () => reject(request.error);
+  });
+};
+
+export const getAllSFX = async (): Promise<{ id: string; blob: Blob }[]> => {
+  const db = await initDB();
+  return new Promise((resolve, reject) => {
+    const transaction = db.transaction(STORES.SFX, 'readonly');
+    const store = transaction.objectStore(STORES.SFX);
+    const request = store.getAll();
+    request.onsuccess = () => resolve(request.result || []);
     request.onerror = () => reject(request.error);
   });
 };

@@ -1,5 +1,4 @@
 
-
 import React, { useEffect, useRef } from 'react';
 import { NEON_COLORS, VisualizerConfig } from '../types';
 
@@ -76,7 +75,8 @@ const Visualizer: React.FC<VisualizerProps> = ({ analyser, isPlaying, config, fp
 
          if (isPlaying) {
             // Если играет музыка - берем данные с частот
-            analyser.getByteFrequencyData(dataArray);
+            // Cast to any to avoid TS lib mismatch for Uint8Array types
+            analyser.getByteFrequencyData(dataArray as any);
          } else {
             // Если пауза - заполняем нулями, но продолжаем цикл анимации, чтобы столбики упали
             dataArray.fill(0);
