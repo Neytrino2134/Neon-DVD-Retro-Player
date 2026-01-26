@@ -10,7 +10,8 @@ export default defineConfig(({ mode }) => {
 
   return {
     plugins: [react()],
-    base: './', 
+    // Base must match your GitHub repository name for Pages to work correctly
+    base: '/Neon-DVD-Retro-Player/', 
     server: {
       host: true, 
       open: false, 
