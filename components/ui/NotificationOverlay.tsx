@@ -3,7 +3,7 @@ import React, { useEffect, useState } from 'react';
 import { Terminal } from 'lucide-react';
 import { useNotification, Notification } from '../../contexts/NotificationContext';
 
-const NotificationItem: React.FC<{ notification: Notification, onDismiss: (id: string) => void }> = ({ notification, onDismiss }) => {
+const NotificationItem: React.FC<{ notification: Notification, onDismiss: (id: string) => void, color: string }> = ({ notification, onDismiss, color }) => {
   // Phases: 'spawn' (line only) -> 'expand' (slide open) -> 'type' (text) -> 'wait' -> 'untype' -> 'collapse' -> 'done'
   const [phase, setPhase] = useState<'spawn' | 'expand' | 'type' | 'wait' | 'untype' | 'collapse' | 'done'>('spawn');
   const [displayedText, setDisplayedText] = useState('');
@@ -64,8 +64,8 @@ const NotificationItem: React.FC<{ notification: Notification, onDismiss: (id: s
     <div 
       className={`
         relative mb-2 
-        bg-black/90 border-l-4 border-neon-green 
-        shadow-[0_0_15px_rgba(0,255,0,0.2)]
+        bg-black/90 border-l-4 
+        shadow-[0_0_15px_rgba(0,0,0,0.5)]
         overflow-hidden
         transition-all duration-500 ease-in-out
         flex items-center
@@ -73,16 +73,24 @@ const NotificationItem: React.FC<{ notification: Notification, onDismiss: (id: s
       style={{
         maxWidth: (phase === 'spawn' || phase === 'collapse') ? '4px' : '320px',
         opacity: 1,
-        minHeight: '44px' // Fixed height ensures the "line" look works well
+        minHeight: '44px', // Fixed height ensures the "line" look works well
+        borderColor: color, // Dynamic border color
+        boxShadow: `0 0 15px ${color}33` // Dynamic shadow with opacity
       }}
     >
       {/* Content Container - Fixed width prevents text reflow during slide */}
       <div className="flex items-center pl-3 pr-4 py-2 min-w-[320px]">
-        <Terminal size={14} className="text-neon-green mr-2 shrink-0" />
-        <span className="font-mono text-xs font-bold text-neon-green tracking-wide">
+        <Terminal size={14} style={{ color }} className="mr-2 shrink-0" />
+        <span 
+            className="font-mono text-xs font-bold tracking-wide"
+            style={{ color }}
+        >
           {displayedText}
           {(phase === 'type' || phase === 'wait' || phase === 'untype') && (
-             <span className="inline-block w-2 h-4 bg-neon-green ml-1 align-middle animate-pulse"></span>
+             <span 
+                className="inline-block w-2 h-4 ml-1 align-middle animate-pulse"
+                style={{ backgroundColor: color }}
+             ></span>
           )}
         </span>
       </div>
@@ -90,7 +98,11 @@ const NotificationItem: React.FC<{ notification: Notification, onDismiss: (id: s
   );
 };
 
-const NotificationOverlay: React.FC = () => {
+interface NotificationOverlayProps {
+    color?: string;
+}
+
+const NotificationOverlay: React.FC<NotificationOverlayProps> = ({ color = '#00ff00' }) => {
   const { notifications, removeNotification } = useNotification();
 
   if (notifications.length === 0) return null;
@@ -101,7 +113,8 @@ const NotificationOverlay: React.FC = () => {
         <NotificationItem 
           key={n.id} 
           notification={n} 
-          onDismiss={removeNotification} 
+          onDismiss={removeNotification}
+          color={color}
         />
       ))}
     </div>

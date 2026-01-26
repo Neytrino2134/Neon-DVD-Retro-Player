@@ -1,19 +1,21 @@
 
-import React from 'react';
-import { Square, CheckSquare, Zap } from 'lucide-react';
+import React, { useState } from 'react';
+import { Square, CheckSquare, Eye, EyeOff, Key } from 'lucide-react';
 import RangeControl from '../RangeControl';
 import CustomSelect from '../CustomSelect';
-import ToggleSwitch from '../ToggleSwitch';
 import { EffectsConfig, HologramCategory } from '../../../types';
 import { useLanguage } from '../../../contexts/LanguageContext';
 
-interface HologramSettingsProps {
-  config: EffectsConfig['holograms'];
-  update: (val: EffectsConfig['holograms']) => void;
+interface GeminiSettingsProps {
+  config: EffectsConfig['geminiChat'];
+  update: (val: EffectsConfig['geminiChat']) => void;
+  apiKey: string;
+  setApiKey: (key: string) => void;
 }
 
-const HologramSettings: React.FC<HologramSettingsProps> = ({ config, update }) => {
+const GeminiSettings: React.FC<GeminiSettingsProps> = ({ config, update, apiKey, setApiKey }) => {
   const { t } = useLanguage();
+  const [showKey, setShowKey] = useState(false);
 
   const toggleCategory = (cat: HologramCategory) => {
       const newCats = { ...config.categories, [cat]: !config.categories[cat] };
@@ -33,11 +35,33 @@ const HologramSettings: React.FC<HologramSettingsProps> = ({ config, update }) =
 
   return (
     <div className="pt-2">
-       {/* 1. Categories Grid (Moved to top) */}
-       <div className="mb-4">
-          <label className="text-white font-mono text-[10px] block mb-2 tracking-widest uppercase opacity-70">CATEGORIES</label>
+       {/* 0. API Key Input */}
+       <div className="mb-4 bg-black/20 p-2 rounded border border-theme-border">
+          <label className="text-theme-text font-mono text-[10px] block mb-2 tracking-widest uppercase opacity-70 flex items-center gap-2">
+             <Key size={12} /> {t('api_key_label')}
+          </label>
+          <div className="flex gap-2">
+             <input 
+                type={showKey ? "text" : "password"} 
+                value={apiKey}
+                onChange={(e) => setApiKey(e.target.value)}
+                placeholder={t('api_key_placeholder')}
+                className="flex-1 bg-black/50 border-b border-theme-muted/50 focus:border-theme-primary outline-none text-xs font-mono text-theme-text placeholder-theme-muted/30 px-1 py-1 transition-colors"
+             />
+             <button 
+                onClick={() => setShowKey(!showKey)}
+                className="p-1 text-theme-muted hover:text-theme-primary transition-colors"
+             >
+                {showKey ? <EyeOff size={14} /> : <Eye size={14} />}
+             </button>
+          </div>
+       </div>
+
+       {/* 1. Categories Grid */}
+       <div className="mb-4 border-t border-theme-border pt-3">
+          <label className="text-white font-mono text-[10px] block mb-2 tracking-widest uppercase opacity-70">TOPICS</label>
           <div className="grid grid-cols-2 gap-2">
-              {(['system', 'interactive', 'music', 'motivational', 'philosophy', 'space'] as HologramCategory[]).map(cat => (
+              {(['interactive', 'music', 'motivational', 'philosophy', 'space'] as HologramCategory[]).map(cat => (
                   <button 
                     key={cat}
                     onClick={() => toggleCategory(cat)}
@@ -57,18 +81,7 @@ const HologramSettings: React.FC<HologramSettingsProps> = ({ config, update }) =
           </div>
        </div>
 
-       {/* 2. Graphical Icons Toggle */}
-       <div className="mb-4 pt-2 border-t border-theme-border">
-          <ToggleSwitch 
-              label={t('hologram_icons')} 
-              icon={Zap} 
-              value={config.enableIcons || false} 
-              onChange={(v) => update({ ...config, enableIcons: v })} 
-              color="blue"
-          />
-       </div>
-
-       {/* 3. Style / Color (Moved below) */}
+       {/* 2. Style / Color */}
        <div className="mb-4 pt-2 border-t border-theme-border">
            <CustomSelect 
               label={t('hologram_color')}
@@ -80,12 +93,11 @@ const HologramSettings: React.FC<HologramSettingsProps> = ({ config, update }) =
        
        <div className="border-t border-theme-border pt-2">
          <RangeControl label={t('opacity')} value={config.opacity} min={0.1} max={1} step={0.1} onChange={v => update({ ...config, opacity: v })} />
-         <RangeControl label={t('scale')} value={config.scale ?? 1.0} min={0.5} max={2.0} step={0.1} onChange={v => update({ ...config, scale: v })} />
-         <RangeControl label={t('msg_speed')} value={config.speed} min={0.5} max={5} step={0.5} onChange={v => update({ ...config, speed: v })} />
-         <RangeControl label={t('msg_interval')} value={config.interval} min={1} max={60} step={1} onChange={v => update({ ...config, interval: v })} />
+         <RangeControl label={t('scale')} value={config.scale ?? 1.0} min={0.5} max={1.5} step={0.1} onChange={v => update({ ...config, scale: v })} />
+         <RangeControl label={t('print_speed')} value={config.typingSpeed} min={0.5} max={3} step={0.5} onChange={v => update({ ...config, typingSpeed: v })} />
        </div>
     </div>
   );
 };
 
-export default HologramSettings;
+export default GeminiSettings;

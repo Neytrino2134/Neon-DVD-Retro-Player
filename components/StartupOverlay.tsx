@@ -1,7 +1,6 @@
 
-
 import React, { useEffect, useState, useRef } from 'react';
-import { Terminal, Cpu, Power } from 'lucide-react';
+import { Terminal, Cpu, Power, Key } from 'lucide-react';
 import { useLanguage } from '../contexts/LanguageContext';
 
 interface StartupOverlayProps {
@@ -9,9 +8,11 @@ interface StartupOverlayProps {
   onFadeOut?: () => void;
   onPlaySfx?: (filename: string) => void;
   onStopSfx?: () => void;
+  apiKey: string;
+  setApiKey: (key: string) => void;
 }
 
-const StartupOverlay: React.FC<StartupOverlayProps> = ({ onComplete, onFadeOut, onPlaySfx, onStopSfx }) => {
+const StartupOverlay: React.FC<StartupOverlayProps> = ({ onComplete, onFadeOut, onPlaySfx, onStopSfx, apiKey, setApiKey }) => {
   const [isVisible, setIsVisible] = useState(true);
   const [hasStarted, setHasStarted] = useState(false); // New state for interaction
   const [windowState, setWindowState] = useState<'hidden' | 'spawn' | 'expand' | 'full' | 'collapse'>('hidden');
@@ -23,12 +24,13 @@ const StartupOverlay: React.FC<StartupOverlayProps> = ({ onComplete, onFadeOut, 
   const [progress, setProgress] = useState(0);
   const [showProgress, setShowProgress] = useState(false);
   const [containerOpacity, setContainerOpacity] = useState(1);
+  const [tempApiKey, setTempApiKey] = useState(apiKey);
   
   // Standby Screen Animation State
   const [standbyOpacity, setStandbyOpacity] = useState(0);
   const [isTransitioning, setIsTransitioning] = useState(false);
 
-  const { language } = useLanguage();
+  const { language, t } = useLanguage();
   const linesEndRef = useRef<HTMLDivElement>(null);
   const timeoutsRef = useRef<number[]>([]);
   const skippedRef = useRef(false);
@@ -79,6 +81,12 @@ const StartupOverlay: React.FC<StartupOverlayProps> = ({ onComplete, onFadeOut, 
 
   const handleStart = () => {
       if (isTransitioning) return;
+      
+      // Save key if changed
+      if (tempApiKey !== apiKey) {
+          setApiKey(tempApiKey);
+      }
+
       setIsTransitioning(true);
       
       // Fade out Standby Screen
@@ -99,7 +107,7 @@ const StartupOverlay: React.FC<StartupOverlayProps> = ({ onComplete, onFadeOut, 
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [hasStarted, isTransitioning]);
+  }, [hasStarted, isTransitioning, tempApiKey]); // Added tempApiKey dependency
 
   useEffect(() => {
     if (!hasStarted) return;
@@ -149,7 +157,7 @@ const StartupOverlay: React.FC<StartupOverlayProps> = ({ onComplete, onFadeOut, 
       addLine("--------------------------------");
       addLine(isRu ? "ДОБРО ПОЖАЛОВАТЬ В СИСТЕМУ" : "WELCOME TO THE SYSTEM");
       await wait(800);
-      addLine("RETRO SONIC ULTRA v0.1.1");
+      addLine("RETRO SONIC ULTRA v0.1.2");
       await wait(800);
       addLine("--------------------------------");
       await wait(1000);
@@ -220,8 +228,7 @@ const StartupOverlay: React.FC<StartupOverlayProps> = ({ onComplete, onFadeOut, 
   if (!hasStarted) {
     return (
         <div 
-            className="fixed inset-0 z-[10000] bg-black flex flex-col items-center justify-center cursor-pointer select-none"
-            onClick={handleStart}
+            className="fixed inset-0 z-[10000] bg-black flex flex-col items-center justify-center cursor-default select-none"
             style={{ 
                 opacity: standbyOpacity, 
                 transition: 'opacity 1s ease-in-out' 
@@ -231,16 +238,47 @@ const StartupOverlay: React.FC<StartupOverlayProps> = ({ onComplete, onFadeOut, 
             <div className="absolute inset-0 bg-white/5 opacity-5 pointer-events-none scanlines"></div>
             <div className="absolute inset-0 pointer-events-none flicker bg-neon-blue/5 opacity-10"></div>
             
-            <div className="flex flex-col items-center gap-8 z-10 animate-pulse">
-                 <div className="w-24 h-24 rounded-full border-4 border-neon-blue flex items-center justify-center bg-neon-blue/10 shadow-[0_0_40px_#00f3ff] transition-transform hover:scale-110 duration-300">
+            <div className="flex flex-col items-center gap-8 z-10 animate-pulse w-full max-w-md px-4">
+                 
+                 {/* Header Text - Moved to Top */}
+                 <h1 className="text-3xl md:text-5xl font-mono font-bold text-white tracking-[0.2em] drop-shadow-[0_0_15px_rgba(255,255,255,0.8)] whitespace-nowrap text-center">
+                    SYSTEM STANDBY
+                 </h1>
+
+                 {/* Power Button */}
+                 <div 
+                    onClick={handleStart}
+                    className="w-24 h-24 rounded-full border-4 border-neon-blue flex items-center justify-center bg-neon-blue/10 shadow-[0_0_40px_#00f3ff] transition-transform hover:scale-110 duration-300 cursor-pointer"
+                 >
                     <Power size={48} className="text-neon-blue" />
                  </div>
                  
-                 <div className="text-center space-y-4">
-                     <h1 className="text-3xl md:text-5xl font-mono font-bold text-white tracking-[0.2em] drop-shadow-[0_0_15px_rgba(255,255,255,0.8)]">
-                        SYSTEM STANDBY
-                     </h1>
-                     <div className="inline-block px-6 py-2 rounded">
+                 <div className="text-center space-y-6 w-full flex flex-col items-center">
+                     
+                     {/* API Key Input - Moved above Start Text */}
+                     <div className="w-full flex flex-col items-center gap-2 group">
+                        <div className="relative w-full max-w-xs">
+                            <div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none text-neon-blue/50">
+                                <Key size={14} />
+                            </div>
+                            <input 
+                                type="password" 
+                                value={tempApiKey}
+                                onChange={(e) => setTempApiKey(e.target.value)}
+                                placeholder={t('api_key_placeholder')}
+                                className="w-full bg-black/50 border border-neon-blue/30 rounded-md py-2 pl-9 pr-3 text-xs font-mono text-neon-blue focus:outline-none focus:border-neon-blue focus:shadow-[0_0_15px_rgba(0,243,255,0.3)] transition-all placeholder-neon-blue/30 text-center"
+                            />
+                        </div>
+                        <span className="text-[9px] text-neon-blue/40 font-mono tracking-wider">
+                            {t('api_key_label')} (OPTIONAL)
+                        </span>
+                     </div>
+
+                     {/* Start Button/Text - Moved to Bottom */}
+                     <div 
+                        onClick={handleStart}
+                        className="inline-block px-6 py-2 rounded cursor-pointer hover:bg-neon-blue/10 transition-colors"
+                     >
                         <p className="text-neon-blue font-mono text-sm md:text-lg tracking-widest font-bold">
                             {language === 'ru' ? 'НАЖМИТЕ ENTER ДЛЯ ЗАПУСКА' : 'PRESS ENTER TO INITIALIZE SYSTEM'}
                         </p>
@@ -274,7 +312,7 @@ const StartupOverlay: React.FC<StartupOverlayProps> = ({ onComplete, onFadeOut, 
 
   return (
     <div 
-      className="fixed inset-0 z-[10000] bg-black flex items-center justify-center cursor-none transition-opacity duration-1000 ease-out select-none"
+      className={`fixed inset-0 z-[10000] bg-black flex items-center justify-center cursor-none transition-opacity duration-1000 ease-out select-none ${containerOpacity < 1 ? 'pointer-events-none' : ''}`}
       style={{ opacity: containerOpacity }}
       onDoubleClick={handleSkip}
     >

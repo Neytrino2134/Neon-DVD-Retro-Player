@@ -1,12 +1,16 @@
-
 import { useState, useRef, useEffect, useCallback, SyntheticEvent } from 'react';
-import { AudioTrack } from '../types';
-import { getAllTracks, saveTrack, clearTracks } from '../lib/db';
+import { AudioTrack, Playlist } from '../types';
+import { getAllTracks, saveTrack, getAllPlaylists, savePlaylist, deletePlaylistAndTracks, clearTracksInPlaylist } from '../lib/db';
 
 type Deck = 'A' | 'B';
 
 export const useAudioPlayer = () => {
-  const [tracks, setTracks] = useState<AudioTrack[]>([]);
+  // Playlist State
+  const [playlists, setPlaylists] = useState<Playlist[]>([]);
+  const [activePlaylistId, setActivePlaylistId] = useState<string>(''); // What user sees
+  const [playingPlaylistId, setPlayingPlaylistId] = useState<string>(''); // What audio plays
+  
+  // Track State
   const [currentTrackIndex, setCurrentTrackIndex] = useState<number>(-1);
   const [isPlaying, setIsPlaying] = useState(false);
   
@@ -28,15 +32,14 @@ export const useAudioPlayer = () => {
   const [analyser, setAnalyser] = useState<AnalyserNode | null>(null);
 
   // --- DUAL DECK ARCHITECTURE ---
-  // We use two audio elements to allow true overlapping playback
   const audioRefA = useRef<HTMLAudioElement>(null);
   const audioRefB = useRef<HTMLAudioElement>(null);
   
   // Refs for logic
   const activeDeckRef = useRef<Deck>('A');
   const isCrossfadingRef = useRef(false);
-  const hasTriggeredAutoMixRef = useRef(false); // Prevents double triggers near end
-  const crossfadeTimeoutRef = useRef<number | null>(null); // To clear cleanup timeouts on rapid switching
+  const hasTriggeredAutoMixRef = useRef(false); 
+  const crossfadeTimeoutRef = useRef<number | null>(null); 
   
   // Refs for Web Audio API
   const audioContextRef = useRef<AudioContext | null>(null);
@@ -44,19 +47,26 @@ export const useAudioPlayer = () => {
   const sourceBRef = useRef<MediaElementAudioSourceNode | null>(null);
   const gainARef = useRef<GainNode | null>(null);
   const gainBRef = useRef<GainNode | null>(null);
+  const masterGainRef = useRef<GainNode | null>(null); // New Master Gain
 
-  // Persist settings
+  // Helper to get tracks of currently PLAYING playlist (for audio engine)
+  const getPlayingTracks = useCallback(() => {
+      const p = playlists.find(pl => pl.id === playingPlaylistId);
+      return p ? p.tracks : [];
+  }, [playlists, playingPlaylistId]);
+
+  // Helper to get tracks of currently VISIBLE playlist (for UI list)
+  const getVisibleTracks = useCallback(() => {
+      const p = playlists.find(pl => pl.id === activePlaylistId);
+      return p ? p.tracks : [];
+  }, [playlists, activePlaylistId]);
+
+  // Persist settings & Update Master Volume
   useEffect(() => {
     localStorage.setItem('neon_volume', volume.toString());
-    // Apply master volume to active deck immediately if not fading
-    if (gainARef.current && gainBRef.current && !isCrossfadingRef.current) {
-        const now = audioContextRef.current?.currentTime || 0;
-        const activeGain = activeDeckRef.current === 'A' ? gainARef.current : gainBRef.current;
-        const inactiveGain = activeDeckRef.current === 'A' ? gainBRef.current : gainARef.current;
-        
-        // Immediate update if not fading
-        activeGain.gain.setTargetAtTime(volume, now, 0.05);
-        inactiveGain.gain.setTargetAtTime(0, now, 0.05);
+    if (masterGainRef.current && audioContextRef.current) {
+        const now = audioContextRef.current.currentTime;
+        masterGainRef.current.gain.setTargetAtTime(volume, now, 0.05);
     }
   }, [volume]);
   
@@ -64,37 +74,71 @@ export const useAudioPlayer = () => {
      localStorage.setItem('neon_crossfade', crossfadeDuration.toString());
   }, [crossfadeDuration]);
 
-  // Load tracks from DB
+  // INITIAL LOAD
   useEffect(() => {
-    const loadTracks = async () => {
+    const loadData = async () => {
       try {
+        const savedPlaylists = await getAllPlaylists();
         const savedTracks = await getAllTracks();
-        if (savedTracks.length > 0) {
-          const loadedTracks = savedTracks.map(t => ({ 
-            id: t.id, 
-            name: t.name, 
-            url: URL.createObjectURL(t.file), 
-            file: t.file 
-          }));
-          setTracks(loadedTracks);
-          setCurrentTrackIndex(0);
-          
-          // Preload first track into Deck A
-          if (audioRefA.current) {
-             audioRefA.current.src = loadedTracks[0].url;
-             audioRefA.current.load();
-          }
-          activeDeckRef.current = 'A';
-          setIsPlaying(false);
+        
+        // If no playlists exist, create a default one
+        if (savedPlaylists.length === 0) {
+            const defaultId = crypto.randomUUID();
+            const defaultPl = { id: defaultId, name: 'MAIN DECK', order: 0 };
+            await savePlaylist(defaultPl);
+            
+            // If there are legacy tracks with no playlist ID or old format, migrate them
+            const migratedTracks: AudioTrack[] = [];
+            for (const t of savedTracks) {
+                const updated = { ...t, playlistId: defaultId, url: URL.createObjectURL(t.file) };
+                await saveTrack({ id: updated.id, playlistId: defaultId, name: updated.name, file: updated.file });
+                migratedTracks.push(updated);
+            }
+            
+            setPlaylists([{ ...defaultPl, tracks: migratedTracks }]);
+            setActivePlaylistId(defaultId);
+            setPlayingPlaylistId(defaultId);
+
+            if (migratedTracks.length > 0) {
+                 setCurrentTrackIndex(0);
+                 if (audioRefA.current) {
+                     audioRefA.current.src = migratedTracks[0].url;
+                     audioRefA.current.load();
+                 }
+            }
+        } else {
+            // Map tracks to playlists
+            const hydratedPlaylists = savedPlaylists.map(pl => ({
+                ...pl,
+                tracks: savedTracks
+                    .filter(t => t.playlistId === pl.id)
+                    .map(t => ({ ...t, url: URL.createObjectURL(t.file) }))
+            }));
+            
+            setPlaylists(hydratedPlaylists);
+            setActivePlaylistId(hydratedPlaylists[0].id);
+            setPlayingPlaylistId(hydratedPlaylists[0].id);
+
+            const initialTracks = hydratedPlaylists[0].tracks;
+            if (initialTracks.length > 0) {
+                setCurrentTrackIndex(0);
+                if (audioRefA.current) {
+                    audioRefA.current.src = initialTracks[0].url;
+                    audioRefA.current.load();
+                }
+            }
         }
+        
+        activeDeckRef.current = 'A';
+        setIsPlaying(false);
       } catch (err) {
-        console.error("Error loading tracks:", err);
+        console.error("Error loading data:", err);
       }
     };
-    loadTracks();
+    loadData();
   }, []);
 
-  // Initialize Web Audio API (Routing)
+  // Initialize Web Audio API
   const initAudio = useCallback(() => {
     if (!audioContextRef.current) {
       const AC = window.AudioContext || (window as any).webkitAudioContext;
@@ -102,23 +146,23 @@ export const useAudioPlayer = () => {
       audioContextRef.current = context;
       
       const analyserNode = context.createAnalyser();
-      // CHANGED: Lower smoothing for punchier visuals
       analyserNode.smoothingTimeConstant = 0.6; 
       setAnalyser(analyserNode);
 
-      // Create Gain Nodes for Fading
       const gainA = context.createGain();
       const gainB = context.createGain();
+      const masterGain = context.createGain();
       
-      // Connect gains to analyser, analyser to output
+      // Routing: Deck Gains -> Analyser -> Master Gain -> Output
       gainA.connect(analyserNode);
       gainB.connect(analyserNode);
-      analyserNode.connect(context.destination);
+      analyserNode.connect(masterGain);
+      masterGain.connect(context.destination);
 
       gainARef.current = gainA;
       gainBRef.current = gainB;
+      masterGainRef.current = masterGain;
 
-      // Connect HTML Audio Elements to Web Audio
       if (audioRefA.current) {
         try {
           const sourceA = context.createMediaElementSource(audioRefA.current);
@@ -135,9 +179,10 @@ export const useAudioPlayer = () => {
         } catch(e) { console.warn("Source B attach error", e); }
       }
       
-      // Initial State
-      gainA.gain.value = volume;
-      gainB.gain.value = 0;
+      // Initialize Gains
+      masterGain.gain.value = volume;
+      gainA.gain.value = activeDeckRef.current === 'A' ? 1 : 0;
+      gainB.gain.value = activeDeckRef.current === 'B' ? 1 : 0;
     }
     
     if (audioContextRef.current && audioContextRef.current.state === 'suspended') {
@@ -146,14 +191,15 @@ export const useAudioPlayer = () => {
   }, [volume]);
 
   // --- CROSSFADE LOGIC ---
-  const performCrossfade = useCallback((toTrackIndex: number) => {
-      // Init audio if context is missing or suspended
+  // Modified to accept an optional track list for context switching
+  const performCrossfade = useCallback((toTrackIndex: number, specificTracks?: AudioTrack[]) => {
       initAudio();
+      
+      // Use provided tracks (for playlist switch) or current playing tracks
+      const tracksToUse = specificTracks || getPlayingTracks();
+      
+      if (!tracksToUse[toTrackIndex] || !audioContextRef.current || !gainARef.current || !gainBRef.current) return;
 
-      if (!tracks[toTrackIndex] || !audioContextRef.current || !gainARef.current || !gainBRef.current) return;
-
-      // --- CRITICAL FIX FOR RAPID SWITCHING ---
-      // If a crossfade cleanup is pending, cancel it so we don't stop the wrong track mid-play
       if (crossfadeTimeoutRef.current) {
         clearTimeout(crossfadeTimeoutRef.current);
         crossfadeTimeoutRef.current = null;
@@ -170,26 +216,20 @@ export const useAudioPlayer = () => {
 
       if (!activeAudio || !nextAudio) return;
 
-      // 1. Prepare Next Deck
-      nextAudio.src = tracks[toTrackIndex].url;
+      nextAudio.src = tracksToUse[toTrackIndex].url;
       nextAudio.currentTime = 0;
 
-      // Mark as crossfading (prevents pause events from triggering UI changes)
       isCrossfadingRef.current = true;
       hasTriggeredAutoMixRef.current = true;
 
-      // --- ZERO CROSSFADE: HARD CUT ---
-      // This solves the bug where clicking rapidly or having 0 duration causes toggling/pausing
+      // Hard Cut
       if (crossfadeDuration === 0) {
          const now = audioContextRef.current.currentTime;
-         
-         // Instant Gain Switch
          activeGain.gain.cancelScheduledValues(now);
          nextGain.gain.cancelScheduledValues(now);
          activeGain.gain.setValueAtTime(0, now);
-         nextGain.gain.setValueAtTime(volume, now);
+         nextGain.gain.setValueAtTime(1, now); 
 
-         // Sync Switch
          nextAudio.play()
             .then(() => setIsPlaying(true))
             .catch(e => console.error("Hard play failed", e));
@@ -197,7 +237,6 @@ export const useAudioPlayer = () => {
          activeAudio.pause();
          activeAudio.currentTime = 0;
          
-         // Update State Instantly
          activeDeckRef.current = nextDeck;
          setCurrentTrackIndex(toTrackIndex);
          
@@ -206,50 +245,37 @@ export const useAudioPlayer = () => {
          return; 
       }
 
-      // --- NORMAL CROSSFADE ---
-      
-      // 2. Play Next Deck
+      // Smooth Fade
       nextAudio.play().then(() => {
-          // Force state to playing immediately
           setIsPlaying(true);
-
           const now = audioContextRef.current!.currentTime;
           const fadeTime = crossfadeDuration; 
 
-          // Cancel any scheduled automation (STOP previous fades)
           activeGain.gain.cancelScheduledValues(now);
           nextGain.gain.cancelScheduledValues(now);
 
-          // 3. Perform Fade
-          // Fade OUT active
           activeGain.gain.setValueAtTime(activeGain.gain.value, now);
           activeGain.gain.linearRampToValueAtTime(0, now + fadeTime);
 
-          // Fade IN next
           nextGain.gain.setValueAtTime(nextGain.gain.value, now);
-          nextGain.gain.linearRampToValueAtTime(volume, now + fadeTime);
+          nextGain.gain.linearRampToValueAtTime(1, now + fadeTime); 
 
-          // Update pointers immediately so UI updates
           activeDeckRef.current = nextDeck;
           setCurrentTrackIndex(toTrackIndex);
           
-          // Reset trigger lock after a delay
           setTimeout(() => { 
              hasTriggeredAutoMixRef.current = false; 
           }, 1000);
 
-          // Cleanup Timer
           crossfadeTimeoutRef.current = window.setTimeout(() => {
-             // Stop the old deck to save CPU
              activeAudio.pause();
              activeAudio.currentTime = 0;
              isCrossfadingRef.current = false;
              crossfadeTimeoutRef.current = null;
              
-             // Ensure volumes are clean (snapped) at end
              const finalNow = audioContextRef.current?.currentTime || 0;
              activeGain.gain.setValueAtTime(0, finalNow);
-             nextGain.gain.setValueAtTime(volume, finalNow);
+             nextGain.gain.setValueAtTime(1, finalNow);
 
           }, fadeTime * 1000 + 100); 
 
@@ -258,13 +284,21 @@ export const useAudioPlayer = () => {
           isCrossfadingRef.current = false;
       });
 
-  }, [tracks, volume, crossfadeDuration, initAudio]);
+  }, [getPlayingTracks, volume, crossfadeDuration, initAudio]);
 
-  // Standard Play/Pause
   const togglePlay = useCallback(() => {
     initAudio();
     const activeAudio = activeDeckRef.current === 'A' ? audioRefA.current : audioRefB.current;
     
+    // If no track is loaded, check if we can load from current playlist
+    if (!activeAudio?.src || activeAudio.src === window.location.href) {
+        const tracks = getPlayingTracks();
+        if (tracks.length > 0) {
+            selectTrack(0);
+            return;
+        }
+    }
+
     if (isPlaying) {
       activeAudio?.pause();
       setIsPlaying(false);
@@ -272,44 +306,72 @@ export const useAudioPlayer = () => {
       activeAudio?.play().catch(console.warn);
       setIsPlaying(true);
       
-      // Restore volume if we paused mid-fade
       if (gainARef.current && gainBRef.current) {
          const now = audioContextRef.current?.currentTime || 0;
          const activeGain = activeDeckRef.current === 'A' ? gainARef.current : gainBRef.current;
          const inactiveGain = activeDeckRef.current === 'A' ? gainBRef.current : gainARef.current;
-         
-         // Snap to correct volumes
          activeGain.gain.cancelScheduledValues(now);
          inactiveGain.gain.cancelScheduledValues(now);
-         activeGain.gain.setValueAtTime(volume, now);
+         activeGain.gain.setValueAtTime(1, now);
          inactiveGain.gain.setValueAtTime(0, now);
       }
     }
-  }, [isPlaying, initAudio, volume]);
+  }, [isPlaying, initAudio, volume, getPlayingTracks]);
 
   const nextTrack = useCallback(() => {
-    if (tracks.length === 0) return;
-    const nextIndex = (currentTrackIndex + 1) % tracks.length;
+    // 1. Check if we need to switch playlists (Active tab != Playing tab)
+    // This happens when user clicked a tab but let the old song finish
+    if (activePlaylistId !== playingPlaylistId) {
+        const newPlaylist = playlists.find(p => p.id === activePlaylistId);
+        if (newPlaylist && newPlaylist.tracks.length > 0) {
+            // Context Switch!
+            setPlayingPlaylistId(activePlaylistId);
+            
+            // If playing, crossfade to new playlist first track
+            if (isPlaying) {
+                performCrossfade(0, newPlaylist.tracks);
+            } else {
+                // If paused, just prep the new track
+                setCurrentTrackIndex(0);
+                const nextDeck = activeDeckRef.current;
+                const audio = nextDeck === 'A' ? audioRefA.current : audioRefB.current;
+                if (audio) {
+                    audio.src = newPlaylist.tracks[0].url;
+                    audio.currentTime = 0;
+                }
+            }
+            hasTriggeredAutoMixRef.current = false;
+            return;
+        }
+        // If new playlist is empty, fall through or stop? 
+        // For now, let's fall through to stop safely if nothing to play.
+    }
+
+    // 2. Normal Next Track logic (Same Playlist)
+    const currentTracks = getPlayingTracks();
+    if (currentTracks.length === 0) return;
     
-    // Always perform crossfade/switch logic, even if paused, to load next track
+    const nextIndex = (currentTrackIndex + 1) % currentTracks.length;
+    
     if (isPlaying) {
         performCrossfade(nextIndex);
     } else {
-        // Simple swap without fade
         setCurrentTrackIndex(nextIndex);
-        const nextDeck = activeDeckRef.current; // Reuse same deck if paused
+        const nextDeck = activeDeckRef.current; 
         const audio = nextDeck === 'A' ? audioRefA.current : audioRefB.current;
         if (audio) {
-            audio.src = tracks[nextIndex].url;
+            audio.src = currentTracks[nextIndex].url;
             audio.currentTime = 0;
         }
         hasTriggeredAutoMixRef.current = false;
     }
-  }, [tracks, currentTrackIndex, isPlaying, performCrossfade]);
+  }, [getPlayingTracks, currentTrackIndex, isPlaying, performCrossfade, activePlaylistId, playingPlaylistId, playlists]);
 
   const prevTrack = useCallback(() => {
-    if (tracks.length === 0) return;
-    const prevIndex = (currentTrackIndex - 1 + tracks.length) % tracks.length;
+    // Prev track always stays in the PLAYING playlist context
+    const currentTracks = getPlayingTracks();
+    if (currentTracks.length === 0) return;
+    const prevIndex = (currentTrackIndex - 1 + currentTracks.length) % currentTracks.length;
     
     if (isPlaying) {
         performCrossfade(prevIndex);
@@ -318,24 +380,34 @@ export const useAudioPlayer = () => {
         const nextDeck = activeDeckRef.current;
         const audio = nextDeck === 'A' ? audioRefA.current : audioRefB.current;
         if (audio) {
-            audio.src = tracks[prevIndex].url;
+            audio.src = currentTracks[prevIndex].url;
             audio.currentTime = 0;
         }
         hasTriggeredAutoMixRef.current = false;
     }
-  }, [tracks, currentTrackIndex, isPlaying, performCrossfade]);
+  }, [getPlayingTracks, currentTrackIndex, isPlaying, performCrossfade]);
 
   const selectTrack = useCallback((index: number) => {
-      if (index === currentTrackIndex) return;
+      // If user clicks a track in a different playlist, switch context immediately
+      let tracksToPlay = getPlayingTracks();
+      
+      if (activePlaylistId !== playingPlaylistId) {
+          const newPlaylist = playlists.find(p => p.id === activePlaylistId);
+          if (newPlaylist) {
+              setPlayingPlaylistId(activePlaylistId);
+              tracksToPlay = newPlaylist.tracks;
+          }
+      }
+
+      if (!tracksToPlay[index] || (index === currentTrackIndex && activePlaylistId === playingPlaylistId)) return;
       
       if (isPlaying) {
-          performCrossfade(index);
+          performCrossfade(index, tracksToPlay);
       } else {
-          // If paused, we switch AND play
           const nextDeck = activeDeckRef.current;
           const audio = nextDeck === 'A' ? audioRefA.current : audioRefB.current;
           if (audio) {
-              audio.src = tracks[index].url;
+              audio.src = tracksToPlay[index].url;
               audio.currentTime = 0;
               initAudio();
               audio.play();
@@ -344,14 +416,13 @@ export const useAudioPlayer = () => {
           setCurrentTrackIndex(index);
           hasTriggeredAutoMixRef.current = false;
       }
-  }, [currentTrackIndex, isPlaying, performCrossfade, tracks, initAudio]);
+  }, [currentTrackIndex, isPlaying, performCrossfade, getPlayingTracks, activePlaylistId, playingPlaylistId, playlists, initAudio]);
 
   const seek = useCallback((time: number) => {
     const audio = activeDeckRef.current === 'A' ? audioRefA.current : audioRefB.current;
     if (audio) {
       audio.currentTime = time;
       setCurrentTime(time);
-      // Reset automix trigger if we seeked back before the trigger point
       if (audio.duration && time < audio.duration - crossfadeDuration) {
           hasTriggeredAutoMixRef.current = false;
       }
@@ -370,66 +441,208 @@ export const useAudioPlayer = () => {
       isCrossfadingRef.current = false;
   }, []);
   
-  // File processing
+  // --- FILE MANAGEMENT ---
   const processAudioFiles = async (files: File[]) => {
-    const newTracks = files.map(file => ({ id: crypto.randomUUID(), name: file.name, url: URL.createObjectURL(file), file }));
-    for (const t of newTracks) await saveTrack({ id: t.id, name: t.name, file: t.file });
-    const prevCount = tracks.length;
-    setTracks(prev => [...prev, ...newTracks]);
-    
-    if (prevCount === 0) { 
-      setCurrentTrackIndex(0); 
-      if (audioRefA.current) {
-          audioRefA.current.src = newTracks[0].url;
-          audioRefA.current.load();
-      }
-      activeDeckRef.current = 'A';
-      initAudio();
+    let targetPlaylistId = activePlaylistId;
+    if (!targetPlaylistId) {
+        const plId = crypto.randomUUID();
+        const pl = { id: plId, name: 'NEW DECK', order: playlists.length };
+        await savePlaylist(pl);
+        setPlaylists(prev => [...prev, { ...pl, tracks: [] }]);
+        setActivePlaylistId(plId);
+        setPlayingPlaylistId(plId);
+        targetPlaylistId = plId;
     }
+
+    const newTracks = files.map(file => ({ 
+        id: crypto.randomUUID(), 
+        playlistId: targetPlaylistId,
+        name: file.name, 
+        url: URL.createObjectURL(file), 
+        file 
+    }));
+
+    for (const t of newTracks) {
+        await saveTrack({ id: t.id, playlistId: t.playlistId, name: t.name, file: t.file });
+    }
+
+    setPlaylists(prev => prev.map(pl => {
+        if (pl.id === targetPlaylistId) {
+            const updatedTracks = [...pl.tracks, ...newTracks];
+            // If we are currently PLAYING this playlist and it was empty, start logic
+            if (pl.id === playingPlaylistId && pl.tracks.length === 0 && updatedTracks.length > 0) {
+                 setCurrentTrackIndex(0);
+                 if (audioRefA.current) {
+                     audioRefA.current.src = updatedTracks[0].url;
+                     audioRefA.current.load();
+                 }
+                 initAudio();
+            }
+            return { ...pl, tracks: updatedTracks };
+        }
+        return pl;
+    }));
   };
 
   const clearPlaylist = useCallback(async () => {
-    stop();
-    [audioRefA.current, audioRefB.current].forEach(a => {
-        if (a) { a.removeAttribute('src'); a.load(); }
-    });
-    tracks.forEach(t => URL.revokeObjectURL(t.url));
-    setTracks([]);
-    setCurrentTrackIndex(-1);
-    await clearTracks();
-  }, [tracks, stop]);
+    // Only stop if we are clearing the CURRENTLY PLAYING playlist
+    if (activePlaylistId === playingPlaylistId) {
+        stop();
+        [audioRefA.current, audioRefB.current].forEach(a => {
+            if (a) { a.removeAttribute('src'); a.load(); }
+        });
+        setCurrentTrackIndex(-1);
+    }
+    
+    // Revoke URLs for active playlist
+    const visibleTracks = getVisibleTracks();
+    visibleTracks.forEach(t => URL.revokeObjectURL(t.url));
+
+    await clearTracksInPlaylist(activePlaylistId);
+
+    setPlaylists(prev => prev.map(pl => {
+        if (pl.id === activePlaylistId) return { ...pl, tracks: [] };
+        return pl;
+    }));
+  }, [activePlaylistId, playingPlaylistId, getVisibleTracks, stop]);
   
   const sortTracks = useCallback(() => {
-    setTracks(prev => {
-      const currentId = prev[currentTrackIndex]?.id;
-      const sorted = [...prev].sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: 'base' }));
-      if (currentId) {
-        const newIndex = sorted.findIndex(t => t.id === currentId);
-        if (newIndex !== -1) setCurrentTrackIndex(newIndex);
-      }
-      return sorted;
-    });
-  }, [currentTrackIndex]);
+    setPlaylists(prev => prev.map(pl => {
+        if (pl.id === activePlaylistId) {
+            // Only update index if we are sorting the playing playlist
+            const shouldUpdateIndex = pl.id === playingPlaylistId;
+            const currentId = shouldUpdateIndex ? pl.tracks[currentTrackIndex]?.id : null;
+            
+            const sorted = [...pl.tracks].sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: 'base' }));
+            
+            if (currentId) {
+                const newIndex = sorted.findIndex(t => t.id === currentId);
+                if (newIndex !== -1) setCurrentTrackIndex(newIndex);
+            }
+            return { ...pl, tracks: sorted };
+        }
+        return pl;
+    }));
+  }, [activePlaylistId, playingPlaylistId, currentTrackIndex]);
 
   const shuffleTracks = useCallback(() => {
-    setTracks(prev => {
-      const currentId = prev[currentTrackIndex]?.id;
-      const shuffled = [...prev];
-      for (let i = shuffled.length - 1; i > 0; i--) {
-        const j = Math.floor(Math.random() * (i + 1));
-        [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+    setPlaylists(prev => prev.map(pl => {
+        if (pl.id === activePlaylistId) {
+            const shouldUpdateIndex = pl.id === playingPlaylistId;
+            const currentId = shouldUpdateIndex ? pl.tracks[currentTrackIndex]?.id : null;
+            
+            const shuffled = [...pl.tracks];
+            for (let i = shuffled.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+            }
+            
+            if (currentId) {
+                const newIndex = shuffled.findIndex(t => t.id === currentId);
+                if (newIndex !== -1) setCurrentTrackIndex(newIndex);
+            }
+            return { ...pl, tracks: shuffled };
+        }
+        return pl;
+    }));
+  }, [activePlaylistId, playingPlaylistId, currentTrackIndex]);
+
+  // --- PLAYLIST MANAGEMENT ---
+
+  const addPlaylist = async () => {
+      const id = crypto.randomUUID();
+      const name = `DECK ${playlists.length + 1}`;
+      const newPl: Playlist = { id, name, order: playlists.length, tracks: [] };
+      await savePlaylist(newPl);
+      setPlaylists(prev => [...prev, newPl]);
+  };
+
+  const removePlaylist = async (id: string) => {
+      if (playlists.length <= 1) return; // Prevent deleting last playlist
+      
+      const plToDelete = playlists.find(p => p.id === id);
+      if (plToDelete) {
+          plToDelete.tracks.forEach(t => URL.revokeObjectURL(t.url));
       }
-      if (currentId) {
-        const newIndex = shuffled.findIndex(t => t.id === currentId);
-        if (newIndex !== -1) setCurrentTrackIndex(newIndex);
+
+      await deletePlaylistAndTracks(id);
+      
+      setPlaylists(prev => {
+          const filtered = prev.filter(p => p.id !== id);
+          // If we deleted the ACTIVE one
+          if (id === activePlaylistId) {
+             const nextActive = filtered[0];
+             setActivePlaylistId(nextActive.id);
+          }
+          // If we deleted the PLAYING one
+          if (id === playingPlaylistId) {
+             stop();
+             const nextPlaying = filtered[0];
+             setPlayingPlaylistId(nextPlaying.id);
+             setCurrentTrackIndex(0);
+             if (nextPlaying.tracks.length > 0 && audioRefA.current) {
+                 audioRefA.current.src = nextPlaying.tracks[0].url;
+                 audioRefA.current.load();
+             }
+          }
+          return filtered;
+      });
+  };
+
+  const renamePlaylist = async (id: string, newName: string) => {
+      setPlaylists(prev => prev.map(p => {
+          if (p.id === id) {
+              const updated = { ...p, name: newName };
+              savePlaylist({ id: updated.id, name: updated.name, order: updated.order });
+              return updated;
+          }
+          return p;
+      }));
+  };
+
+  const reorderPlaylists = async (dragIndex: number, hoverIndex: number) => {
+      const cloned = [...playlists];
+      const [removed] = cloned.splice(dragIndex, 1);
+      cloned.splice(hoverIndex, 0, removed);
+      
+      // Update order property
+      const updated = cloned.map((p, idx) => ({ ...p, order: idx }));
+      setPlaylists(updated);
+      
+      // Persist all
+      for (const p of updated) {
+          await savePlaylist({ id: p.id, name: p.name, order: p.order });
       }
-      return shuffled;
-    });
-  }, [currentTrackIndex]);
+  };
+
+  const switchPlaylist = (id: string) => {
+      if (id === activePlaylistId) return;
+      
+      setActivePlaylistId(id);
+      
+      // If we are NOT playing, switch the playing context immediately to the new tab
+      // so the user can hit Play and hear the new tab.
+      // If we ARE playing, do NOT stop. Keep playing old tab.
+      if (!isPlaying) {
+          setPlayingPlaylistId(id);
+          const targetPl = playlists.find(p => p.id === id);
+          if (targetPl && targetPl.tracks.length > 0) {
+              setCurrentTrackIndex(0);
+              const nextDeck = activeDeckRef.current;
+              const audio = nextDeck === 'A' ? audioRefA.current : audioRefB.current;
+              if (audio) {
+                  audio.src = targetPl.tracks[0].url;
+                  audio.currentTime = 0;
+                  audio.load();
+              }
+          } else {
+              setCurrentTrackIndex(-1);
+          }
+      }
+  };
+
 
   // --- AUTOMATION LOOP ---
-  // We use handleTimeUpdate to detect when to crossfade
-  // Added preventAutoMix flag to support reboot logic
   const handleTimeUpdate = (_e: any, preventAutoMix = false) => {
       const active = activeDeckRef.current === 'A' ? audioRefA.current : audioRefB.current;
       if (active) {
@@ -440,81 +653,43 @@ export const useAudioPlayer = () => {
           if (dur) setDuration(dur);
 
           // AUTO-MIX LOGIC
-          // If we are near end AND playing AND haven't triggered yet AND crossfade is enabled
-          // AND we are NOT preventing auto mix (e.g. waiting for scheduled reboot)
           if (!preventAutoMix && isPlaying && dur > 0 && crossfadeDuration > 0) {
               if (ct >= dur - crossfadeDuration && !hasTriggeredAutoMixRef.current && !isCrossfadingRef.current) {
-                   // Calculate next index
-                   const nextIndex = (currentTrackIndex + 1) % tracks.length;
-                   // Only mix if we have more than 1 track or looping
-                   if (tracks.length > 1) {
-                       performCrossfade(nextIndex);
-                   }
+                   // This calls nextTrack, which handles playlist switching logic
+                   nextTrack();
               }
           }
       }
   };
 
-  // --- MEDIA SESSION API INTEGRATION ---
-  useEffect(() => {
-    if ('mediaSession' in navigator && currentTrackIndex >= 0 && tracks[currentTrackIndex]) {
-      const track = tracks[currentTrackIndex];
-      navigator.mediaSession.metadata = new MediaMetadata({
-        title: track.name,
-        artist: 'Neon Retro Player',
-        album: 'Retro Mix',
-        // You can add artwork here if you extract cover art
-        artwork: [
-            { src: 'https://cdn-icons-png.flaticon.com/512/3204/3204362.png', sizes: '512x512', type: 'image/png' }
-        ]
-      });
-
-      // Update handlers
-      navigator.mediaSession.setActionHandler('play', () => {
-         togglePlay();
-      });
-      navigator.mediaSession.setActionHandler('pause', () => {
-         togglePlay();
-      });
-      navigator.mediaSession.setActionHandler('previoustrack', () => {
-         prevTrack();
-      });
-      navigator.mediaSession.setActionHandler('nexttrack', () => {
-         nextTrack();
-      });
-    }
-  }, [currentTrackIndex, tracks, togglePlay, prevTrack, nextTrack]);
-
   // --- SYNC UI STATE WITH AUDIO EVENT ---
-  // If the browser (global media key) plays the audio natively without invoking our React handlers,
-  // we need to listen to the DOM event to update UI state (Visualizer, Pause button, etc.)
   const onAudioPlay = useCallback(() => {
       if (!isPlaying) setIsPlaying(true);
-      initAudio(); // Ensure context is running
+      initAudio(); 
   }, [isPlaying, initAudio]);
 
   const onAudioPause = useCallback((e: SyntheticEvent<HTMLAudioElement>) => {
-      // Determine which deck caused the pause event
-      // If it's the inactive deck (e.g. from crossfade cleanup), ignore it
       const activeElement = activeDeckRef.current === 'A' ? audioRefA.current : audioRefB.current;
-      
-      // If we can determine the source event target, compare it.
-      // If e.target is not the active deck's audio element, we return early.
       if (activeElement && e.target !== activeElement) {
          return;
       }
-
-      // Only set to false if we are not in the middle of a crossfade operation
-      // The old deck pausing during a fade shouldn't trigger global pause state
       if (isPlaying && !isCrossfadingRef.current) setIsPlaying(false);
   }, [isPlaying]);
 
+  // DERIVED STATE FOR EXPORT
+  const visibleTracks = getVisibleTracks();
+  const playingTracks = getPlayingTracks();
+  const currentTrack = playingTracks[currentTrackIndex];
 
   return {
     audioRefA,
     audioRefB,
-    tracks,
+    tracks: visibleTracks, // UI List
+    playlists,
+    activePlaylistId,
+    playingPlaylistId, // Exposed for UI highlighting logic
     currentTrackIndex,
+    currentTrack, // Exposed for Screensaver/LCD
     isPlaying,
     volume,
     currentTime,
@@ -528,6 +703,11 @@ export const useAudioPlayer = () => {
     setDuration,
     processAudioFiles,
     clearPlaylist,
+    addPlaylist,
+    removePlaylist,
+    renamePlaylist,
+    reorderPlaylists,
+    switchPlaylist,
     nextTrack,
     prevTrack,
     togglePlay,

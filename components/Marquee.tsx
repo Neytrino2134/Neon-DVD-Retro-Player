@@ -1,4 +1,5 @@
 
+
 import React, { useEffect, useRef, useState } from 'react';
 
 interface MarqueeProps {
@@ -6,13 +7,14 @@ interface MarqueeProps {
   speed: number;
   opacity: number;
   fontSize: number;
-  className?: string;
+  className?: string; // Keep for legacy, but color overrides it
+  color?: string; // New: Hex color
 }
 
 // Characters used for the glitch effect: Blocks + Symbols
 const GLITCH_CHARS = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789@#$%&*!??█▓▒░<>/[]{}-=_+";
 
-const Marquee: React.FC<MarqueeProps> = ({ text, speed, opacity, fontSize, className }) => {
+const Marquee: React.FC<MarqueeProps> = ({ text, speed, opacity, fontSize, className, color = '#00ff00' }) => {
   // We keep track of what is actually displayed (which might be glitched)
   const [displayText, setDisplayText] = useState(text);
   
@@ -138,7 +140,14 @@ const Marquee: React.FC<MarqueeProps> = ({ text, speed, opacity, fontSize, class
       className={`overflow-hidden whitespace-nowrap w-full h-full pointer-events-none ${className}`} 
       style={{ opacity, fontSize: `${fontSize}px` }}
     >
-      <div ref={containerRef} className="flex items-center h-full will-change-transform">
+      <div 
+        ref={containerRef} 
+        className="flex items-center h-full will-change-transform"
+        style={{
+            color: color,
+            textShadow: `0 0 8px ${color}cc`
+        }}
+      >
         {/* Render multiple copies for seamless scrolling */}
         {[0, 1, 2, 3].map((i) => (
           <div 

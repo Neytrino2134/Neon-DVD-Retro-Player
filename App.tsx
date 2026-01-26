@@ -1,8 +1,8 @@
 
-
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { LanguageProvider } from './contexts/LanguageContext';
 import { NotificationProvider, useNotification } from './contexts/NotificationContext';
+import { ThemeProvider, useTheme } from './contexts/ThemeContext';
 import SettingsPanel from './components/settings/SettingsPanel';
 import Controls from './components/Controls';
 import RetroScreen from './components/RetroScreen';
@@ -19,6 +19,7 @@ function AppContent() {
   const [isDragging, setIsDragging] = useState(false);
   const appContainerRef = useRef<HTMLDivElement>(null);
   const { addNotification } = useNotification();
+  const { currentTheme, setTheme, controlStyle, setControlStyle } = useTheme();
   
   // Reload State Logic
   const [rebootPhase, setRebootPhase] = useState<'idle' | 'waiting' | 'active'>('idle');
@@ -154,7 +155,10 @@ function AppContent() {
     // Handle .NRP Config files
     const nrpFiles = droppedFiles.filter(f => f.name.toLowerCase().endsWith('.nrp'));
     if (nrpFiles.length > 0) {
-      config.importConfig(nrpFiles[0]);
+      config.importConfig(nrpFiles[0], (loaded) => {
+          if (loaded.theme) setTheme(loaded.theme);
+          if (loaded.controlStyle) setControlStyle(loaded.controlStyle);
+      });
       addNotification("Configuration Loaded", "success");
     }
 
@@ -207,18 +211,22 @@ function AppContent() {
   return (
     <div 
       ref={appContainerRef}
-      className="flex flex-col md:flex-row h-screen w-full bg-black overflow-hidden relative"
+      className="flex flex-col md:flex-row h-screen w-full bg-theme-bg text-theme-text overflow-hidden relative"
       onDragOver={onDragOver}
       onDragEnter={onDragEnter}
       onDragLeave={onDragLeave}
       onDrop={onDrop}
     >
+      <CustomCursor style={config.cursorStyle} />
+      
       <StartupOverlay 
         key={startupKey}
         onFadeOut={handleOverlayFadeOut}
         onComplete={handleBootComplete} 
         onPlaySfx={playSFX} 
         onStopSfx={stopAllSFX}
+        apiKey={config.apiKey}
+        setApiKey={config.setApiKey}
       />
       <ShutdownOverlay 
         active={rebootPhase === 'active'} 
@@ -252,12 +260,12 @@ function AppContent() {
       
       {/* Settings Panel - Left Side */}
       <div 
-        className={`shrink-0 z-20 transition-all duration-700 ease-out border-r border-gray-800 
+        className={`shrink-0 z-20 transition-all duration-700 ease-out
           ${(focusMode || introState < 1) ? '-translate-x-full opacity-0' : 'translate-x-0 opacity-100'}
-          ${focusMode ? 'w-0 overflow-hidden border-none' : 'w-full md:w-[400px]'}
+          ${focusMode ? 'w-0 overflow-hidden' : 'w-full md:w-[460px]'}
         `}
       >
-        <div className="w-full h-full md:w-[400px]">
+        <div className="w-full h-full md:w-[460px]">
            <SettingsPanel 
              showVisualizer={config.showVisualizer} setShowVisualizer={config.setShowVisualizer}
              showDvd={config.showDvd} setShowDvd={config.setShowDvd}
@@ -265,6 +273,7 @@ function AppContent() {
              visualizerConfig={config.visualizerConfig} setVisualizerConfig={config.setVisualizerConfig}
              dvdConfig={config.dvdConfig} setDvdConfig={config.setDvdConfig}
              effectsConfig={config.effectsConfig} setEffectsConfig={config.setEffectsConfig}
+             watermarkConfig={config.watermarkConfig} setWatermarkConfig={config.setWatermarkConfig}
              bgColor={config.bgColor} setBgColor={config.setBgColor}
              bgPattern={config.bgPattern} setBgPattern={config.setBgPattern}
              bgPatternConfig={config.bgPatternConfig} setBgPatternConfig={config.setBgPatternConfig}
@@ -277,7 +286,7 @@ function AppContent() {
              onSelectBg={config.selectBg}
              onDeselectBg={config.deselectBg}
              onClearBgMedia={config.handleClearBg}
-             onExportConfig={config.exportConfig}
+             onExportConfig={() => config.exportConfig(currentTheme, controlStyle)}
              bgAutoplayInterval={config.bgAutoplayInterval}
              setBgAutoplayInterval={config.setBgAutoplayInterval}
              onScheduleReload={handleScheduleReload}
@@ -286,12 +295,23 @@ function AppContent() {
              crossfadeDuration={player.crossfadeDuration}
              setCrossfadeDuration={player.setCrossfadeDuration}
              savedPresets={config.savedPresets}
-             savePreset={(n) => { config.savePreset(n); addNotification(`Preset "${n}" saved`, "success"); }}
-             loadPreset={(id) => { config.loadPreset(id); addNotification("Preset loaded", "success"); }}
+             savePreset={(n) => { config.savePreset(n, currentTheme, controlStyle); addNotification(`Preset "${n}" saved`, "success"); }}
+             loadPreset={(id) => { 
+                 const loaded = config.loadPreset(id); 
+                 if (loaded) {
+                     if (loaded.theme) setTheme(loaded.theme);
+                     if (loaded.controlStyle) setControlStyle(loaded.controlStyle);
+                     addNotification("Preset loaded", "success"); 
+                 }
+             }}
              deletePreset={config.deletePreset}
              renamePreset={config.renamePreset}
              onSfxUpload={handleZipUpload}
              sfxMap={sfxMap}
+             cursorStyle={config.cursorStyle}
+             setCursorStyle={config.setCursorStyle}
+             apiKey={config.apiKey}
+             setApiKey={config.setApiKey}
            />
         </div>
       </div>
@@ -303,7 +323,7 @@ function AppContent() {
           <RetroScreen 
             analyser={player.analyser}
             isPlaying={player.isPlaying}
-            currentTrack={player.tracks[player.currentTrackIndex]}
+            currentTrack={player.currentTrack} // Use the playing track, not list[index]
             bgMedia={config.bgMedia}
             bgColor={config.bgColor}
             bgPattern={config.bgPattern}
@@ -314,6 +334,7 @@ function AppContent() {
             showDvd={config.showDvd}
             effectsConfig={config.effectsConfig}
             marqueeConfig={config.marqueeConfig}
+            watermarkConfig={config.watermarkConfig}
             progress={playbackPercentage}
             focusMode={focusMode}
             setFocusMode={(v) => { setFocusMode(v); addNotification(v ? "Cinema Mode Active" : "UI Restored", "info"); }}
@@ -327,20 +348,26 @@ function AppContent() {
             currentTime={player.currentTime}
             duration={player.duration}
             onPlaySfx={playSFX}
+            volume={player.volume}
+            apiKey={config.apiKey}
           />
       </div>
       
       {/* Controls Panel - Right Side */}
       <div 
-        className={`shrink-0 z-20 transition-all duration-700 ease-out border-l border-gray-800
+        className={`shrink-0 z-20 transition-all duration-700 ease-out
            ${(introState < 1) ? 'translate-x-full opacity-0' : 'translate-x-0 opacity-100'}
-           ${focusMode ? 'w-0 overflow-hidden border-none' : 'w-full md:w-72 lg:w-80'}
+           ${focusMode ? 'w-0 overflow-hidden' : 'w-full md:w-72 lg:w-80'}
         `}
       >
         <div className="w-full h-full md:w-72 lg:w-80">
             <Controls 
               tracks={player.tracks} 
+              playlists={player.playlists}
+              activePlaylistId={player.activePlaylistId}
+              playingPlaylistId={player.playingPlaylistId}
               currentTrackIndex={player.currentTrackIndex} 
+              currentTrack={player.currentTrack}
               isPlaying={player.isPlaying} 
               volume={player.volume} 
               currentTime={player.currentTime}
@@ -357,6 +384,12 @@ function AppContent() {
               onClearPlaylist={() => { player.clearPlaylist(); addNotification("Playlist cleared", "warning"); }}
               onSort={() => { player.sortTracks(); addNotification("Playlist sorted A-Z", "info"); }}
               onShuffle={() => { player.shuffleTracks(); addNotification("Playlist shuffled", "info"); }}
+              // Playlist Actions
+              onAddPlaylist={player.addPlaylist}
+              onRemovePlaylist={player.removePlaylist}
+              onRenamePlaylist={player.renamePlaylist}
+              onSwitchPlaylist={player.switchPlaylist}
+              onReorderPlaylists={player.reorderPlaylists}
             />
         </div>
       </div>
@@ -375,12 +408,13 @@ function AppContent() {
 
 function App() {
   return (
-    <NotificationProvider>
-      <LanguageProvider>
-        <CustomCursor />
-        <AppContent />
-      </LanguageProvider>
-    </NotificationProvider>
+    <ThemeProvider>
+      <NotificationProvider>
+        <LanguageProvider>
+          <AppContent />
+        </LanguageProvider>
+      </NotificationProvider>
+    </ThemeProvider>
   );
 }
 

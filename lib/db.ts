@@ -1,11 +1,11 @@
-
 /**
  * Simple IndexedDB wrapper for storing File/Blob objects
  */
 const DB_NAME = 'NeonPlayerDB';
-const DB_VERSION = 2; // Incremented version for schema change
+const DB_VERSION = 3; // Updated for Playlist support
 const STORES = {
   TRACKS: 'tracks',
+  PLAYLISTS: 'playlists',
   BACKGROUND: 'background',
   SFX: 'sfx'
 };
@@ -14,11 +14,25 @@ export const initDB = (): Promise<IDBDatabase> => {
   return new Promise((resolve, reject) => {
     const request = indexedDB.open(DB_NAME, DB_VERSION);
 
-    request.onupgradeneeded = (_e) => {
+    request.onupgradeneeded = (_e: IDBVersionChangeEvent) => {
       const db = request.result;
+      const transaction = request.transaction;
+      
       if (!db.objectStoreNames.contains(STORES.TRACKS)) {
-        db.createObjectStore(STORES.TRACKS, { keyPath: 'id' });
+        const trackStore = db.createObjectStore(STORES.TRACKS, { keyPath: 'id' });
+        trackStore.createIndex('playlistId', 'playlistId', { unique: false });
+      } else {
+        // Upgrade existing tracks store if needed
+        const trackStore = transaction?.objectStore(STORES.TRACKS);
+        if (trackStore && !trackStore.indexNames.contains('playlistId')) {
+           trackStore.createIndex('playlistId', 'playlistId', { unique: false });
+        }
       }
+
+      if (!db.objectStoreNames.contains(STORES.PLAYLISTS)) {
+        db.createObjectStore(STORES.PLAYLISTS, { keyPath: 'id' });
+      }
+
       if (!db.objectStoreNames.contains(STORES.BACKGROUND)) {
         db.createObjectStore(STORES.BACKGROUND, { keyPath: 'id' });
       }
@@ -32,7 +46,65 @@ export const initDB = (): Promise<IDBDatabase> => {
   });
 };
 
-export const saveTrack = async (track: { id: string; name: string; file: File }) => {
+// --- PLAYLIST FUNCTIONS ---
+
+export const savePlaylist = async (playlist: { id: string; name: string; order: number }) => {
+    const db = await initDB();
+    return new Promise<void>((resolve, reject) => {
+        const transaction = db.transaction(STORES.PLAYLISTS, 'readwrite');
+        const store = transaction.objectStore(STORES.PLAYLISTS);
+        const request = store.put(playlist);
+        request.onsuccess = () => resolve();
+        request.onerror = () => reject(request.error);
+    });
+};
+
+export const getAllPlaylists = async (): Promise<{ id: string; name: string; order: number }[]> => {
+    const db = await initDB();
+    return new Promise((resolve, reject) => {
+        const transaction = db.transaction(STORES.PLAYLISTS, 'readonly');
+        const store = transaction.objectStore(STORES.PLAYLISTS);
+        const request = store.getAll();
+        request.onsuccess = () => {
+            const results = request.result || [];
+            results.sort((a, b) => a.order - b.order);
+            resolve(results);
+        };
+        request.onerror = () => reject(request.error);
+    });
+};
+
+export const deletePlaylistAndTracks = async (playlistId: string) => {
+    const db = await initDB();
+    return new Promise<void>((resolve, reject) => {
+        const transaction = db.transaction([STORES.PLAYLISTS, STORES.TRACKS], 'readwrite');
+        
+        // Delete Playlist
+        const plStore = transaction.objectStore(STORES.PLAYLISTS);
+        plStore.delete(playlistId);
+
+        // Delete Tracks associated with playlist
+        const trackStore = transaction.objectStore(STORES.TRACKS);
+        const index = trackStore.index('playlistId');
+        const range = IDBKeyRange.only(playlistId);
+        
+        // We need to collect keys first then delete, or use openCursor
+        index.openCursor(range).onsuccess = (e) => {
+            const cursor = (e.target as IDBRequest).result;
+            if (cursor) {
+                cursor.delete();
+                cursor.continue();
+            }
+        };
+
+        transaction.oncomplete = () => resolve();
+        transaction.onerror = () => reject(transaction.error);
+    });
+};
+
+// --- TRACK FUNCTIONS ---
+
+export const saveTrack = async (track: { id: string; playlistId: string; name: string; file: File }) => {
   const db = await initDB();
   return new Promise<void>((resolve, reject) => {
     const transaction = db.transaction(STORES.TRACKS, 'readwrite');
@@ -43,7 +115,7 @@ export const saveTrack = async (track: { id: string; name: string; file: File })
   });
 };
 
-export const getAllTracks = async (): Promise<{ id: string; name: string; file: File }[]> => {
+export const getAllTracks = async (): Promise<{ id: string; playlistId: string; name: string; file: File }[]> => {
   const db = await initDB();
   return new Promise((resolve, reject) => {
     const transaction = db.transaction(STORES.TRACKS, 'readonly');
@@ -54,16 +126,38 @@ export const getAllTracks = async (): Promise<{ id: string; name: string; file: 
   });
 };
 
+// Clear ALL tracks (nuclear option, usually we want to clear per playlist)
 export const clearTracks = async () => {
   const db = await initDB();
   return new Promise<void>((resolve, reject) => {
-    const transaction = db.transaction(STORES.TRACKS, 'readwrite');
-    const store = transaction.objectStore(STORES.TRACKS);
-    const request = store.clear();
-    request.onsuccess = () => resolve();
-    request.onerror = () => reject(request.error);
+    const transaction = db.transaction([STORES.TRACKS, STORES.PLAYLISTS], 'readwrite');
+    transaction.objectStore(STORES.TRACKS).clear();
+    transaction.objectStore(STORES.PLAYLISTS).clear();
+    requestAnimationFrame(() => resolve());
+    transaction.onerror = () => reject(transaction.error);
   });
 };
+
+export const clearTracksInPlaylist = async (playlistId: string) => {
+    const db = await initDB();
+    return new Promise<void>((resolve, reject) => {
+        const transaction = db.transaction(STORES.TRACKS, 'readwrite');
+        const store = transaction.objectStore(STORES.TRACKS);
+        const index = store.index('playlistId');
+        const range = IDBKeyRange.only(playlistId);
+        
+        index.openCursor(range).onsuccess = (e) => {
+            const cursor = (e.target as IDBRequest).result;
+            if (cursor) {
+                cursor.delete();
+                cursor.continue();
+            }
+        };
+        transaction.oncomplete = () => resolve();
+        transaction.onerror = () => reject(transaction.error);
+    });
+};
+
 
 // --- BACKGROUND FUNCTIONS ---
 

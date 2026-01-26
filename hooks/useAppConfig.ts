@@ -1,6 +1,6 @@
 
 import { useState, useEffect, useCallback } from 'react';
-import { VisualizerConfig, DvdConfig, EffectsConfig, MarqueeConfig, BackgroundMedia, PatternConfig, AppPreset } from '../types';
+import { VisualizerConfig, DvdConfig, EffectsConfig, MarqueeConfig, BackgroundMedia, PatternConfig, AppPreset, CursorStyle, WatermarkConfig, ThemeType, ControlStyle } from '../types';
 import { getAllBackgrounds, saveBackground, clearBackgrounds, deleteBackground } from '../lib/db';
 
 const STORAGE_KEYS = {
@@ -13,8 +13,11 @@ const STORAGE_KEYS = {
   SHOW_VISUALIZER: 'neon_show_visualizer',
   SHOW_DVD: 'neon_show_dvd',
   MARQUEE: 'neon_marquee_config',
+  WATERMARK: 'neon_watermark_config',
   BG_AUTOPLAY: 'neon_bg_autoplay_interval',
-  PRESETS: 'neon_config_presets'
+  PRESETS: 'neon_config_presets',
+  CURSOR: 'neon_cursor_style',
+  API_KEY: 'neon_gemini_api_key' // New Key
 };
 
 const DEFAULT_PRESETS: AppPreset[] = [
@@ -25,9 +28,9 @@ const DEFAULT_PRESETS: AppPreset[] = [
     config: {
       visualizerConfig: {
         style: 'blue', position: 'bottom', barCount: 128, sensitivity: 1.5, fillOpacity: 0.3,
-        strokeEnabled: true, strokeOpacity: 0.8, showTips: true, normalize: false, minFrequency: 0, maxFrequency: 100, 
+        strokeEnabled: true, strokeOpacity: 0.8, showTips: true, normalize: false, preventVolumeScaling: false, minFrequency: 0, maxFrequency: 100, 
         barGap: 2, mirror: false, segmented: false, segmentHeight: 4, segmentGap: 2,
-        tipHeight: 2, tipSpeed: 15
+        tipHeight: 2, tipSpeed: 15, highlightLastBrick: false, tipColor: 'white', tipGlow: false, barGravity: 5
       },
       dvdConfig: { size: 150, speed: 2, opacity: 0.7, enableSfx: false, logoType: 'neon_waves' },
       effectsConfig: {
@@ -36,25 +39,34 @@ const DEFAULT_PRESETS: AppPreset[] = [
         cyberHack: { enabled: false, speed: 5, opacity: 0.7, density: 0.5, scale: 1.0, backgroundOpacity: 0.4 },
         debugConsole: { enabled: false, opacity: 0.9, scale: 1.0 },
         holograms: { 
-          enabled: false, opacity: 0.8, speed: 1.0, interval: 15, scale: 1.0,
+          enabled: false, opacity: 0.8, speed: 1.0, interval: 15, scale: 1.0, enableIcons: false,
           categories: { system: true, interactive: true, music: true, motivational: true, philosophy: false, space: false }
-        }
+        },
+        geminiChat: {
+          enabled: false, opacity: 0.9, scale: 1.0, typingSpeed: 1.0, 
+          categories: { system: false, interactive: true, music: true, motivational: true, philosophy: true, space: true }
+        },
+        lightLeaks: { enabled: false, intensity: 0.5, speed: 0.5, number: 6 }
       },
       marqueeConfig: {
-        enabled: true, showProgress: true, progressMode: 'blocks', progressHeight: 20, progressOpacity: 0.6,
+        enabled: true, style: 'matrix', showProgress: true, progressMode: 'blocks', progressHeight: 20, progressOpacity: 0.6,
         speed: 1, opacity: 0.9, fontSize: 40
       },
+      watermarkConfig: { scale: 1.0, opacity: 1.0, flashIntensity: 0.5 },
       bgColor: '#0f172a',
       bgPattern: 'none',
       bgPatternConfig: { intensity: 0.25, scale: 1.0 },
       showVisualizer: true,
       showDvd: true,
-      bgAutoplayInterval: 5
+      bgAutoplayInterval: 5,
+      cursorStyle: 'default',
+      theme: 'neon-retro',
+      controlStyle: 'default'
     }
   },
   {
     id: 'middle_wave_bar',
-    name: 'Middle Wave Bar',
+    name: 'Middle Wave Bar Blue',
     createdAt: Date.now(),
     config: {
       visualizerConfig: {
@@ -67,6 +79,7 @@ const DEFAULT_PRESETS: AppPreset[] = [
         strokeOpacity: 0.8,
         showTips: true,
         normalize: false,
+        preventVolumeScaling: false,
         minFrequency: 5,
         maxFrequency: 81,
         barGap: 8,
@@ -75,7 +88,11 @@ const DEFAULT_PRESETS: AppPreset[] = [
         segmentHeight: 30,
         segmentGap: 9,
         tipHeight: 5,
-        tipSpeed: 6
+        tipSpeed: 6,
+        highlightLastBrick: true,
+        tipColor: "white",
+        tipGlow: true,
+        barGravity: 5
       },
       dvdConfig: {
         size: 180,
@@ -119,6 +136,7 @@ const DEFAULT_PRESETS: AppPreset[] = [
           speed: 1,
           interval: 1,
           scale: 1.3,
+          enableIcons: false,
           categories: {
             system: true,
             interactive: true,
@@ -127,6 +145,16 @@ const DEFAULT_PRESETS: AppPreset[] = [
             philosophy: true,
             space: true
           }
+        },
+        geminiChat: {
+          enabled: false, opacity: 0.9, scale: 1.0, typingSpeed: 1.0,
+          categories: { system: false, interactive: true, music: true, motivational: true, philosophy: true, space: true }
+        },
+        lightLeaks: {
+          enabled: false,
+          intensity: 0.6,
+          speed: 0.3,
+          number: 8
         }
       },
       bgColor: "#000000",
@@ -139,6 +167,7 @@ const DEFAULT_PRESETS: AppPreset[] = [
       showDvd: false,
       marqueeConfig: {
         enabled: true,
+        style: "matrix",
         showProgress: true,
         progressMode: "blocks",
         progressHeight: 20,
@@ -147,7 +176,15 @@ const DEFAULT_PRESETS: AppPreset[] = [
         opacity: 0.6,
         fontSize: 40
       },
-      bgAutoplayInterval: 5
+      watermarkConfig: {
+        scale: 1,
+        opacity: 1,
+        flashIntensity: 0.5
+      },
+      bgAutoplayInterval: 5,
+      cursorStyle: "classic-blue",
+      theme: "neon-blue",
+      controlStyle: "round"
     }
   }
 ];
@@ -159,12 +196,15 @@ const getInitial = <T,>(key: string, defaultValue: T): T => {
 };
 
 export const useAppConfig = () => {
+  const [apiKey, setApiKey] = useState(() => localStorage.getItem(STORAGE_KEYS.API_KEY) || '');
   const [showVisualizer, setShowVisualizer] = useState(() => getInitial(STORAGE_KEYS.SHOW_VISUALIZER, true));
   const [showDvd, setShowDvd] = useState(() => getInitial(STORAGE_KEYS.SHOW_DVD, true));
+  const [cursorStyle, setCursorStyle] = useState<CursorStyle>(() => getInitial(STORAGE_KEYS.CURSOR, 'default'));
   
   const [marqueeConfig, setMarqueeConfig] = useState<MarqueeConfig>(() => {
     const defaults = {
       enabled: true, 
+      style: 'matrix',
       showProgress: true, 
       progressMode: 'blocks',
       progressHeight: 20,
@@ -176,28 +216,25 @@ export const useAppConfig = () => {
 
     const initial = getInitial(STORAGE_KEYS.MARQUEE, defaults);
     
-    // Merge with defaults to ensure new props exist
-    return {
-      ...defaults,
-      ...initial
-    };
+    return { ...defaults, ...initial };
+  });
+
+  const [watermarkConfig, setWatermarkConfig] = useState<WatermarkConfig>(() => {
+    const defaults: WatermarkConfig = { scale: 1.0, opacity: 1.0, flashIntensity: 0.5 };
+    const initial = getInitial(STORAGE_KEYS.WATERMARK, defaults);
+    return { ...defaults, ...initial };
   });
 
   const [visualizerConfig, setVisualizerConfig] = useState<VisualizerConfig>(() => {
     const defaults: VisualizerConfig = {
       style: 'blue', position: 'bottom', barCount: 128, sensitivity: 1.5, fillOpacity: 0.3,
-      strokeEnabled: true, strokeOpacity: 0.8, showTips: true, normalize: false, minFrequency: 0, maxFrequency: 100, 
+      strokeEnabled: true, strokeOpacity: 0.8, showTips: true, normalize: false, preventVolumeScaling: false, minFrequency: 0, maxFrequency: 100, 
       barGap: 2, mirror: false, segmented: false, segmentHeight: 4, segmentGap: 2,
-      tipHeight: 2, tipSpeed: 15
+      tipHeight: 2, tipSpeed: 15, highlightLastBrick: false, tipColor: 'white', tipGlow: false, barGravity: 5
     };
 
     const initial = getInitial(STORAGE_KEYS.VISUALIZER, defaults);
-
-    // Merge for backward compatibility
-    return {
-        ...defaults,
-        ...initial
-    }
+    return { ...defaults, ...initial }
   });
 
   const [dvdConfig, setDvdConfig] = useState<DvdConfig>(() => {
@@ -213,29 +250,22 @@ export const useAppConfig = () => {
         cyberHack: { enabled: false, speed: 5, opacity: 0.7, density: 0.5, scale: 1.0, backgroundOpacity: 0.4 },
         debugConsole: { enabled: false, opacity: 0.9, scale: 1.0 },
         holograms: { 
-          enabled: false, 
-          opacity: 0.8, 
-          speed: 1.0, 
-          interval: 15, 
-          scale: 1.0,
-          categories: {
-            system: true,
-            interactive: true,
-            music: true,
-            motivational: true,
-            philosophy: false,
-            space: false
-          }
-        }
+          enabled: false, opacity: 0.8, speed: 1.0, interval: 15, scale: 1.0, enableIcons: false,
+          categories: { system: true, interactive: true, music: true, motivational: true, philosophy: false, space: false }
+        },
+        geminiChat: {
+          enabled: false, opacity: 0.9, scale: 1.0, typingSpeed: 1.0,
+          categories: { system: false, interactive: true, music: true, motivational: true, philosophy: true, space: true }
+        },
+        lightLeaks: { enabled: false, intensity: 0.5, speed: 0.5, number: 6 }
       };
       const initial = getInitial(STORAGE_KEYS.EFFECTS, defaults);
       
-      const hologramDefaults = {
-        enabled: false,
-        opacity: 0.8,
-        speed: 1.0,
-        interval: 15,
-        scale: 1.0
+      const hologramDefaults = { enabled: false, opacity: 0.8, speed: 1.0, interval: 15, scale: 1.0, enableIcons: false };
+      const lightLeaksDefaults = { enabled: false, intensity: 0.5, speed: 0.5, number: 6 };
+      const geminiDefaults = {
+          enabled: false, opacity: 0.9, scale: 1.0, typingSpeed: 1.0,
+          categories: { system: false, interactive: true, music: true, motivational: true, philosophy: true, space: true }
       };
 
       const savedCategories = (initial.holograms?.categories || {}) as any;
@@ -248,16 +278,16 @@ export const useAppConfig = () => {
           space: savedCategories.space ?? false
       };
 
-      // Ensure new properties exist for old saves
       return {
           ...initial,
           debugConsole: initial.debugConsole || { enabled: false, opacity: 0.9, scale: 1.0 },
           holograms: { 
-            // Merge defaults first, then initial, then merge specific nested props
             ...hologramDefaults,
             ...(initial.holograms || {}),
             categories: mergedCategories
-          }
+          },
+          geminiChat: initial.geminiChat || geminiDefaults,
+          lightLeaks: initial.lightLeaks || lightLeaksDefaults
       }
   });
   
@@ -265,22 +295,16 @@ export const useAppConfig = () => {
   const [bgPattern, setBgPattern] = useState(() => localStorage.getItem(STORAGE_KEYS.BG_PATTERN) || 'none');
   const [bgPatternConfig, setBgPatternConfig] = useState<PatternConfig>(() => getInitial(STORAGE_KEYS.BG_PATTERN_CONFIG, { intensity: 0.25, scale: 1.0 }));
   
-  // Background State: List + Current Index
   const [bgList, setBgList] = useState<BackgroundMedia[]>([]);
   const [currentBgIndex, setCurrentBgIndex] = useState<number>(0);
   
-  // Autoplay Interval in Minutes (default 5)
   const [bgAutoplayInterval, setBgAutoplayInterval] = useState<number>(() => getInitial(STORAGE_KEYS.BG_AUTOPLAY, 5));
 
-  // Saved Presets - Initialize with Defaults if empty
   const [savedPresets, setSavedPresets] = useState<AppPreset[]>(() => {
     const saved = localStorage.getItem(STORAGE_KEYS.PRESETS);
     if (saved) {
       try {
         const parsed = JSON.parse(saved);
-        // If we have saved presets, use them. If array is empty (user deleted all), 
-        // we might want to restore defaults or respect the empty state. 
-        // For now, if it's empty, we restore defaults so the user always has a starting point.
         return parsed.length > 0 ? parsed : DEFAULT_PRESETS;
       } catch {
         return DEFAULT_PRESETS;
@@ -289,7 +313,10 @@ export const useAppConfig = () => {
     return DEFAULT_PRESETS;
   });
 
-  // Persistence
+  useEffect(() => {
+    localStorage.setItem(STORAGE_KEYS.API_KEY, apiKey);
+  }, [apiKey]);
+
   useEffect(() => {
     localStorage.setItem(STORAGE_KEYS.VISUALIZER, JSON.stringify(visualizerConfig));
     localStorage.setItem(STORAGE_KEYS.DVD, JSON.stringify(dvdConfig));
@@ -300,15 +327,15 @@ export const useAppConfig = () => {
     localStorage.setItem(STORAGE_KEYS.SHOW_VISUALIZER, JSON.stringify(showVisualizer));
     localStorage.setItem(STORAGE_KEYS.SHOW_DVD, JSON.stringify(showDvd));
     localStorage.setItem(STORAGE_KEYS.MARQUEE, JSON.stringify(marqueeConfig));
+    localStorage.setItem(STORAGE_KEYS.WATERMARK, JSON.stringify(watermarkConfig));
     localStorage.setItem(STORAGE_KEYS.BG_AUTOPLAY, JSON.stringify(bgAutoplayInterval));
-  }, [visualizerConfig, dvdConfig, effectsConfig, bgColor, bgPattern, bgPatternConfig, showVisualizer, showDvd, marqueeConfig, bgAutoplayInterval]);
+    localStorage.setItem(STORAGE_KEYS.CURSOR, JSON.stringify(cursorStyle));
+  }, [visualizerConfig, dvdConfig, effectsConfig, bgColor, bgPattern, bgPatternConfig, showVisualizer, showDvd, marqueeConfig, watermarkConfig, bgAutoplayInterval, cursorStyle]);
 
-  // Persist Presets
   useEffect(() => {
     localStorage.setItem(STORAGE_KEYS.PRESETS, JSON.stringify(savedPresets));
   }, [savedPresets]);
 
-  // Load Backgrounds from DB
   useEffect(() => {
     const hydrate = async () => {
       const savedBgs = await getAllBackgrounds();
@@ -332,14 +359,12 @@ export const useAppConfig = () => {
         const type = file.type.startsWith('video') ? 'video' : 'image';
         const id = crypto.randomUUID();
         const newItem: BackgroundMedia = { id, type, file, url: URL.createObjectURL(file) };
-        
         await saveBackground({ id, type, file });
         newItems.push(newItem);
     }
 
     setBgList(prev => {
         const updated = [...prev, ...newItems];
-        // If we were empty, start at 0. If not, stay where we are.
         if (prev.length === 0) setCurrentBgIndex(0);
         return updated;
     });
@@ -348,15 +373,9 @@ export const useAppConfig = () => {
   const removeBg = async (id: string) => {
     const index = bgList.findIndex(item => item.id === id);
     if (index === -1) return;
-    
-    // Revoke URL
     if (bgList[index].url) URL.revokeObjectURL(bgList[index].url);
-    
-    // Update List
     const newList = bgList.filter(item => item.id !== id);
     setBgList(newList);
-    
-    // Update Index
     if (newList.length === 0) {
         setCurrentBgIndex(0);
     } else if (currentBgIndex >= newList.length) {
@@ -364,7 +383,6 @@ export const useAppConfig = () => {
     } else if (currentBgIndex > index) {
         setCurrentBgIndex(currentBgIndex - 1);
     }
-    
     await deleteBackground(id);
   };
 
@@ -373,14 +391,12 @@ export const useAppConfig = () => {
         const newList = [...bgList];
         [newList[index - 1], newList[index]] = [newList[index], newList[index - 1]];
         setBgList(newList);
-        
         if (currentBgIndex === index) setCurrentBgIndex(index - 1);
         else if (currentBgIndex === index - 1) setCurrentBgIndex(index);
     } else if (direction === 'down' && index < bgList.length - 1) {
         const newList = [...bgList];
         [newList[index + 1], newList[index]] = [newList[index], newList[index + 1]];
         setBgList(newList);
-        
         if (currentBgIndex === index) setCurrentBgIndex(index + 1);
         else if (currentBgIndex === index + 1) setCurrentBgIndex(index);
     }
@@ -392,13 +408,11 @@ export const useAppConfig = () => {
       }
   };
 
-  // Switch to color mode without clearing list
   const deselectBg = () => {
       setCurrentBgIndex(-1);
   };
 
   const handleClearBg = async () => {
-    // Revoke URLs to free memory
     bgList.forEach(bg => URL.revokeObjectURL(bg.url));
     await clearBackgrounds();
     setBgList([]);
@@ -415,21 +429,18 @@ export const useAppConfig = () => {
     setCurrentBgIndex(prev => (prev - 1 + bgList.length) % bgList.length);
   }, [bgList.length]);
 
-  // Autoplay Logic
   useEffect(() => {
     if (bgList.length <= 1 || bgAutoplayInterval <= 0) return;
-
     const intervalMs = bgAutoplayInterval * 60 * 1000;
     const intervalId = setInterval(() => {
       nextBg();
     }, intervalMs);
-
     return () => clearInterval(intervalId);
   }, [bgList.length, bgAutoplayInterval, nextBg]);
 
   // --- PRESET MANAGEMENT ---
 
-  const savePreset = (name: string) => {
+  const savePreset = (name: string, theme: ThemeType, controlStyle: ControlStyle) => {
     const newPreset: AppPreset = {
       id: crypto.randomUUID(),
       name,
@@ -439,24 +450,27 @@ export const useAppConfig = () => {
         dvdConfig,
         effectsConfig,
         marqueeConfig,
+        watermarkConfig,
         bgColor,
         bgPattern,
         bgPatternConfig,
         showVisualizer,
         showDvd,
-        bgAutoplayInterval
+        bgAutoplayInterval,
+        cursorStyle,
+        theme,
+        controlStyle
       }
     };
     setSavedPresets(prev => [...prev, newPreset]);
   };
 
-  const loadPreset = (id: string) => {
+  const loadPreset = (id: string): AppPreset['config'] | null => {
     const preset = savedPresets.find(p => p.id === id);
-    if (!preset) return;
+    if (!preset) return null;
 
     const { config } = preset;
     
-    // Apply all settings
     setVisualizerConfig(config.visualizerConfig);
     setDvdConfig(config.dvdConfig);
     setEffectsConfig(config.effectsConfig);
@@ -467,6 +481,10 @@ export const useAppConfig = () => {
     setShowVisualizer(config.showVisualizer);
     setShowDvd(config.showDvd);
     setBgAutoplayInterval(config.bgAutoplayInterval);
+    if (config.cursorStyle) setCursorStyle(config.cursorStyle);
+    if (config.watermarkConfig) setWatermarkConfig(config.watermarkConfig);
+    
+    return config;
   };
 
   const deletePreset = (id: string) => {
@@ -481,10 +499,11 @@ export const useAppConfig = () => {
 
   // --- EXPORT / IMPORT ---
 
-  const exportConfig = () => {
+  const exportConfig = (theme: ThemeType, controlStyle: ControlStyle) => {
     const config = {
-      visualizerConfig, dvdConfig, effectsConfig, bgColor, bgPattern, bgPatternConfig, showVisualizer, showDvd, marqueeConfig, bgAutoplayInterval, version: '1.0'
+      visualizerConfig, dvdConfig, effectsConfig, bgColor, bgPattern, bgPatternConfig, showVisualizer, showDvd, marqueeConfig, watermarkConfig, bgAutoplayInterval, cursorStyle, theme, controlStyle, version: '1.1'
     };
+    // Note: API Key is purposely excluded from export for security
     const blob = new Blob([JSON.stringify(config, null, 2)], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
     const date = new Date();
@@ -496,7 +515,7 @@ export const useAppConfig = () => {
     URL.revokeObjectURL(url);
   };
 
-  const importConfig = (file: File) => {
+  const importConfig = (file: File, onLoadCallback: (config: any) => void) => {
     const reader = new FileReader();
     reader.onload = (event) => {
       try {
@@ -511,6 +530,12 @@ export const useAppConfig = () => {
         if (typeof content.showDvd === 'boolean') setShowDvd(content.showDvd);
         if (content.marqueeConfig) setMarqueeConfig(content.marqueeConfig);
         if (typeof content.bgAutoplayInterval === 'number') setBgAutoplayInterval(content.bgAutoplayInterval);
+        if (content.cursorStyle) setCursorStyle(content.cursorStyle);
+        if (content.watermarkConfig) setWatermarkConfig(content.watermarkConfig);
+        
+        // Pass the full content to callback so App can handle theme/style
+        if (onLoadCallback) onLoadCallback(content);
+
       } catch (err) {
         console.error("Failed to parse NRP config file", err);
       }
@@ -519,12 +544,14 @@ export const useAppConfig = () => {
   };
 
   return {
+    apiKey, setApiKey,
     showVisualizer, setShowVisualizer,
     showDvd, setShowDvd,
     marqueeConfig, setMarqueeConfig,
     visualizerConfig, setVisualizerConfig,
     dvdConfig, setDvdConfig,
     effectsConfig, setEffectsConfig,
+    watermarkConfig, setWatermarkConfig,
     bgColor, setBgColor,
     bgPattern, setBgPattern,
     bgPatternConfig, setBgPatternConfig,
@@ -537,12 +564,11 @@ export const useAppConfig = () => {
     nextBg, prevBg,
     bgCount: bgList.length,
     exportConfig, importConfig,
-    
-    // Preset Manager
     savedPresets,
     savePreset,
     loadPreset,
     deletePreset,
-    renamePreset
+    renamePreset,
+    cursorStyle, setCursorStyle
   };
 };

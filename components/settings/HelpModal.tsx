@@ -66,17 +66,17 @@ const HelpModal: React.FC<HelpModalProps> = ({ onClose }) => {
   return (
     <div className={overlayClass} onClick={handleClose}>
       <div 
-        className="bg-gray-900 border border-neon-blue shadow-[0_0_30px_rgba(0,243,255,0.2)] rounded-lg w-full max-w-md overflow-hidden relative flex flex-col"
+        className="bg-theme-panel border border-theme-primary shadow-theme-glow rounded-lg w-full max-w-md overflow-hidden relative flex flex-col"
         style={windowStyle}
         onClick={(e) => e.stopPropagation()}
       >
         <div className={contentClass}>
             {/* Modal Header */}
-            <div className="flex items-center justify-between p-4 border-b border-gray-800 bg-gray-950 shrink-0">
-            <h3 className="text-neon-blue font-mono text-lg font-bold flex items-center gap-2">
+            <div className="flex items-center justify-between p-4 border-b border-theme-border bg-theme-bg shrink-0">
+            <h3 className="text-theme-primary font-mono text-lg font-bold flex items-center gap-2">
                 <HelpCircle size={20} /> {t('help')}
             </h3>
-            <button onClick={handleClose} className="text-gray-400 hover:text-white transition-colors">
+            <button onClick={handleClose} className="text-theme-muted hover:text-theme-text transition-colors">
                 <X size={20} />
             </button>
             </div>
@@ -85,43 +85,43 @@ const HelpModal: React.FC<HelpModalProps> = ({ onClose }) => {
             <div className="p-6 space-y-6 overflow-y-auto max-h-[80vh] custom-scrollbar flex-1">
             {/* Hotkeys */}
             <div>
-                <h4 className="text-white font-mono text-xs uppercase opacity-70 mb-3 flex items-center gap-2">
+                <h4 className="text-theme-text font-mono text-xs uppercase opacity-70 mb-3 flex items-center gap-2">
                     <Keyboard size={14} /> {t('hotkeys')}
                 </h4>
                 <div className="grid grid-cols-2 gap-y-2 gap-x-4 text-xs font-mono">
-                    <div className="text-gray-400">Space</div><div className="text-white">Play / Pause</div>
-                    <div className="text-gray-400">F</div><div className="text-white">Cinema Mode</div>
-                    <div className="text-gray-400">Shift + F</div><div className="text-white">Fullscreen</div>
-                    <div className="text-gray-400">Arrows ◄ ►</div><div className="text-white">Change BG</div>
-                    <div className="text-gray-400">Pause/Break</div><div className="text-white">Reboot</div>
+                    <div className="text-theme-muted">Space</div><div className="text-theme-text">Play / Pause</div>
+                    <div className="text-theme-muted">F</div><div className="text-theme-text">Cinema Mode</div>
+                    <div className="text-theme-muted">Shift + F</div><div className="text-theme-text">Fullscreen</div>
+                    <div className="text-theme-muted">Arrows ◄ ►</div><div className="text-theme-text">Change BG</div>
+                    <div className="text-theme-muted">Pause/Break</div><div className="text-theme-text">Reboot</div>
                 </div>
             </div>
 
-            <div className="h-px bg-gray-800"></div>
+            <div className="h-px bg-theme-border"></div>
 
             {/* Author Info */}
             <div className="space-y-4">
                 <div className="flex items-center gap-3">
-                    <div className="p-2 bg-gray-800 rounded-full text-neon-purple border border-gray-700"><User size={16}/></div>
+                    <div className="p-2 bg-theme-bg rounded-full text-theme-secondary border border-theme-border"><User size={16}/></div>
                     <div>
-                        <div className="text-[10px] text-gray-500 uppercase">{t('author')}</div>
-                        <div className="text-white font-mono font-bold">MeowMasterArt</div>
+                        <div className="text-[10px] text-theme-muted uppercase">{t('author')}</div>
+                        <div className="text-theme-text font-mono font-bold">MeowMasterArt</div>
                     </div>
                 </div>
                 
                 <div className="flex items-center gap-3">
-                    <div className="p-2 bg-gray-800 rounded-full text-neon-green border border-gray-700"><Mail size={16}/></div>
+                    <div className="p-2 bg-theme-bg rounded-full text-theme-accent border border-theme-border"><Mail size={16}/></div>
                     <div>
-                        <div className="text-[10px] text-gray-500 uppercase">{t('contact')}</div>
-                        <a href="mailto:Meowmasterart@gmail.com" className="text-white font-mono hover:text-neon-green transition-colors">Meowmasterart@gmal.com</a>
+                        <div className="text-[10px] text-theme-muted uppercase">{t('contact')}</div>
+                        <a href="mailto:Meowmasterart@gmail.com" className="text-theme-text font-mono hover:text-theme-accent transition-colors">Meowmasterart@gmal.com</a>
                     </div>
                 </div>
 
                 <div className="flex items-center gap-3">
-                    <div className="p-2 bg-gray-800 rounded-full text-white border border-gray-700"><Github size={16}/></div>
+                    <div className="p-2 bg-theme-bg rounded-full text-theme-text border border-theme-border"><Github size={16}/></div>
                     <div>
-                        <div className="text-[10px] text-gray-500 uppercase">{t('repo')}</div>
-                        <a href="https://github.com/Neytrino2134/Neon-DVD-Retro-Player" target="_blank" rel="noopener noreferrer" className="text-neon-blue font-mono hover:underline break-all text-xs">
+                        <div className="text-[10px] text-theme-muted uppercase">{t('repo')}</div>
+                        <a href="https://github.com/Neytrino2134/Neon-DVD-Retro-Player" target="_blank" rel="noopener noreferrer" className="text-theme-primary font-mono hover:underline break-all text-xs">
                             github.com/Neytrino2134/Neon-DVD-Retro-Player
                         </a>
                     </div>

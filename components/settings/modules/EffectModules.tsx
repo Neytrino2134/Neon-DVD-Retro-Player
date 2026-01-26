@@ -1,6 +1,4 @@
 
-
-
 import React from 'react';
 import RangeControl from '../RangeControl';
 import CustomSelect from '../CustomSelect';
@@ -21,7 +19,7 @@ export const MixerSettings: React.FC<{ crossfadeDuration: number, setCrossfadeDu
     const { t } = useLanguage();
     return (
         <div className="pt-2">
-            <div className="p-3 bg-black/40 border border-gray-700 rounded mb-2">
+            <div className="p-3 bg-theme-panel/50 border border-theme-border rounded mb-2">
                 <RangeControl 
                     label={t('crossfade_duration')} 
                     value={crossfadeDuration} 
@@ -134,6 +132,17 @@ export const SignalSettings: React.FC<{ config: EffectsConfig, update: (k: keyof
             <RangeControl label={t('chromatic_aberration')} value={config.chromaticAberration ?? 0} min={0} max={20} step={0.5} onChange={v => update('chromaticAberration', v)} />
             <RangeControl label={t('static_noise')} value={config.noise} min={0} max={0.5} step={0.01} onChange={v => update('noise', v)} />
             <RangeControl label={t('vhs_jitter')} value={config.vhsJitter} min={0} max={10} step={0.5} onChange={v => update('vhsJitter', v)} />
+        </div>
+    );
+};
+
+export const LightLeaksSettings: React.FC<{ config: EffectsConfig['lightLeaks'], update: (v: EffectsConfig['lightLeaks']) => void }> = ({ config, update }) => {
+    const { t } = useLanguage();
+    return (
+        <div className="pt-2">
+           <RangeControl label={t('quantity')} value={config.number} min={1} max={20} step={1} onChange={v => update({ ...config, number: v })} />
+           <RangeControl label={t('intensity')} value={config.intensity} min={0.1} max={1.0} step={0.05} onChange={v => update({ ...config, intensity: v })} />
+           <RangeControl label={t('speed')} value={config.speed} min={0.1} max={2.0} step={0.1} onChange={v => update({ ...config, speed: v })} />
         </div>
     );
 };

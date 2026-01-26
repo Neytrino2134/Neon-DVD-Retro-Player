@@ -5,6 +5,7 @@ import RangeControl from '../RangeControl';
 import CustomSelect from '../CustomSelect';
 import { MarqueeConfig } from '../../../types';
 import { useLanguage } from '../../../contexts/LanguageContext';
+import { useTheme } from '../../../contexts/ThemeContext';
 
 interface MarqueeSettingsProps {
   config: MarqueeConfig;
@@ -13,32 +14,67 @@ interface MarqueeSettingsProps {
 
 const MarqueeSettings: React.FC<MarqueeSettingsProps> = ({ config, update }) => {
   const { t } = useLanguage();
+  const { controlStyle } = useTheme();
   const [expandTimeScale, setExpandTimeScale] = useState(true);
+
+  const styleOptions = [
+    { value: 'retro', label: t('style_retro') },
+    { value: 'blue', label: t('style_blue') },
+    { value: 'pink', label: t('style_pink') },
+    { value: 'theme-blue', label: t('style_theme_blue') },
+    { value: 'warm', label: t('style_warm') },
+    { value: 'gray', label: t('style_gray') },
+    { value: 'ocean', label: t('style_ocean') },
+    { value: 'matrix', label: t('style_matrix') },
+    { value: 'inferno', label: t('style_inferno') },
+  ];
+
+  // Dynamic Radius
+  let containerRadius = 'rounded-sm';
+  let knobRadius = 'rounded-sm';
+  let wrapperRadius = 'rounded';
+
+  if (controlStyle === 'round') {
+      containerRadius = 'rounded-lg';
+      knobRadius = 'rounded-md';
+      wrapperRadius = 'rounded-lg';
+  } else if (controlStyle === 'circle') {
+      containerRadius = 'rounded-full';
+      knobRadius = 'rounded-full';
+      wrapperRadius = 'rounded-lg';
+  }
 
   return (
     <div className="pt-2">
+        <CustomSelect 
+            label={t('visual_style')} 
+            value={config.style || 'matrix'} 
+            options={styleOptions} 
+            onChange={(v) => update('style', v)} 
+        />
+
         {/* Custom Collapsible for Time Scale (Progress Bar) */}
-        <div className="bg-gray-800/20 border border-gray-700/50 rounded overflow-hidden mb-3 hover:border-gray-600 transition-colors">
+        <div className={`bg-theme-panel/40 border border-theme-border ${wrapperRadius} overflow-hidden mb-3 hover:border-theme-muted transition-colors`}>
           <div className="flex items-center justify-between p-3">
             <div 
                className="flex items-center gap-3 cursor-pointer flex-1"
                onClick={() => setExpandTimeScale(!expandTimeScale)}
             >
-                <div className="text-neon-yellow opacity-80">
+                <div className="text-theme-accent opacity-80">
                     <Clock size={16} />
                 </div>
-                <span className="font-mono text-[11px] tracking-widest text-white uppercase">{t('time_scale')}</span>
+                <span className="font-mono text-[11px] tracking-widest text-theme-text uppercase">{t('time_scale')}</span>
                 {config.showProgress && (
-                    <ChevronDown size={14} className={`text-neon-blue opacity-70 transition-transform ${expandTimeScale ? 'rotate-180' : ''}`} />
+                    <ChevronDown size={14} className={`text-theme-primary opacity-70 transition-transform ${expandTimeScale ? 'rotate-180' : ''}`} />
                 )}
             </div>
             <button
                 onClick={() => update('showProgress', !config.showProgress)}
-                className={`relative w-10 h-5 rounded-sm transition-all duration-300 shadow-inner ml-2 border border-gray-600/50
-                ${config.showProgress ? 'bg-neon-purple shadow-[0_0_8px_rgba(188,19,254,0.5)]' : 'bg-gray-800'}
+                className={`relative w-10 h-5 ${containerRadius} transition-all duration-300 shadow-inner ml-2 border border-theme-border
+                ${config.showProgress ? 'bg-theme-secondary shadow-[0_0_8px_var(--color-secondary)]' : 'bg-gray-800'}
                 `}
             >
-                <div className={`absolute top-0.5 left-0.5 w-3.5 h-3.5 bg-white rounded-sm shadow-md transition-transform duration-300
+                <div className={`absolute top-0.5 left-0.5 w-3.5 h-3.5 bg-theme-toggleKnob ${knobRadius} shadow-md transition-transform duration-300
                 ${config.showProgress ? 'translate-x-5' : 'translate-x-0'}
                 `}></div>
             </button>
@@ -46,7 +82,7 @@ const MarqueeSettings: React.FC<MarqueeSettingsProps> = ({ config, update }) => 
           
           {/* Collapsible Progress Bar Settings */}
           <div className={`transition-[max-height,opacity,padding] duration-300 ease-in-out overflow-hidden ${config.showProgress && expandTimeScale ? 'max-h-60 opacity-100 p-3 pt-0' : 'max-h-0 opacity-0 p-0'}`}>
-            <div className="pl-4 pt-2 space-y-3 border-l-2 border-neon-purple/30 ml-2">
+            <div className="pl-4 pt-2 space-y-3 border-l-2 border-theme-muted ml-2">
                <CustomSelect 
                   label={t('prog_mode')}
                   value={config.progressMode || 'continuous'}

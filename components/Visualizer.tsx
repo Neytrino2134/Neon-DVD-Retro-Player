@@ -7,9 +7,10 @@ interface VisualizerProps {
   isPlaying: boolean;
   config: VisualizerConfig;
   fps: number;
+  volume: number; // NEW PROP
 }
 
-const Visualizer: React.FC<VisualizerProps> = ({ analyser, isPlaying, config, fps }) => {
+const Visualizer: React.FC<VisualizerProps> = ({ analyser, isPlaying, config, fps, volume }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const animationRef = useRef<number>(0);
   const lastDrawTimeRef = useRef<number>(0);
@@ -159,6 +160,15 @@ const Visualizer: React.FC<VisualizerProps> = ({ analyser, isPlaying, config, fp
                 }
             }
 
+            // --- VOLUME COMPENSATION LOGIC ---
+            // If preventVolumeScaling is FALSE (default), we want visualizer to follow Master Volume.
+            // Since our Analyser is now Pre-Fader (always 100% signal), we manually simulate volume drop.
+            if (!config.preventVolumeScaling) {
+                rawValue *= volume;
+            }
+            // If preventVolumeScaling is TRUE (Ignore Volume), we do nothing, 
+            // taking the full 100% signal from Pre-Fader analyser.
+
             // Применение нормализации (Auto-Gain)
             let scaledValue = rawValue;
             if (config.normalize) {
@@ -193,8 +203,11 @@ const Visualizer: React.FC<VisualizerProps> = ({ analyser, isPlaying, config, fp
             if (scaledValue < 5) barHeight = 0; // Noise gate
 
             // 4. ФИЗИКА БАРА (Attack / Decay)
-            // Делаем падение чуть быстрее (0.82 -> 0.75), чтобы визуалайзер "дышал" между битами
-            const baseDecay = 0.75; 
+            // Dynamic Decay based on barGravity config (0-10)
+            // Default (5) -> 0.73. High Gravity (10) -> 0.48 (Fast). Low Gravity (0) -> 0.98 (Slow).
+            const gravityInput = config.barGravity ?? 5;
+            const baseDecay = Math.max(0.1, 0.98 - (gravityInput * 0.05));
+            
             const decay = Math.pow(baseDecay, fpsRatio);
 
             let finalValue = prevBars[i] * decay; 
@@ -232,6 +245,10 @@ const Visualizer: React.FC<VisualizerProps> = ({ analyser, isPlaying, config, fp
             switch (config.style) {
               case 'blue': color = '#00f3ff'; break;
               case 'pink': color = '#ff00ff'; break;
+              case 'warm': color = '#fbbf24'; break; // Amber
+              case 'gray': color = '#d4d4d4'; break; // Neutral Gray
+              case 'ocean': color = '#4B8CA8'; break; // Ocean Teal
+              case 'theme-blue': color = '#3b82f6'; break; // Royal Blue
               case 'matrix':
                  // Dynamic green brightness
                  const intensity = Math.min(255, (barHeight / HEIGHT) * 255 + 50);
@@ -271,14 +288,14 @@ const Visualizer: React.FC<VisualizerProps> = ({ analyser, isPlaying, config, fp
             };
             y = getY(barHeight);
 
-            ctx.fillStyle = color;
-            ctx.globalAlpha = config.fillOpacity;
             const gap = config.barGap;
             const drawWidth = Math.max(0.5, barWidth - gap);
 
             // --- DRAW BAR HELPER ---
             const drawBar = (bx: number, by: number, bw: number, bh: number) => {
                  if (bh <= 0) return;
+                 ctx.fillStyle = color;
+                 
                  if (config.segmented) {
                      const segHeight = config.segmentHeight || 4; 
                      const segGap = config.segmentGap || 2;       
@@ -287,47 +304,65 @@ const Visualizer: React.FC<VisualizerProps> = ({ analyser, isPlaying, config, fp
                      
                      if (segments === 0) return;
 
-                     const drawSegment = (sy: number) => {
+                     const drawSegment = (sy: number, isLast: boolean) => {
+                        // Apply Highlighting logic for last brick
+                        if (isLast && config.highlightLastBrick) {
+                            ctx.fillStyle = '#ffffff'; // White for highlight
+                            ctx.globalAlpha = 1.0;
+                            ctx.shadowBlur = 5;
+                            ctx.shadowColor = color; // Glow with the base color
+                        } else {
+                            ctx.fillStyle = color;
+                            ctx.globalAlpha = config.fillOpacity;
+                            ctx.shadowBlur = 0;
+                        }
+
                         ctx.fillRect(bx, sy, bw, segHeight);
-                        if (config.strokeEnabled) {
+                        
+                        if (config.strokeEnabled && (!isLast || !config.highlightLastBrick)) {
                             ctx.strokeStyle = color;
                             ctx.lineWidth = 1;
                             ctx.globalAlpha = config.strokeOpacity;
                             ctx.strokeRect(bx, sy, bw, segHeight);
-                            ctx.globalAlpha = config.fillOpacity;
                         }
                      };
 
                      if (config.position === 'bottom') {
                          for (let s = 0; s < segments; s++) {
                              const sy = HEIGHT - segHeight - (s * unit);
-                             drawSegment(sy);
+                             const isLast = s === segments - 1;
+                             drawSegment(sy, isLast);
                          }
                      } else if (config.position === 'center') {
                          const mid = HEIGHT / 2;
                          const halfSegments = Math.ceil(segments / 2);
                          for (let s = 0; s < halfSegments; s++) {
                              const sy = mid - (segGap / 2) - segHeight - (s * unit);
-                             drawSegment(sy);
+                             const isLast = s === halfSegments - 1;
+                             drawSegment(sy, isLast);
                          }
                          for (let s = 0; s < halfSegments; s++) {
                              const sy = mid + (segGap / 2) + (s * unit);
-                             drawSegment(sy);
+                             const isLast = s === halfSegments - 1;
+                             drawSegment(sy, isLast);
                          }
                      } else {
+                         // TOP
                          for (let s = 0; s < segments; s++) {
-                             drawSegment(by + (s * unit));
+                             const isLast = s === segments - 1;
+                             drawSegment(by + (s * unit), isLast);
                          }
                      }
                  } else {
                      // NORMAL BAR
+                     ctx.fillStyle = color;
+                     ctx.globalAlpha = config.fillOpacity;
                      ctx.fillRect(bx, by, bw, bh);
                      if (config.strokeEnabled) {
                         ctx.strokeStyle = color;
                         ctx.lineWidth = 1;
                         ctx.globalAlpha = config.strokeOpacity;
                         ctx.strokeRect(bx, by, bw, bh);
-                        ctx.globalAlpha = config.fillOpacity;
                      }
                  }
             };
@@ -348,6 +383,30 @@ const Visualizer: React.FC<VisualizerProps> = ({ analyser, isPlaying, config, fp
                 const tipH = tipBars[i];
                 if (tipH > 2) {
                     const tipThickness = config.tipHeight || 2; 
+                    
+                    // TIP COLOR & GLOW LOGIC
+                    const tipColorMap: Record<string, string> = {
+                        white: '#ffffff',
+                        blue: '#00f3ff',
+                        pink: '#ff00ff',
+                        green: '#00ff00',
+                        purple: '#bc13fe',
+                        yellow: '#f9f871',
+                        red: '#ff3333'
+                    };
+                    const selectedColor = tipColorMap[config.tipColor || 'white'] || '#ffffff';
+                    
+                    ctx.fillStyle = selectedColor; 
+                    ctx.globalAlpha = Math.min(1, config.fillOpacity + 0.4);
+
+                    if (config.tipGlow) {
+                        ctx.shadowBlur = 10;
+                        ctx.shadowColor = selectedColor;
+                    } else {
+                        ctx.shadowBlur = 0;
+                    }
+
+                    // Tip Position Calculation
                     let tipY = 0;
                     if (config.position === 'bottom') tipY = HEIGHT - tipH - tipThickness - 1; 
                     else if (config.position === 'top') tipY = tipH + 1;
@@ -355,8 +414,7 @@ const Visualizer: React.FC<VisualizerProps> = ({ analyser, isPlaying, config, fp
                          const center = HEIGHT / 2;
                          const topTipY = center - (tipH / 2) - tipThickness - 1;
                          const bottomTipY = center + (tipH / 2) + 1;
-                         ctx.fillStyle = '#ffffff'; 
-                         ctx.globalAlpha = Math.min(1, config.fillOpacity + 0.4);
+                         
                          if (config.mirror) {
                             const xRight = startX + (i * barWidth) + (gap / 2);
                             const xLeft = startX - ((i + 1) * barWidth) + (gap / 2);
@@ -369,11 +427,9 @@ const Visualizer: React.FC<VisualizerProps> = ({ analyser, isPlaying, config, fp
                             ctx.fillRect(x, topTipY, drawWidth, tipThickness);
                             ctx.fillRect(x, bottomTipY, drawWidth, tipThickness);
                         }
+                        ctx.shadowBlur = 0; // Reset shadow for next loop
                         continue;
                     }
-
-                    ctx.fillStyle = '#ffffff'; 
-                    ctx.globalAlpha = Math.min(1, config.fillOpacity + 0.4);
 
                     if (config.mirror) {
                         const xRight = startX + (i * barWidth) + (gap / 2);
@@ -384,6 +440,8 @@ const Visualizer: React.FC<VisualizerProps> = ({ analyser, isPlaying, config, fp
                          const x = (i * barWidth) + (gap / 2);
                          ctx.fillRect(x, tipY, drawWidth, tipThickness);
                     }
+                    
+                    ctx.shadowBlur = 0; // Reset shadow
                 }
             }
         }
@@ -416,7 +474,7 @@ const Visualizer: React.FC<VisualizerProps> = ({ analyser, isPlaying, config, fp
         cancelAnimationFrame(animationRef.current);
       }
     };
-  }, [analyser, isPlaying, config, fps]);
+  }, [analyser, isPlaying, config, fps, volume]);
 
   return (
     <canvas 

@@ -1,4 +1,5 @@
 
+
 import React, { useRef, useState } from 'react';
 import { Layers, Palette, List, ChevronDown, ChevronUp, Timer, Trash2, Image as ImageIcon, Music, Download, FileArchive, Check, X } from 'lucide-react';
 import { BackgroundMedia, PatternConfig } from '../../types';
@@ -32,8 +33,9 @@ interface BackgroundSettingsProps {
 }
 
 const BG_PALETTE = [
-  '#0f172a', '#000000', '#1a0505', '#051a05', '#05051a', '#1a051a',
-  '#1a1a1a', '#2d1b2e', '#001a1a', '#2e2e2e'
+  '#0f172a', '#000000', '#030712', '#020617', '#1c1917', '#050A10',
+  '#1a0505', '#051a05', '#05051a', '#1a051a', '#2d1b2e', '#001a1a',
+  '#171717', '#2e2e2e', '#11001c', '#001510', '#1a1005', '#202020'
 ];
 
 const PATTERNS = [
@@ -75,9 +77,9 @@ const BackgroundSettings: React.FC<BackgroundSettingsProps> = ({
 
     return (
       <div className="flex flex-col gap-2 min-w-[200px]">
-         <div className="flex items-center justify-between border-b border-gray-700 pb-1 mb-1">
-             <span className="text-gray-400">STATUS:</span>
-             <span className={`font-bold ${isComplete ? 'text-neon-green' : isEmpty ? 'text-gray-500' : 'text-yellow-500'}`}>
+         <div className="flex items-center justify-between border-b border-theme-border pb-1 mb-1">
+             <span className="text-theme-muted">STATUS:</span>
+             <span className={`font-bold ${isComplete ? 'text-theme-accent' : isEmpty ? 'text-theme-muted' : 'text-yellow-500'}`}>
                 {isComplete ? 'ACTIVE' : isEmpty ? 'EMPTY' : 'PARTIAL'}
              </span>
          </div>
@@ -87,15 +89,15 @@ const BackgroundSettings: React.FC<BackgroundSettingsProps> = ({
                 const isFound = Object.keys(sfxMap).some(k => k.startsWith(baseName));
                 return (
                     <div key={baseName} className="flex items-center gap-2 text-[9px]">
-                        {isFound ? <Check size={10} className="text-neon-green" /> : <X size={10} className="text-red-500" />}
-                        <span className={isFound ? 'text-gray-300' : 'text-gray-500 line-through'}>{baseName}</span>
+                        {isFound ? <Check size={10} className="text-theme-accent" /> : <X size={10} className="text-red-500" />}
+                        <span className={isFound ? 'text-theme-text' : 'text-theme-muted line-through'}>{baseName}</span>
                     </div>
                 );
             })}
          </div>
 
          {!isComplete && (
-             <div className="text-[9px] text-gray-500 mt-1 italic border-t border-gray-800 pt-1">
+             <div className="text-[9px] text-theme-muted mt-1 italic border-t border-theme-border pt-1">
                  Required: wav/mp3/m4a with these names
              </div>
          )}
@@ -104,15 +106,15 @@ const BackgroundSettings: React.FC<BackgroundSettingsProps> = ({
   };
 
   return (
-    <div className="p-4 bg-gray-900 border-t border-gray-800 z-10 shrink-0 space-y-3">
+    <div className="p-4 bg-theme-bg border-t border-theme-border z-10 shrink-0 space-y-3">
       <div>
-        <h3 className="flex items-center gap-2 text-xs font-mono text-white mb-2 opacity-80"><Layers size={14} className="text-neon-yellow" /> {t('background')}</h3>
+        <h3 className="flex items-center gap-2 text-xs font-mono text-theme-text mb-2 opacity-80"><Layers size={14} className="text-theme-accent" /> {t('background')}</h3>
         
         {/* Colors & Patterns Collapsible */}
-        <div className="rounded border border-gray-700 bg-black/40 overflow-hidden mb-2">
+        <div className="rounded border border-theme-border bg-theme-panel/40 overflow-hidden mb-2">
             <button 
                 onClick={() => setShowBgSettings(!showBgSettings)}
-                className="w-full flex items-center justify-between p-2 text-xs font-mono text-gray-400 hover:text-white hover:bg-gray-800 transition-colors"
+                className="w-full flex items-center justify-between p-2 text-xs font-mono text-theme-muted hover:text-theme-text hover:bg-theme-panel transition-colors"
             >
                 <div className="flex items-center gap-2">
                     <Palette size={12} />
@@ -121,9 +123,9 @@ const BackgroundSettings: React.FC<BackgroundSettingsProps> = ({
                 <ChevronDown size={12} className={`transition-transform duration-300 ${showBgSettings ? 'rotate-180' : ''}`} />
             </button>
             
-            <div className={`transition-all duration-300 ease-in-out overflow-hidden px-2 ${showBgSettings ? 'max-h-[500px] py-2 border-t border-gray-800' : 'max-h-0'}`}>
+            <div className={`transition-all duration-300 ease-in-out overflow-hidden px-2 ${showBgSettings ? 'max-h-[500px] py-2 border-t border-theme-border' : 'max-h-0'}`}>
               {/* Colors */}
-              <div className="grid grid-cols-5 gap-1.5 mb-3">
+              <div className="grid grid-cols-6 gap-1.5 mb-3">
                 {BG_PALETTE.map(c => (
                   <button 
                     key={c} 
@@ -132,7 +134,7 @@ const BackgroundSettings: React.FC<BackgroundSettingsProps> = ({
                       // Do not clear media list, just deselect current media
                       if (onDeselectBg) onDeselectBg(); 
                     }} 
-                    className={`h-6 rounded-sm border ${bgColor === c && !bgMedia ? 'border-neon-purple shadow-[0_0_10px_#bc13fe] scale-105' : 'border-gray-600 hover:border-gray-400'}`} 
+                    className={`h-6 rounded-sm border ${bgColor === c && !bgMedia ? 'border-theme-secondary shadow-[0_0_10px_var(--color-secondary)] scale-105' : 'border-gray-600 hover:border-theme-text'}`} 
                     style={{ backgroundColor: c }} 
                   />
                 ))}
@@ -147,8 +149,8 @@ const BackgroundSettings: React.FC<BackgroundSettingsProps> = ({
                     className={`
                         px-1 py-1 text-[9px] font-mono border rounded-sm transition-all
                         ${bgPattern === p.id 
-                            ? 'border-neon-blue bg-neon-blue/20 text-neon-blue shadow-[0_0_5px_rgba(0,243,255,0.4)]' 
-                            : 'border-gray-700 bg-black/20 text-gray-400 hover:border-gray-500'}
+                            ? 'border-theme-primary bg-theme-primary/20 text-theme-primary shadow-[0_0_5px_var(--color-primary)]' 
+                            : 'border-theme-border bg-black/20 text-theme-muted hover:border-theme-text'}
                     `}
                   >
                     {p.label}
@@ -158,7 +160,7 @@ const BackgroundSettings: React.FC<BackgroundSettingsProps> = ({
 
               {/* Pattern Intensity & Scale - Only show if pattern is not 'none' */}
               {bgPattern !== 'none' && bgPatternConfig && setBgPatternConfig && (
-                 <div className="space-y-3 pt-2 border-t border-gray-800">
+                 <div className="space-y-3 pt-2 border-t border-theme-border">
                     <RangeControl 
                       label={t('intensity')} 
                       value={bgPatternConfig.intensity} 
@@ -181,10 +183,10 @@ const BackgroundSettings: React.FC<BackgroundSettingsProps> = ({
         <div className="space-y-2">
           {/* Moved BG List Resource ABOVE Buttons */}
           {bgList.length > 0 && (
-              <div className="rounded border border-gray-700 bg-black/40 overflow-hidden mb-2">
+              <div className="rounded border border-theme-border bg-theme-panel/40 overflow-hidden mb-2">
                   <button 
                       onClick={() => setShowBgList(!showBgList)}
-                      className="w-full flex items-center justify-between p-2 text-xs font-mono text-gray-400 hover:text-white hover:bg-gray-800 transition-colors"
+                      className="w-full flex items-center justify-between p-2 text-xs font-mono text-theme-muted hover:text-theme-text hover:bg-theme-panel transition-colors"
                   >
                       <div className="flex items-center gap-2">
                           <List size={12} />
@@ -194,24 +196,24 @@ const BackgroundSettings: React.FC<BackgroundSettingsProps> = ({
                   </button>
                   
                   <div className={`transition-all duration-300 ease-in-out overflow-hidden ${showBgList ? 'max-h-60' : 'max-h-0'}`}>
-                      <div className="flex items-center justify-between px-3 py-2 border-t border-b border-gray-800 bg-gray-900/50">
-                         <div className="flex items-center gap-2 text-gray-400">
+                      <div className="flex items-center justify-between px-3 py-2 border-t border-b border-theme-border bg-theme-panel/50">
+                         <div className="flex items-center gap-2 text-theme-muted">
                            <Timer size={12} />
                            <span className="text-[10px] font-mono tracking-wider">{t('auto_timer')}</span>
                          </div>
-                         <div className="flex items-center gap-2 bg-black rounded border border-gray-700 px-1">
+                         <div className="flex items-center gap-2 bg-black rounded border border-theme-border px-1">
                             <button 
                               onClick={() => setBgAutoplayInterval(Math.max(0, bgAutoplayInterval - 1))}
-                              className="p-0.5 hover:text-neon-blue transition-colors"
+                              className="p-0.5 hover:text-theme-primary transition-colors"
                             >
                               <ChevronDown size={14} />
                             </button>
-                            <span className={`text-xs font-mono font-bold min-w-[20px] text-center ${bgAutoplayInterval > 0 ? 'text-neon-green' : 'text-gray-600'}`}>
+                            <span className={`text-xs font-mono font-bold min-w-[20px] text-center ${bgAutoplayInterval > 0 ? 'text-theme-accent' : 'text-theme-muted'}`}>
                               {String(bgAutoplayInterval).padStart(2, '0')}
                             </span>
                             <button 
                               onClick={() => setBgAutoplayInterval(bgAutoplayInterval + 1)}
-                              className="p-0.5 hover:text-neon-blue transition-colors"
+                              className="p-0.5 hover:text-theme-primary transition-colors"
                             >
                               <ChevronUp size={14} />
                             </button>
@@ -225,33 +227,33 @@ const BackgroundSettings: React.FC<BackgroundSettingsProps> = ({
                                   className={`
                                       flex items-center justify-between p-2 rounded text-xs border cursor-pointer group
                                       ${index === currentBgIndex 
-                                          ? 'bg-gray-800 border-neon-blue text-neon-blue' 
-                                          : 'bg-transparent border-transparent text-gray-400 hover:bg-gray-800/50 hover:text-white'}
+                                          ? 'bg-theme-panel border-theme-primary text-theme-primary' 
+                                          : 'bg-transparent border-transparent text-theme-muted hover:bg-theme-panel/50 hover:text-theme-text'}
                                   `}
                                   onClick={() => onSelectBg(index)}
                               >
                                   <div className="flex items-center gap-2 overflow-hidden">
-                                      <div className={`w-1.5 h-1.5 rounded-full ${index === currentBgIndex ? 'bg-neon-blue shadow-[0_0_5px_#00f3ff]' : 'bg-gray-600'}`}></div>
+                                      <div className={`w-1.5 h-1.5 rounded-full ${index === currentBgIndex ? 'bg-theme-primary shadow-[0_0_5px_var(--color-primary)]' : 'bg-gray-600'}`}></div>
                                       <span className="truncate max-w-[120px] font-mono">{bg.file.name}</span>
                                   </div>
                                   <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                                       <button 
                                           onClick={(e) => { e.stopPropagation(); onMoveBg(index, 'up'); }} 
                                           disabled={index === 0}
-                                          className="p-1 hover:text-neon-yellow disabled:opacity-30"
+                                          className="p-1 hover:text-theme-accent disabled:opacity-30"
                                       >
                                           <ChevronUp size={12} />
                                       </button>
                                       <button 
                                           onClick={(e) => { e.stopPropagation(); onMoveBg(index, 'down'); }} 
                                           disabled={index === bgList.length - 1}
-                                          className="p-1 hover:text-neon-yellow disabled:opacity-30"
+                                          className="p-1 hover:text-theme-accent disabled:opacity-30"
                                       >
                                           <ChevronDown size={12} />
                                       </button>
                                       <button 
                                           onClick={(e) => { e.stopPropagation(); onRemoveBg(bg.id); }}
-                                          className="p-1 text-gray-500 hover:text-red-500 transition-colors"
+                                          className="p-1 text-theme-muted hover:text-red-500 transition-colors"
                                       >
                                           <Trash2 size={12} />
                                       </button>
@@ -265,27 +267,27 @@ const BackgroundSettings: React.FC<BackgroundSettingsProps> = ({
 
           <div className="flex gap-2">
               <Tooltip content="LOAD IMAGE/VIDEO" position="top">
-                <button onClick={() => fileInputRef.current?.click()} className="flex-1 flex items-center justify-center gap-2 p-2 bg-gray-800 border border-gray-600 rounded text-gray-300 hover:text-white hover:border-neon-yellow transition-colors min-w-0">
-                    <ImageIcon size={16} className="text-neon-yellow shrink-0" /> <span className="font-mono text-[10px] md:text-xs truncate">IMG</span>
+                <button onClick={() => fileInputRef.current?.click()} className="flex-1 flex items-center justify-center gap-2 p-2 bg-theme-panel border border-theme-border rounded text-theme-muted hover:text-theme-text hover:border-theme-accent transition-colors min-w-0">
+                    <ImageIcon size={16} className="text-theme-accent shrink-0" /> <span className="font-mono text-[10px] md:text-xs truncate">IMG</span>
                 </button>
               </Tooltip>
               
               <Tooltip content="LOAD AUDIO" position="top">
-                <button onClick={() => audioInputRef.current?.click()} className="flex-1 flex items-center justify-center gap-2 p-2 bg-gray-800 border border-gray-600 rounded text-gray-300 hover:text-white hover:border-neon-green transition-colors min-w-0">
-                    <Music size={16} className="text-neon-green shrink-0" /> <span className="font-mono text-[10px] md:text-xs truncate">AUDIO</span>
+                <button onClick={() => audioInputRef.current?.click()} className="flex-1 flex items-center justify-center gap-2 p-2 bg-theme-panel border border-theme-border rounded text-theme-muted hover:text-theme-text hover:border-theme-primary transition-colors min-w-0">
+                    <Music size={16} className="text-theme-primary shrink-0" /> <span className="font-mono text-[10px] md:text-xs truncate">AUDIO</span>
                 </button>
               </Tooltip>
               
               {onSfxUpload && (
                 <Tooltip content={getSfxTooltipContent()} position="top">
-                  <button onClick={() => sfxInputRef.current?.click()} className="flex-1 flex items-center justify-center gap-2 p-2 bg-gray-800 border border-gray-600 rounded text-gray-300 hover:text-white hover:border-neon-pink transition-colors min-w-0">
-                      <FileArchive size={16} className="text-neon-pink shrink-0" /> <span className="font-mono text-[10px] md:text-xs truncate">SFX</span>
+                  <button onClick={() => sfxInputRef.current?.click()} className="flex-1 flex items-center justify-center gap-2 p-2 bg-theme-panel border border-theme-border rounded text-theme-muted hover:text-theme-text hover:border-theme-secondary transition-colors min-w-0">
+                      <FileArchive size={16} className="text-theme-secondary shrink-0" /> <span className="font-mono text-[10px] md:text-xs truncate">SFX</span>
                   </button>
                 </Tooltip>
               )}
 
               <Tooltip content={t('export_config')} position="top">
-                <button onClick={onExportConfig} className="shrink-0 w-10 flex items-center justify-center p-2 bg-gray-800 border border-neon-purple text-neon-purple rounded hover:bg-neon-purple hover:text-black hover:shadow-[0_0_15px_#bc13fe] transition-all active:scale-95">
+                <button onClick={onExportConfig} className="shrink-0 w-10 flex items-center justify-center p-2 bg-theme-panel border border-theme-secondary text-theme-secondary rounded hover:bg-theme-secondary hover:text-black hover:shadow-[0_0_15px_var(--color-secondary)] transition-all active:scale-95">
                   <Download size={16} />
                 </button>
               </Tooltip>

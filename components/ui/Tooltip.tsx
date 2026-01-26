@@ -160,20 +160,20 @@ export const Tooltip: React.FC<TooltipProps> = ({ content, children, position = 
             className={`
                 relative overflow-hidden transition-all duration-300 ease-out rounded
                 ${animStage === 1 
-                    ? 'h-[2px] min-w-[20px] max-w-[40px] bg-neon-blue border-none shadow-[0_0_10px_#00f3ff]' 
-                    : 'h-auto min-w-[60px] max-w-[250px] bg-black/90 border border-neon-blue shadow-[0_0_15px_rgba(0,243,255,0.4)]'
+                    ? 'h-[2px] min-w-[20px] max-w-[40px] bg-theme-primary border-none shadow-[0_0_10px_var(--color-primary)]' 
+                    : 'h-auto min-w-[60px] max-w-[250px] bg-black/90 border border-theme-primary shadow-[0_0_15px_var(--color-primary)]'
                 }
                 ${animStage >= 2 ? 'px-3 py-1.5' : 'px-0 py-0'}
             `}
           >
              <div className={`
-                text-[10px] font-mono font-bold text-neon-blue tracking-wider uppercase whitespace-nowrap flex items-center
+                text-[10px] font-mono font-bold text-theme-primary tracking-wider uppercase whitespace-nowrap flex items-center
                 ${animStage >= 3 ? 'opacity-100' : 'opacity-0'}
              `}>
                 {isStringContent ? (
                     <>
                         {displayedText}
-                        <span className="inline-block w-1.5 h-3 bg-neon-blue ml-0.5 animate-pulse align-middle"></span>
+                        <span className="inline-block w-1.5 h-3 bg-theme-primary ml-0.5 animate-pulse align-middle"></span>
                     </>
                 ) : (
                     // If content is complex (JSX), fade it in

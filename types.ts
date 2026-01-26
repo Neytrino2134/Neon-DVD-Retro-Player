@@ -1,10 +1,17 @@
 
-
 export interface AudioTrack {
   id: string;
+  playlistId: string; // New field to link track to a playlist
   name: string;
   url: string;
   file: File;
+}
+
+export interface Playlist {
+  id: string;
+  name: string;
+  order: number;
+  tracks: AudioTrack[];
 }
 
 export interface BackgroundMedia {
@@ -17,7 +24,8 @@ export interface BackgroundMedia {
 export interface PlayerState {
   isPlaying: boolean;
   currentTrackIndex: number;
-  tracks: AudioTrack[];
+  playlists: Playlist[];
+  activePlaylistId: string;
 }
 
 export const NEON_COLORS = [
@@ -29,8 +37,13 @@ export const NEON_COLORS = [
   '#ff3333', // Red
 ];
 
-export type VisualizerStyle = 'retro' | 'blue' | 'pink' | 'matrix' | 'inferno';
+export type VisualizerStyle = 'retro' | 'blue' | 'pink' | 'matrix' | 'inferno' | 'warm' | 'gray' | 'ocean' | 'theme-blue';
 export type VisualizerPosition = 'center' | 'top' | 'bottom';
+export type TipColor = 'white' | 'blue' | 'pink' | 'green' | 'purple' | 'yellow' | 'red';
+export type CursorStyle = 'default' | 'classic-blue' | 'classic-warm' | 'classic-white' | 'classic-ocean';
+
+export type ThemeType = 'neon-retro' | 'neon-blue' | 'warm-cozy' | 'neutral-gray' | 'neutral-ocean';
+export type ControlStyle = 'default' | 'round' | 'circle';
 
 export interface VisualizerConfig {
   style: VisualizerStyle;
@@ -43,7 +56,10 @@ export interface VisualizerConfig {
   showTips: boolean; 
   tipHeight: number; // New: Thickness of the tip
   tipSpeed: number; // New: Falling speed (gravity)
+  tipColor: TipColor; // NEW: Color of the tip
+  tipGlow: boolean; // NEW: Enable glow for tip
   normalize: boolean;
+  preventVolumeScaling: boolean; // NEW: Ignore volume level for visuals
   minFrequency: number;
   maxFrequency: number;
   barGap: number;
@@ -51,6 +67,8 @@ export interface VisualizerConfig {
   segmented: boolean;
   segmentHeight: number; 
   segmentGap: number; 
+  highlightLastBrick: boolean; // NEW: Highlight the top-most brick
+  barGravity: number; // NEW: Gravity/Decay for the bars themselves
 }
 
 export interface DvdConfig {
@@ -63,6 +81,7 @@ export interface DvdConfig {
 
 export interface MarqueeConfig {
   enabled: boolean;
+  style: VisualizerStyle; // New: Visual style for text color
   showProgress: boolean; 
   progressMode: 'continuous' | 'blocks'; // New
   progressHeight: number; // New
@@ -72,7 +91,22 @@ export interface MarqueeConfig {
   fontSize: number;
 }
 
+export interface WatermarkConfig {
+  scale: number;
+  opacity: number;
+  flashIntensity: number; // 0 to 1
+}
+
 export type HologramCategory = 'system' | 'interactive' | 'music' | 'motivational' | 'philosophy' | 'space';
+
+export interface GeminiChatConfig {
+  enabled: boolean;
+  opacity: number;
+  scale: number;
+  typingSpeed: number; // 1 = Normal
+  color?: string;
+  categories: Record<HologramCategory, boolean>;
+}
 
 export interface EffectsConfig {
   fps: number;
@@ -109,7 +143,16 @@ export interface EffectsConfig {
     speed: number; // Typing speed
     interval: number; // Seconds between messages
     scale: number;
+    color?: string; // NEW: Specific color for hologram
+    enableIcons: boolean; // NEW: Enable graphical icons
     categories: Record<HologramCategory, boolean>;
+  };
+  geminiChat: GeminiChatConfig; // NEW
+  lightLeaks: {
+    enabled: boolean;
+    intensity: number; // Opacity
+    speed: number; // Movement speed
+    number: number; // Amount of blobs
   };
 }
 
@@ -132,11 +175,15 @@ export interface AppPreset {
     dvdConfig: DvdConfig;
     effectsConfig: EffectsConfig;
     marqueeConfig: MarqueeConfig;
+    watermarkConfig?: WatermarkConfig; // Optional for backward compatibility
     bgColor: string;
     bgPattern: string;
     bgPatternConfig: PatternConfig;
     showVisualizer: boolean;
     showDvd: boolean;
     bgAutoplayInterval: number;
+    cursorStyle?: CursorStyle;
+    theme?: ThemeType;
+    controlStyle?: ControlStyle;
   }
 }

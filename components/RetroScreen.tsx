@@ -1,8 +1,7 @@
 
-
 import React, { useRef, useEffect, forwardRef, useMemo, useState } from 'react';
 import { Upload, Minimize, Maximize, Monitor, Power } from 'lucide-react';
-import { AudioTrack, VisualizerConfig, EffectsConfig, DvdConfig, MarqueeConfig, PatternConfig } from '../types';
+import { AudioTrack, VisualizerConfig, EffectsConfig, DvdConfig, MarqueeConfig, PatternConfig, WatermarkConfig } from '../types';
 import DvdLogo from './DvdLogo';
 import Visualizer from './Visualizer';
 import MediaRenderer from './MediaRenderer';
@@ -15,6 +14,8 @@ import DebugConsoleEffect from './effects/DebugConsoleEffect';
 import ChromaticAberration from './effects/ChromaticAberration';
 import TransitionEffect from './effects/TransitionEffect';
 import HologramEffect from './effects/HologramEffect';
+import GeminiChatEffect from './effects/GeminiChatEffect';
+import LightLeaksEffect from './effects/LightLeaksEffect';
 import Marquee from './Marquee';
 import ProgressBar from './ProgressBar';
 import NotificationOverlay from './ui/NotificationOverlay';
@@ -47,6 +48,7 @@ interface RetroScreenProps {
   showDvd: boolean;
   effectsConfig: EffectsConfig;
   marqueeConfig: MarqueeConfig;
+  watermarkConfig?: WatermarkConfig;
   
   // Progress
   progress?: number;
@@ -70,16 +72,20 @@ interface RetroScreenProps {
 
   // SFX
   onPlaySfx?: (name: string) => void;
+  volume: number; // ADDED
+  
+  // API
+  apiKey?: string; // New Prop
 }
 
 const RetroScreen = forwardRef<HTMLDivElement, RetroScreenProps>(({
   analyser, isPlaying, currentTrack, bgMedia, bgColor, bgPattern = 'none', bgPatternConfig,
-  visualizerConfig, showVisualizer, dvdConfig, showDvd, effectsConfig, marqueeConfig,
+  visualizerConfig, showVisualizer, dvdConfig, showDvd, effectsConfig, marqueeConfig, watermarkConfig,
   progress = 0, currentTime, duration,
   focusMode, setFocusMode, isDragging,
   onDragOver, onDragEnter, onDragLeave, onDrop,
   onScheduleReload, rebootPhase,
-  onPlaySfx
+  onPlaySfx, volume, apiKey
 }, externalRef) => {
   
   const { t } = useLanguage();
@@ -167,6 +173,30 @@ const RetroScreen = forwardRef<HTMLDivElement, RetroScreenProps>(({
     return `INSERT DISK  ${dots}  SYSTEM READY  ${dots}  ${brand}  ${dots}  WAITING FOR INPUT  ${dots} ${getRandomGlitch()} ${dots} `;
   }, [currentTrack]);
 
+  // Determine marquee color based on style
+  const getMarqueeColor = (style: string) => {
+      switch (style) {
+          case 'blue': return '#00f3ff';
+          case 'pink': return '#ff00ff';
+          case 'inferno': return '#ff3333';
+          case 'retro': return '#f9f871'; // Yellow for Retro text
+          case 'theme-blue': return '#3b82f6'; // Royal Blue
+          case 'warm': return '#fbbf24';       // Amber
+          case 'gray': return '#d4d4d4';       // Gray
+          case 'ocean': return '#4B8CA8';      // Teal
+          case 'matrix': default: return '#00ff00';
+      }
+  };
+
+  const marqueeColor = getMarqueeColor(marqueeConfig.style || 'matrix');
+
+  // Watermark Animation Calc
+  const watermarkAnimClass = (watermarkConfig?.flashIntensity || 0) > 0 ? "animate-text-flash" : "";
+  const watermarkAnimStyle: React.CSSProperties = {
+      // Map intensity 0.1-1.0 to speed (e.g., 20s to 1s)
+      animationDuration: watermarkConfig?.flashIntensity ? `${21 - (watermarkConfig.flashIntensity * 20)}s` : '0s'
+  };
+
   return (
     <div 
       className={`flex-grow flex items-center justify-center relative bg-gray-950 transition-all duration-500 ${focusMode ? 'p-0' : 'p-1 md:p-3'}`}
@@ -182,8 +212,8 @@ const RetroScreen = forwardRef<HTMLDivElement, RetroScreenProps>(({
         onDrop={onDrop}
       >
          <div ref={containerRef} className="relative w-full h-full overflow-hidden bg-black">
-            {/* IN-SCREEN NOTIFICATION OVERLAY */}
-            <NotificationOverlay />
+            {/* IN-SCREEN NOTIFICATION OVERLAY - Updated with Dynamic Color */}
+            <NotificationOverlay color={marqueeColor} />
 
             {/* Screen Controls - Left (Reboot) */}
             <div className="absolute top-4 left-4 z-50 flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
@@ -223,7 +253,9 @@ const RetroScreen = forwardRef<HTMLDivElement, RetroScreenProps>(({
                 <Tooltip content={focusMode ? "EXIT FULL SCREEN" : "FULL SCREEN"} position="left">
                   <button 
                     onClick={() => setFocusMode(!focusMode)} 
-                    className="text-neon-green p-2 bg-transparent rounded-full transition-all border border-transparent hover:bg-neon-green/20 hover:shadow-[0_0_15px_rgba(0,255,0,0.5)] active:scale-95"
+                    // Dynamic styling for Fullscreen button
+                    style={{ color: marqueeColor }}
+                    className="p-2 bg-transparent rounded-full transition-all border border-transparent hover:shadow-[0_0_15px_currentColor] active:scale-95"
                   >
                       {focusMode ? <Minimize size={20} /> : <Maximize size={20} />}
                   </button>
@@ -244,7 +276,9 @@ const RetroScreen = forwardRef<HTMLDivElement, RetroScreenProps>(({
                 
                 <TransitionEffect phase={transitionPhase} />
                 
-                {showVisualizer && <Visualizer analyser={analyser} isPlaying={isPlaying} config={visualizerConfig} fps={120} />}
+                <LightLeaksEffect config={effectsConfig.lightLeaks} />
+
+                {showVisualizer && <Visualizer analyser={analyser} isPlaying={isPlaying} config={visualizerConfig} fps={120} volume={volume} />}
                 {showDvd && <DvdLogo containerRef={containerRef} fps={effectsConfig.fps} effectsConfig={effectsConfig} config={dvdConfig} onPlaySfx={onPlaySfx} />}
                 
                 <ProgressBar 
@@ -253,7 +287,7 @@ const RetroScreen = forwardRef<HTMLDivElement, RetroScreenProps>(({
                     mode={marqueeConfig.progressMode}
                     height={marqueeConfig.progressHeight}
                     opacity={marqueeConfig.progressOpacity}
-                    color="#00ff00"
+                    color={marqueeColor}
                 />
 
                 {marqueeConfig.enabled && (
@@ -263,7 +297,8 @@ const RetroScreen = forwardRef<HTMLDivElement, RetroScreenProps>(({
                         speed={marqueeConfig.speed}
                         opacity={marqueeConfig.opacity}
                         fontSize={marqueeConfig.fontSize}
-                        className="text-neon-green font-mono font-bold drop-shadow-[0_0_8px_rgba(0,255,0,0.8)]"
+                        color={marqueeColor}
+                        className="font-mono font-bold"
                      />
                    </div>
                 )}
@@ -271,6 +306,7 @@ const RetroScreen = forwardRef<HTMLDivElement, RetroScreenProps>(({
                 <GlitchEffect effects={effectsConfig} />
                 <CyberHackEffect effects={effectsConfig} />
                 <HologramEffect effects={effectsConfig} />
+                <GeminiChatEffect effects={effectsConfig} apiKey={apiKey} />
             </div>
             
             <DebugConsoleEffect effects={effectsConfig} />
@@ -292,16 +328,49 @@ const RetroScreen = forwardRef<HTMLDivElement, RetroScreenProps>(({
 
             {!isPlaying && !currentTrack && !isDragging && (
                 <div className="absolute inset-0 flex items-center justify-center z-20 pointer-events-none">
-                    <div className="text-neon-blue font-mono text-xl border border-neon-blue/50 px-8 py-4 rounded bg-black/20 backdrop-blur-[2px] shadow-[0_0_20px_rgba(0,243,255,0.1)]">INSERT DISK</div>
+                    {/* Dynamic color for INSERT DISK */}
+                    <div 
+                        className="font-mono text-xl border px-8 py-4 rounded bg-black/20 backdrop-blur-[2px]"
+                        style={{ 
+                            color: marqueeColor, 
+                            borderColor: `${marqueeColor}80`, // 50% opacity border
+                            boxShadow: `0 0 20px ${marqueeColor}20` // 12% opacity shadow
+                        }}
+                    >
+                        INSERT DISK
+                    </div>
                 </div>
             )}
          </div>
-         <div className="absolute bottom-6 right-8 z-50 flex flex-col items-end pointer-events-none select-none mix-blend-screen">
-            <div className="flex flex-col items-end text-xs font-mono font-bold tracking-wider text-gray-600 mb-1 space-y-0.5">
-               <span className="animate-text-flash" style={{ animationDuration: '7s', animationDelay: '2s' }}>By MeowMasterArt</span>
-               <span className="animate-text-flash" style={{ animationDuration: '11s', animationDelay: '4s' }}>MeowMasterArt@gmail.com</span>
+         
+         {/* Watermark Section - Updated with Dynamic Color */}
+         <div 
+            className="absolute bottom-6 right-8 z-50 flex flex-col items-end pointer-events-none select-none mix-blend-screen"
+            style={{
+                opacity: watermarkConfig?.opacity ?? 1,
+                transform: `scale(${watermarkConfig?.scale ?? 1})`,
+                transformOrigin: 'bottom right',
+                color: marqueeColor // Apply color to container
+            }}
+         >
+            <div className="flex flex-col items-end text-xs font-mono font-bold tracking-wider mb-1 space-y-0.5 opacity-80">
+               <span 
+                  className={watermarkAnimClass} 
+                  style={{ animationDuration: watermarkAnimStyle.animationDuration, animationDelay: '2s', color: 'currentColor' }}
+                >
+                    By MeowMasterArt
+                </span>
+               <span 
+                  className={watermarkAnimClass} 
+                  style={{ animationDuration: watermarkAnimStyle.animationDuration, animationDelay: '4s', color: 'currentColor' }}
+               >
+                   MeowMasterArt@gmail.com
+               </span>
             </div>
-            <div className="flex items-center gap-2 font-black text-lg tracking-widest uppercase animate-text-flash text-gray-700">
+            <div 
+                className={`flex items-center gap-2 font-black text-lg tracking-widest uppercase ${watermarkAnimClass}`}
+                style={{ animationDuration: watermarkAnimStyle.animationDuration, color: 'currentColor' }}
+            >
                <Monitor size={20} /> RETRO-SONIC ULTRA
             </div>
          </div>

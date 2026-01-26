@@ -72,12 +72,12 @@ const ContextMenu: React.FC<ContextMenuProps> = ({
   return (
     <div 
       ref={menuRef}
-      className="fixed z-[100] w-60 bg-black/95 border border-neon-blue shadow-[0_0_20px_rgba(0,243,255,0.2)] backdrop-blur-md rounded flex flex-col overflow-hidden"
+      className="fixed z-[100] w-60 bg-black/95 border border-theme-primary shadow-[0_0_20px_var(--color-primary)] backdrop-blur-md rounded flex flex-col overflow-hidden"
       style={{ top: position.y, left: position.x }}
     >
        {/* Header */}
        <div className="flex items-center justify-between px-3 py-2 border-b border-gray-800 bg-gray-900/80">
-          <span className="text-[10px] font-mono text-neon-blue tracking-widest font-bold">
+          <span className="text-[10px] font-mono text-theme-primary tracking-widest font-bold">
             {t('ctx_actions')}
           </span>
           <div className="flex gap-1">
@@ -92,11 +92,11 @@ const ContextMenu: React.FC<ContextMenuProps> = ({
            <div className="text-[9px] text-gray-500 px-2 mb-1 font-mono flex items-center gap-1 uppercase tracking-wider">
               <Music size={10} /> {t('ctx_track_ctrl')}
            </div>
-           <button onClick={() => { onPrevTrack(); setVisible(false); }} className="w-full text-left px-3 py-2 text-xs font-mono text-gray-300 hover:bg-neon-blue hover:text-black transition-all flex items-center justify-between group rounded-sm border border-transparent hover:border-neon-blue/50">
+           <button onClick={() => { onPrevTrack(); setVisible(false); }} className="w-full text-left px-3 py-2 text-xs font-mono text-theme-muted hover:bg-theme-primary hover:text-black transition-all flex items-center justify-between group rounded-sm border border-transparent hover:border-theme-primary/50">
                <span>{t('ctx_prev_track')}</span>
                <ChevronLeft size={14} className="group-hover:-translate-x-1 transition-transform" /> 
            </button>
-           <button onClick={() => { onNextTrack(); setVisible(false); }} className="w-full text-left px-3 py-2 text-xs font-mono text-gray-300 hover:bg-neon-blue hover:text-black transition-all flex items-center justify-between group rounded-sm border border-transparent hover:border-neon-blue/50">
+           <button onClick={() => { onNextTrack(); setVisible(false); }} className="w-full text-left px-3 py-2 text-xs font-mono text-theme-muted hover:bg-theme-primary hover:text-black transition-all flex items-center justify-between group rounded-sm border border-transparent hover:border-theme-primary/50">
                <span>{t('ctx_next_track')}</span>
                <ChevronRight size={14} className="group-hover:translate-x-1 transition-transform" /> 
            </button>
@@ -109,11 +109,11 @@ const ContextMenu: React.FC<ContextMenuProps> = ({
            <div className="text-[9px] text-gray-500 px-2 mb-1 font-mono flex items-center gap-1 uppercase tracking-wider">
               <Image size={10} /> {t('ctx_bg_ctrl')}
            </div>
-           <button onClick={() => { onPrevBg(); setVisible(false); }} className="w-full text-left px-3 py-2 text-xs font-mono text-gray-300 hover:bg-neon-purple hover:text-black transition-all flex items-center justify-between group rounded-sm border border-transparent hover:border-neon-purple/50">
+           <button onClick={() => { onPrevBg(); setVisible(false); }} className="w-full text-left px-3 py-2 text-xs font-mono text-theme-muted hover:bg-theme-secondary hover:text-black transition-all flex items-center justify-between group rounded-sm border border-transparent hover:border-theme-secondary/50">
                <span>{t('ctx_prev_bg')}</span>
                <ChevronLeft size={14} className="group-hover:-translate-x-1 transition-transform" /> 
            </button>
-           <button onClick={() => { onNextBg(); setVisible(false); }} className="w-full text-left px-3 py-2 text-xs font-mono text-gray-300 hover:bg-neon-purple hover:text-black transition-all flex items-center justify-between group rounded-sm border border-transparent hover:border-neon-purple/50">
+           <button onClick={() => { onNextBg(); setVisible(false); }} className="w-full text-left px-3 py-2 text-xs font-mono text-theme-muted hover:bg-theme-secondary hover:text-black transition-all flex items-center justify-between group rounded-sm border border-transparent hover:border-theme-secondary/50">
                <span>{t('ctx_next_bg')}</span>
                <ChevronRight size={14} className="group-hover:translate-x-1 transition-transform" /> 
            </button>
@@ -126,7 +126,7 @@ const ContextMenu: React.FC<ContextMenuProps> = ({
            <div className="text-[9px] text-gray-500 px-2 mb-1 font-mono flex items-center gap-1 uppercase tracking-wider">
               <Maximize size={10} /> {t('ctx_view_ctrl')}
            </div>
-           <button onClick={() => { onToggleFullScreen(); setVisible(false); }} className="w-full text-left px-3 py-2 text-xs font-mono text-gray-300 hover:bg-neon-green hover:text-black transition-all flex items-center justify-between group rounded-sm border border-transparent hover:border-neon-green/50">
+           <button onClick={() => { onToggleFullScreen(); setVisible(false); }} className="w-full text-left px-3 py-2 text-xs font-mono text-theme-muted hover:bg-theme-accent hover:text-black transition-all flex items-center justify-between group rounded-sm border border-transparent hover:border-theme-accent/50">
                <span>{t('ctx_fullscreen')}</span>
            </button>
        </div>
