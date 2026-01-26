@@ -1,6 +1,6 @@
 
 import React, { useState } from 'react';
-import { Settings, Disc, Activity, Zap, Terminal, AlertTriangle, Tv, Type, Bug, Power, MessageSquare, AudioWaveform, HelpCircle, Save, ChevronUp, ChevronDown, Home, Sun, Palette, MousePointer2, Sliders, Stamp, Bot, Layers, Image as ImageIcon, Files } from 'lucide-react';
+import { Settings, Disc, Activity, Zap, Terminal, AlertTriangle, Tv, Type, Bug, Power, MessageSquare, AudioWaveform, HelpCircle, Save, ChevronDown, Home, Sun, Palette, MousePointer2, Sliders, Stamp, Bot, Image as ImageIcon, Files } from 'lucide-react';
 import { VisualizerConfig, EffectsConfig, DvdConfig, MarqueeConfig, PatternConfig, BackgroundMedia, AppPreset, CursorStyle, WatermarkConfig, ThemeType, ControlStyle, BgTransitionType } from '../../types';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { useTheme } from '../../contexts/ThemeContext';
@@ -83,6 +83,9 @@ interface SettingsPanelProps {
   // Transition (New)
   bgTransition: BgTransitionType;
   setBgTransition: (t: BgTransitionType) => void;
+
+  // Tutorial
+  onRestartTutorial: () => void;
 }
 
 const SettingsPanel: React.FC<SettingsPanelProps> = ({
@@ -95,7 +98,8 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
   savedPresets, savePreset, loadPreset, deletePreset, renamePreset,
   sfxMap,
   cursorStyle, setCursorStyle, apiKey, setApiKey,
-  bgTransition, setBgTransition
+  bgTransition, setBgTransition,
+  onRestartTutorial
 }) => {
   const [expandedState, setExpandedState] = useState<Record<string, boolean>>({});
   const [expandWatermark, setExpandWatermark] = useState(false);
@@ -134,9 +138,9 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
   ];
 
   const controlStyleOptions = [
-    { value: 'default', label: t('style_default') },
-    { value: 'round', label: t('style_round') },
-    { value: 'circle', label: t('style_circle') },
+    { value: 'default', label: t('style_default'), shape: 'square' as const },
+    { value: 'round', label: t('style_round'), shape: 'rounded' as const },
+    { value: 'circle', label: t('style_circle'), shape: 'circle' as const },
   ];
 
   // Dynamic Radius for internal groups
@@ -161,6 +165,15 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
           </div>
           
           <div className="flex items-center gap-2">
+            <Tooltip content={t('help')} position="bottom">
+              <button 
+                onClick={() => setShowHelp(true)}
+                className="text-theme-muted hover:text-theme-primary transition-colors p-1"
+              >
+                <HelpCircle size={18} />
+              </button>
+            </Tooltip>
+
             <Tooltip content="HOME" position="bottom">
               <button 
                 onClick={onGoHome}
@@ -169,17 +182,8 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
                 <Home size={18} />
               </button>
             </Tooltip>
-
-            <Tooltip content={<TranslatedText k="help" />} position="bottom">
-              <button 
-                onClick={() => setShowHelp(true)}
-                className="text-theme-muted hover:text-theme-primary transition-colors p-1"
-              >
-                <HelpCircle size={18} />
-              </button>
-            </Tooltip>
             
-            <Tooltip content={<TranslatedText k="reboot" />} position="bottom">
+            <Tooltip content={t('reboot')} position="bottom">
               <button 
                 onClick={onScheduleReload}
                 className="text-theme-muted hover:text-red-500 transition-colors p-1"
@@ -240,7 +244,7 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
 
         {/* PRESETS */}
         <ModuleWrapper id="presets" label={<TranslatedText k="config_manager" />} icon={Save} isEnabled={true} isAlwaysOn={true} isExpanded={expandedState['presets']} onToggleExpand={() => toggleExpand('presets')} onToggleEnable={() => {}}>
-             <ConfigManager 
+            <ConfigManager 
                 presets={savedPresets}
                 onSave={savePreset}
                 onLoad={loadPreset}
@@ -289,10 +293,10 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
                     {/* WATERMARK SETTINGS - Collapsible Group */}
                     {watermarkConfig && (
                         <div className={`mt-4 bg-theme-panel/40 border border-theme-border ${innerWrapperRadius} overflow-hidden hover:border-theme-muted transition-colors`}>
-                             <div 
+                            <div 
                                 className="flex items-center justify-between p-3 cursor-pointer"
                                 onClick={() => setExpandWatermark(!expandWatermark)}
-                             >
+                            >
                                 <div className="flex items-center gap-3">
                                     <div className="text-theme-muted opacity-80">
                                         <Stamp size={16} />
@@ -302,13 +306,13 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
                                     </span>
                                 </div>
                                 <ChevronDown size={14} className={`text-theme-primary opacity-70 transition-transform ${expandWatermark ? 'rotate-180' : ''}`} />
-                             </div>
-                             
-                             <div 
+                            </div>
+                            
+                            <div 
                                 className={`grid transition-[grid-template-rows,padding,opacity] duration-300 ease-in-out 
                                     ${expandWatermark ? 'grid-rows-[1fr] opacity-100 p-3 pt-0' : 'grid-rows-[0fr] opacity-0 p-0'}
                                 `}
-                             >
+                            >
                                 <div className="overflow-hidden">
                                     <div className="pl-4 pt-2 space-y-3 border-l-2 border-theme-muted ml-2">
                                         <RangeControl label={<TranslatedText k="scale" />} value={watermarkConfig.scale} min={0.5} max={2.0} step={0.1} onChange={(v) => updateWatermark('scale', v)} className="mb-0" />
@@ -316,7 +320,7 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
                                         <RangeControl label={<TranslatedText k="flash_intensity" />} value={watermarkConfig.flashIntensity} min={0} max={1.0} step={0.1} onChange={(v) => updateWatermark('flashIntensity', v)} className="mb-0" />
                                     </div>
                                 </div>
-                             </div>
+                            </div>
                         </div>
                     )}
                 </div>
@@ -357,68 +361,70 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
             <TranslatedText k="modules" />
         </h3>
         
-        {/* WAVEFORM */}
-        <ModuleWrapper id="wave" label={<TranslatedText k="waveform" />} icon={Activity} isEnabled={showVisualizer} isExpanded={expandedState['wave']} onToggleExpand={() => toggleExpand('wave')} onToggleEnable={() => setShowVisualizer(!showVisualizer)}>
-            <VisualizerSettings config={visualizerConfig} update={updateVisualizer} />
-        </ModuleWrapper>
+        <div id="tutorial-modules">
+            {/* WAVEFORM */}
+            <ModuleWrapper id="wave" label={<TranslatedText k="waveform" />} icon={Activity} isEnabled={showVisualizer} isExpanded={expandedState['wave']} onToggleExpand={() => toggleExpand('wave')} onToggleEnable={() => setShowVisualizer(!showVisualizer)}>
+                <VisualizerSettings config={visualizerConfig} update={updateVisualizer} />
+            </ModuleWrapper>
 
-        {/* MARQUEE */}
-        <ModuleWrapper id="marquee" label={<TranslatedText k="top_marquee" />} icon={Type} isEnabled={marqueeConfig.enabled} isExpanded={expandedState['marquee']} onToggleExpand={() => toggleExpand('marquee')} onToggleEnable={() => updateMarquee('enabled', !marqueeConfig.enabled)}>
-            <MarqueeSettings config={marqueeConfig} update={updateMarquee} />
-        </ModuleWrapper>
+            {/* MARQUEE */}
+            <ModuleWrapper id="marquee" label={<TranslatedText k="top_marquee" />} icon={Type} isEnabled={marqueeConfig.enabled} isExpanded={expandedState['marquee']} onToggleExpand={() => toggleExpand('marquee')} onToggleEnable={() => updateMarquee('enabled', !marqueeConfig.enabled)}>
+                <MarqueeSettings config={marqueeConfig} update={updateMarquee} />
+            </ModuleWrapper>
 
-        {/* DVD */}
-        <ModuleWrapper id="dvd" label={<TranslatedText k="dvd_saver" />} icon={Disc} isEnabled={showDvd} isExpanded={expandedState['dvd']} onToggleExpand={() => toggleExpand('dvd')} onToggleEnable={() => setShowDvd(!showDvd)}>
-            <DvdSettings config={dvdConfig} update={updateDvd} />
-        </ModuleWrapper>
+            {/* DVD */}
+            <ModuleWrapper id="dvd" label={<TranslatedText k="dvd_saver" />} icon={Disc} isEnabled={showDvd} isExpanded={expandedState['dvd']} onToggleExpand={() => toggleExpand('dvd')} onToggleEnable={() => setShowDvd(!showDvd)}>
+                <DvdSettings config={dvdConfig} update={updateDvd} />
+            </ModuleWrapper>
 
-        {/* LIGHT LEAKS */}
-        <ModuleWrapper id="leaks" label={<TranslatedText k="light_leaks" />} icon={Sun} isEnabled={effectsConfig.lightLeaks.enabled} isExpanded={expandedState['leaks']} onToggleExpand={() => toggleExpand('leaks')} onToggleEnable={() => updateEffect('lightLeaks', { ...effectsConfig.lightLeaks, enabled: !effectsConfig.lightLeaks.enabled })}>
-            <LightLeaksSettings config={effectsConfig.lightLeaks} update={(v) => updateEffect('lightLeaks', v)} />
-        </ModuleWrapper>
+            {/* LIGHT LEAKS */}
+            <ModuleWrapper id="leaks" label={<TranslatedText k="light_leaks" />} icon={Sun} isEnabled={effectsConfig.lightLeaks.enabled} isExpanded={expandedState['leaks']} onToggleExpand={() => toggleExpand('leaks')} onToggleEnable={() => updateEffect('lightLeaks', { ...effectsConfig.lightLeaks, enabled: !effectsConfig.lightLeaks.enabled })}>
+                <LightLeaksSettings config={effectsConfig.lightLeaks} update={(v) => updateEffect('lightLeaks', v)} />
+            </ModuleWrapper>
 
-        {/* HOLOGRAMS */}
-        <ModuleWrapper id="hologram" label={<TranslatedText k="holograms" />} icon={MessageSquare} isEnabled={effectsConfig.holograms.enabled} isExpanded={expandedState['hologram']} onToggleExpand={() => toggleExpand('hologram')} onToggleEnable={() => updateEffect('holograms', { ...effectsConfig.holograms, enabled: !effectsConfig.holograms.enabled })}>
-            <HologramSettings config={effectsConfig.holograms} update={(v) => updateEffect('holograms', v)} />
-        </ModuleWrapper>
+            {/* HOLOGRAMS */}
+            <ModuleWrapper id="hologram" label={<TranslatedText k="holograms" />} icon={MessageSquare} isEnabled={effectsConfig.holograms.enabled} isExpanded={expandedState['hologram']} onToggleExpand={() => toggleExpand('hologram')} onToggleEnable={() => updateEffect('holograms', { ...effectsConfig.holograms, enabled: !effectsConfig.holograms.enabled })}>
+                <HologramSettings config={effectsConfig.holograms} update={(v) => updateEffect('holograms', v)} />
+            </ModuleWrapper>
 
-        {/* GEMINI CHAT */}
-        <ModuleWrapper id="gemini" label={<TranslatedText k="gemini_chat" />} icon={Bot} isEnabled={effectsConfig.geminiChat.enabled} isExpanded={expandedState['gemini']} onToggleExpand={() => toggleExpand('gemini')} onToggleEnable={() => updateEffect('geminiChat', { ...effectsConfig.geminiChat, enabled: !effectsConfig.geminiChat.enabled })}>
-            <GeminiSettings 
-                config={effectsConfig.geminiChat} 
-                update={(v) => updateEffect('geminiChat', v)} 
-                apiKey={apiKey}
-                setApiKey={setApiKey}
-            />
-        </ModuleWrapper>
+            {/* GEMINI CHAT */}
+            <ModuleWrapper id="gemini" label={<TranslatedText k="gemini_chat" />} icon={Bot} isEnabled={effectsConfig.geminiChat.enabled} isExpanded={expandedState['gemini']} onToggleExpand={() => toggleExpand('gemini')} onToggleEnable={() => updateEffect('geminiChat', { ...effectsConfig.geminiChat, enabled: !effectsConfig.geminiChat.enabled })}>
+                <GeminiSettings 
+                    config={effectsConfig.geminiChat} 
+                    update={(v) => updateEffect('geminiChat', v)} 
+                    apiKey={apiKey}
+                    setApiKey={setApiKey}
+                />
+            </ModuleWrapper>
 
-        {/* DEBUG CONSOLE */}
-        <ModuleWrapper id="debug" label={<TranslatedText k="debug_console" />} icon={Bug} isEnabled={effectsConfig.debugConsole.enabled} isExpanded={expandedState['debug']} onToggleExpand={() => toggleExpand('debug')} onToggleEnable={() => updateEffect('debugConsole', { ...effectsConfig.debugConsole, enabled: !effectsConfig.debugConsole.enabled })}>
-            <DebugSettings config={effectsConfig.debugConsole} update={(v) => updateEffect('debugConsole', v)} />
-        </ModuleWrapper>
+            {/* DEBUG CONSOLE */}
+            <ModuleWrapper id="debug" label={<TranslatedText k="debug_console" />} icon={Bug} isEnabled={effectsConfig.debugConsole.enabled} isExpanded={expandedState['debug']} onToggleExpand={() => toggleExpand('debug')} onToggleEnable={() => updateEffect('debugConsole', { ...effectsConfig.debugConsole, enabled: !effectsConfig.debugConsole.enabled })}>
+                <DebugSettings config={effectsConfig.debugConsole} update={(v) => updateEffect('debugConsole', v)} />
+            </ModuleWrapper>
 
-        {/* SCANLINES */}
-        <ModuleWrapper id="scan" label={<TranslatedText k="scanlines" />} icon={Tv} isEnabled={effectsConfig.scanlineEnabled} isExpanded={expandedState['scan']} onToggleExpand={() => toggleExpand('scan')} onToggleEnable={() => updateEffect('scanlineEnabled', !effectsConfig.scanlineEnabled)}>
-            <ScanlineSettings config={effectsConfig} update={updateEffect} />
-        </ModuleWrapper>
+            {/* SCANLINES */}
+            <ModuleWrapper id="scan" label={<TranslatedText k="scanlines" />} icon={Tv} isEnabled={effectsConfig.scanlineEnabled} isExpanded={expandedState['scan']} onToggleExpand={() => toggleExpand('scan')} onToggleEnable={() => updateEffect('scanlineEnabled', !effectsConfig.scanlineEnabled)}>
+                <ScanlineSettings config={effectsConfig} update={updateEffect} />
+            </ModuleWrapper>
 
-        {/* CYBER HACK */}
-        <ModuleWrapper id="cyber" label={<TranslatedText k="cyber_hack" />} icon={Terminal} isEnabled={effectsConfig.cyberHack.enabled} isExpanded={expandedState['cyber']} onToggleExpand={() => toggleExpand('cyber')} onToggleEnable={() => updateEffect('cyberHack', { ...effectsConfig.cyberHack, enabled: !effectsConfig.cyberHack.enabled })}>
-            <CyberSettings config={effectsConfig.cyberHack} update={(v) => updateEffect('cyberHack', v)} />
-        </ModuleWrapper>
+            {/* CYBER HACK */}
+            <ModuleWrapper id="cyber" label={<TranslatedText k="cyber_hack" />} icon={Terminal} isEnabled={effectsConfig.cyberHack.enabled} isExpanded={expandedState['cyber']} onToggleExpand={() => toggleExpand('cyber')} onToggleEnable={() => updateEffect('cyberHack', { ...effectsConfig.cyberHack, enabled: !effectsConfig.cyberHack.enabled })}>
+                <CyberSettings config={effectsConfig.cyberHack} update={(v) => updateEffect('cyberHack', v)} />
+            </ModuleWrapper>
 
-        {/* GLITCH */}
-        <ModuleWrapper id="glitch" label={<TranslatedText k="digital_glitch" />} icon={AlertTriangle} isEnabled={effectsConfig.glitch.enabled} isExpanded={expandedState['glitch']} onToggleExpand={() => toggleExpand('glitch')} onToggleEnable={() => updateEffect('glitch', { ...effectsConfig.glitch, enabled: !effectsConfig.glitch.enabled })}>
-            <GlitchSettings config={effectsConfig.glitch} update={(v) => updateEffect('glitch', v)} />
-        </ModuleWrapper>
+            {/* GLITCH */}
+            <ModuleWrapper id="glitch" label={<TranslatedText k="digital_glitch" />} icon={AlertTriangle} isEnabled={effectsConfig.glitch.enabled} isExpanded={expandedState['glitch']} onToggleExpand={() => toggleExpand('glitch')} onToggleEnable={() => updateEffect('glitch', { ...effectsConfig.glitch, enabled: !effectsConfig.glitch.enabled })}>
+                <GlitchSettings config={effectsConfig.glitch} update={(v) => updateEffect('glitch', v)} />
+            </ModuleWrapper>
 
-        {/* SIGNAL (Always On) */}
-        <ModuleWrapper id="signal" label={<TranslatedText k="signal_processor" />} icon={Zap} isEnabled={true} isAlwaysOn={true} isExpanded={expandedState['signal']} onToggleExpand={() => toggleExpand('signal')} onToggleEnable={() => {}}>
-            <SignalSettings config={effectsConfig} update={updateEffect} />
-        </ModuleWrapper>
+            {/* SIGNAL (Always On) */}
+            <ModuleWrapper id="signal" label={<TranslatedText k="signal_processor" />} icon={Zap} isEnabled={true} isAlwaysOn={true} isExpanded={expandedState['signal']} onToggleExpand={() => toggleExpand('signal')} onToggleEnable={() => {}}>
+                <SignalSettings config={effectsConfig} update={updateEffect} />
+            </ModuleWrapper>
+        </div>
       </div>
       
-      {showHelp && <HelpModal onClose={() => setShowHelp(false)} />}
+      {showHelp && <HelpModal onClose={() => setShowHelp(false)} onRestartTutorial={onRestartTutorial} />}
     </div>
   );
 };

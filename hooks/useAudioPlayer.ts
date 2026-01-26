@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, useCallback, SyntheticEvent } from 'react';
 import { AudioTrack, Playlist } from '../types';
-import { getAllTracks, saveTrack, getAllPlaylists, savePlaylist, deletePlaylistAndTracks, clearTracksInPlaylist } from '../lib/db';
+import { getAllTracks, saveTrack, getAllPlaylists, savePlaylist, deletePlaylistAndTracks, clearTracksInPlaylist, deleteTracksBulk, saveTracksBulk } from '../lib/db';
 
 type Deck = 'A' | 'B';
 
@@ -191,11 +191,9 @@ export const useAudioPlayer = () => {
   }, [volume]);
 
   // --- CROSSFADE LOGIC ---
-  // Modified to accept an optional track list for context switching
   const performCrossfade = useCallback((toTrackIndex: number, specificTracks?: AudioTrack[]) => {
       initAudio();
       
-      // Use provided tracks (for playlist switch) or current playing tracks
       const tracksToUse = specificTracks || getPlayingTracks();
       
       if (!tracksToUse[toTrackIndex] || !audioContextRef.current || !gainARef.current || !gainBRef.current) return;
@@ -222,7 +220,6 @@ export const useAudioPlayer = () => {
       isCrossfadingRef.current = true;
       hasTriggeredAutoMixRef.current = true;
 
-      // Hard Cut
       if (crossfadeDuration === 0) {
          const now = audioContextRef.current.currentTime;
          activeGain.gain.cancelScheduledValues(now);
@@ -245,7 +242,6 @@ export const useAudioPlayer = () => {
          return; 
       }
 
-      // Smooth Fade
       nextAudio.play().then(() => {
           setIsPlaying(true);
           const now = audioContextRef.current!.currentTime;
@@ -290,7 +286,6 @@ export const useAudioPlayer = () => {
     initAudio();
     const activeAudio = activeDeckRef.current === 'A' ? audioRefA.current : audioRefB.current;
     
-    // If no track is loaded, check if we can load from current playlist
     if (!activeAudio?.src || activeAudio.src === window.location.href) {
         const tracks = getPlayingTracks();
         if (tracks.length > 0) {
@@ -319,19 +314,14 @@ export const useAudioPlayer = () => {
   }, [isPlaying, initAudio, volume, getPlayingTracks]);
 
   const nextTrack = useCallback(() => {
-    // 1. Check if we need to switch playlists (Active tab != Playing tab)
-    // This happens when user clicked a tab but let the old song finish
     if (activePlaylistId !== playingPlaylistId) {
         const newPlaylist = playlists.find(p => p.id === activePlaylistId);
         if (newPlaylist && newPlaylist.tracks.length > 0) {
-            // Context Switch!
             setPlayingPlaylistId(activePlaylistId);
             
-            // If playing, crossfade to new playlist first track
             if (isPlaying) {
                 performCrossfade(0, newPlaylist.tracks);
             } else {
-                // If paused, just prep the new track
                 setCurrentTrackIndex(0);
                 const nextDeck = activeDeckRef.current;
                 const audio = nextDeck === 'A' ? audioRefA.current : audioRefB.current;
@@ -343,11 +333,8 @@ export const useAudioPlayer = () => {
             hasTriggeredAutoMixRef.current = false;
             return;
         }
-        // If new playlist is empty, fall through or stop? 
-        // For now, let's fall through to stop safely if nothing to play.
     }
 
-    // 2. Normal Next Track logic (Same Playlist)
     const currentTracks = getPlayingTracks();
     if (currentTracks.length === 0) return;
     
@@ -368,7 +355,6 @@ export const useAudioPlayer = () => {
   }, [getPlayingTracks, currentTrackIndex, isPlaying, performCrossfade, activePlaylistId, playingPlaylistId, playlists]);
 
   const prevTrack = useCallback(() => {
-    // Prev track always stays in the PLAYING playlist context
     const currentTracks = getPlayingTracks();
     if (currentTracks.length === 0) return;
     const prevIndex = (currentTrackIndex - 1 + currentTracks.length) % currentTracks.length;
@@ -388,7 +374,6 @@ export const useAudioPlayer = () => {
   }, [getPlayingTracks, currentTrackIndex, isPlaying, performCrossfade]);
 
   const selectTrack = useCallback((index: number) => {
-      // If user clicks a track in a different playlist, switch context immediately
       let tracksToPlay = getPlayingTracks();
       
       if (activePlaylistId !== playingPlaylistId) {
@@ -469,7 +454,6 @@ export const useAudioPlayer = () => {
     setPlaylists(prev => prev.map(pl => {
         if (pl.id === targetPlaylistId) {
             const updatedTracks = [...pl.tracks, ...newTracks];
-            // If we are currently PLAYING this playlist and it was empty, start logic
             if (pl.id === playingPlaylistId && pl.tracks.length === 0 && updatedTracks.length > 0) {
                  setCurrentTrackIndex(0);
                  if (audioRefA.current) {
@@ -484,8 +468,28 @@ export const useAudioPlayer = () => {
     }));
   };
 
+  const createPlaylistFromFiles = async (files: File[]) => {
+      const plId = crypto.randomUUID();
+      const plName = `DECK ${playlists.length + 1}`;
+      const newPlaylist: Playlist = { id: plId, name: plName, order: playlists.length, tracks: [] };
+      
+      await savePlaylist(newPlaylist);
+      
+      const newTracks = files.map(file => ({ 
+          id: crypto.randomUUID(), 
+          playlistId: plId,
+          name: file.name, 
+          url: URL.createObjectURL(file), 
+          file 
+      }));
+
+      await saveTracksBulk(newTracks.map(t => ({ id: t.id, playlistId: t.playlistId, name: t.name, file: t.file })));
+
+      setPlaylists(prev => [...prev, { ...newPlaylist, tracks: newTracks }]);
+      setActivePlaylistId(plId);
+  };
+
   const clearPlaylist = useCallback(async () => {
-    // Only stop if we are clearing the CURRENTLY PLAYING playlist
     if (activePlaylistId === playingPlaylistId) {
         stop();
         [audioRefA.current, audioRefB.current].forEach(a => {
@@ -494,7 +498,6 @@ export const useAudioPlayer = () => {
         setCurrentTrackIndex(-1);
     }
     
-    // Revoke URLs for active playlist
     const visibleTracks = getVisibleTracks();
     visibleTracks.forEach(t => URL.revokeObjectURL(t.url));
 
@@ -509,7 +512,6 @@ export const useAudioPlayer = () => {
   const sortTracks = useCallback(() => {
     setPlaylists(prev => prev.map(pl => {
         if (pl.id === activePlaylistId) {
-            // Only update index if we are sorting the playing playlist
             const shouldUpdateIndex = pl.id === playingPlaylistId;
             const currentId = shouldUpdateIndex ? pl.tracks[currentTrackIndex]?.id : null;
             
@@ -547,6 +549,154 @@ export const useAudioPlayer = () => {
     }));
   }, [activePlaylistId, playingPlaylistId, currentTrackIndex]);
 
+  // --- NEW TRACK MANAGEMENT FUNCTIONS ---
+
+  const removeTracks = useCallback(async (playlistId: string, trackIds: string[]) => {
+      // If we are deleting the CURRENTLY PLAYING track, handle logic
+      if (playlistId === playingPlaylistId) {
+          const currentTrack = playlists.find(p => p.id === playlistId)?.tracks[currentTrackIndex];
+          if (currentTrack && trackIds.includes(currentTrack.id)) {
+              stop(); // Stop for safety if current is deleted
+              setCurrentTrackIndex(-1);
+          }
+      }
+
+      await deleteTracksBulk(trackIds);
+
+      setPlaylists(prev => prev.map(pl => {
+          if (pl.id === playlistId) {
+              const remaining = pl.tracks.filter(t => {
+                  if (trackIds.includes(t.id)) {
+                      URL.revokeObjectURL(t.url);
+                      return false;
+                  }
+                  return true;
+              });
+              
+              // Recalculate index if items removed above current
+              if (pl.id === playingPlaylistId && currentTrackIndex > -1) {
+                  const currentId = pl.tracks[currentTrackIndex]?.id;
+                  if (currentId && !trackIds.includes(currentId)) {
+                      const newIndex = remaining.findIndex(t => t.id === currentId);
+                      setCurrentTrackIndex(newIndex);
+                  }
+              }
+              
+              return { ...pl, tracks: remaining };
+          }
+          return pl;
+      }));
+  }, [playlists, playingPlaylistId, currentTrackIndex, stop]);
+
+  const reorderTracks = useCallback((playlistId: string, sourceIndices: number[], targetIndex: number) => {
+      setPlaylists(prev => prev.map(pl => {
+          if (pl.id === playlistId) {
+              const tracks = [...pl.tracks];
+              const movedItems = sourceIndices.sort((a, b) => a - b).map(i => tracks[i]);
+              
+              // Remove items from old positions (iterate backwards to avoid shifting issues)
+              for (let i = sourceIndices.length - 1; i >= 0; i--) {
+                  tracks.splice(sourceIndices[i], 1);
+              }
+              
+              // Calculate insert position
+              // Adjust target index because removing items might shift it
+              let insertAt = targetIndex;
+              const itemsBeforeTarget = sourceIndices.filter(i => i < targetIndex).length;
+              insertAt -= itemsBeforeTarget;
+              
+              tracks.splice(insertAt, 0, ...movedItems);
+
+              // Update Playing Index if needed
+              if (pl.id === playingPlaylistId) {
+                  const currentId = pl.tracks[currentTrackIndex]?.id;
+                  if (currentId) {
+                      const newIndex = tracks.findIndex(t => t.id === currentId);
+                      setCurrentTrackIndex(newIndex);
+                  }
+              }
+
+              return { ...pl, tracks };
+          }
+          return pl;
+      }));
+  }, [playingPlaylistId, currentTrackIndex]);
+
+  const moveTracksToPlaylist = useCallback(async (sourcePlaylistId: string, trackIds: string[], targetPlaylistId: string) => {
+      const sourcePl = playlists.find(p => p.id === sourcePlaylistId);
+      const targetPl = playlists.find(p => p.id === targetPlaylistId);
+      
+      if (!sourcePl || !targetPl) return;
+
+      const movingTracks = sourcePl.tracks.filter(t => trackIds.includes(t.id));
+      
+      // Update DB for moving tracks
+      const tracksToSave = movingTracks.map(t => ({ 
+          id: t.id, 
+          playlistId: targetPlaylistId, 
+          name: t.name, 
+          file: t.file 
+      }));
+      await saveTracksBulk(tracksToSave);
+
+      setPlaylists(prev => prev.map(pl => {
+          if (pl.id === sourcePlaylistId) {
+              const remaining = pl.tracks.filter(t => !trackIds.includes(t.id));
+              // Handle Playing Index if moved from active
+              if (pl.id === playingPlaylistId && currentTrackIndex > -1) {
+                  const currentId = pl.tracks[currentTrackIndex]?.id;
+                  if (currentId && trackIds.includes(currentId)) {
+                      stop(); // Moved playing track away
+                      setCurrentTrackIndex(-1);
+                  } else if (currentId) {
+                      const newIndex = remaining.findIndex(t => t.id === currentId);
+                      setCurrentTrackIndex(newIndex);
+                  }
+              }
+              return { ...pl, tracks: remaining };
+          }
+          if (pl.id === targetPlaylistId) {
+              return { ...pl, tracks: [...pl.tracks, ...movingTracks] };
+          }
+          return pl;
+      }));
+  }, [playlists, playingPlaylistId, currentTrackIndex, stop]);
+
+  const createPlaylistFromMove = useCallback(async (trackIds: string[], sourcePlaylistId: string) => {
+      const sourcePl = playlists.find(p => p.id === sourcePlaylistId);
+      if (!sourcePl) return;
+
+      const plId = crypto.randomUUID();
+      const plName = `DECK ${playlists.length + 1}`;
+      const newPlaylist: Playlist = { id: plId, name: plName, order: playlists.length, tracks: [] };
+      await savePlaylist(newPlaylist);
+
+      const movingTracks = sourcePl.tracks.filter(t => trackIds.includes(t.id));
+      
+      // Update DB
+      const tracksToSave = movingTracks.map(t => ({ 
+          id: t.id, 
+          playlistId: plId, 
+          name: t.name, 
+          file: t.file 
+      }));
+      await saveTracksBulk(tracksToSave);
+
+      setPlaylists(prev => {
+          const newPlState = { ...newPlaylist, tracks: movingTracks };
+          // Remove from old playlist
+          return prev.map(pl => {
+              if (pl.id === sourcePlaylistId) {
+                  const remaining = pl.tracks.filter(t => !trackIds.includes(t.id));
+                  return { ...pl, tracks: remaining };
+              }
+              return pl;
+          }).concat(newPlState);
+      });
+      
+      setActivePlaylistId(plId);
+  }, [playlists]);
+
   // --- PLAYLIST MANAGEMENT ---
 
   const addPlaylist = async () => {
@@ -558,7 +708,7 @@ export const useAudioPlayer = () => {
   };
 
   const removePlaylist = async (id: string) => {
-      if (playlists.length <= 1) return; // Prevent deleting last playlist
+      if (playlists.length <= 1) return; 
       
       const plToDelete = playlists.find(p => p.id === id);
       if (plToDelete) {
@@ -569,12 +719,10 @@ export const useAudioPlayer = () => {
       
       setPlaylists(prev => {
           const filtered = prev.filter(p => p.id !== id);
-          // If we deleted the ACTIVE one
           if (id === activePlaylistId) {
              const nextActive = filtered[0];
              setActivePlaylistId(nextActive.id);
           }
-          // If we deleted the PLAYING one
           if (id === playingPlaylistId) {
              stop();
              const nextPlaying = filtered[0];
@@ -605,11 +753,9 @@ export const useAudioPlayer = () => {
       const [removed] = cloned.splice(dragIndex, 1);
       cloned.splice(hoverIndex, 0, removed);
       
-      // Update order property
       const updated = cloned.map((p, idx) => ({ ...p, order: idx }));
       setPlaylists(updated);
       
-      // Persist all
       for (const p of updated) {
           await savePlaylist({ id: p.id, name: p.name, order: p.order });
       }
@@ -617,12 +763,8 @@ export const useAudioPlayer = () => {
 
   const switchPlaylist = (id: string) => {
       if (id === activePlaylistId) return;
-      
       setActivePlaylistId(id);
       
-      // If we are NOT playing, switch the playing context immediately to the new tab
-      // so the user can hit Play and hear the new tab.
-      // If we ARE playing, do NOT stop. Keep playing old tab.
       if (!isPlaying) {
           setPlayingPlaylistId(id);
           const targetPl = playlists.find(p => p.id === id);
@@ -641,7 +783,6 @@ export const useAudioPlayer = () => {
       }
   };
 
-
   // --- AUTOMATION LOOP ---
   const handleTimeUpdate = (_e: any, preventAutoMix = false) => {
       const active = activeDeckRef.current === 'A' ? audioRefA.current : audioRefB.current;
@@ -652,17 +793,14 @@ export const useAudioPlayer = () => {
           setCurrentTime(ct);
           if (dur) setDuration(dur);
 
-          // AUTO-MIX LOGIC
           if (!preventAutoMix && isPlaying && dur > 0 && crossfadeDuration > 0) {
               if (ct >= dur - crossfadeDuration && !hasTriggeredAutoMixRef.current && !isCrossfadingRef.current) {
-                   // This calls nextTrack, which handles playlist switching logic
                    nextTrack();
               }
           }
       }
   };
 
-  // --- SYNC UI STATE WITH AUDIO EVENT ---
   const onAudioPlay = useCallback(() => {
       if (!isPlaying) setIsPlaying(true);
       initAudio(); 
@@ -676,7 +814,6 @@ export const useAudioPlayer = () => {
       if (isPlaying && !isCrossfadingRef.current) setIsPlaying(false);
   }, [isPlaying]);
 
-  // DERIVED STATE FOR EXPORT
   const visibleTracks = getVisibleTracks();
   const playingTracks = getPlayingTracks();
   const currentTrack = playingTracks[currentTrackIndex];
@@ -687,9 +824,9 @@ export const useAudioPlayer = () => {
     tracks: visibleTracks, // UI List
     playlists,
     activePlaylistId,
-    playingPlaylistId, // Exposed for UI highlighting logic
+    playingPlaylistId,
     currentTrackIndex,
-    currentTrack, // Exposed for Screensaver/LCD
+    currentTrack,
     isPlaying,
     volume,
     currentTime,
@@ -702,6 +839,8 @@ export const useAudioPlayer = () => {
     setCurrentTime,
     setDuration,
     processAudioFiles,
+    createPlaylistFromFiles,
+    createPlaylistFromMove,
     clearPlaylist,
     addPlaylist,
     removePlaylist,
@@ -720,6 +859,9 @@ export const useAudioPlayer = () => {
     handleTimeUpdate,
     activeDeck: activeDeckRef.current,
     onAudioPlay,
-    onAudioPause
+    onAudioPause,
+    removeTracks,
+    reorderTracks,
+    moveTracksToPlaylist
   };
 };

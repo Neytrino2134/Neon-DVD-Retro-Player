@@ -5,8 +5,10 @@ jspm_packages/
 # --- Сборка и временные файлы ---
 dist/
 dist-ssr/
+dist-electron/
 build/
 out/
+public/
 .cache/
 .parcel-cache/
 .eslintcache/

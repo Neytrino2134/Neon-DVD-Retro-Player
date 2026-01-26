@@ -1,3 +1,4 @@
+
 {
   "name": "neon-dvd-player",
   "private": true,
@@ -52,7 +53,7 @@
     ],
     "win": {
       "target": "nsis",
-      "icon": "public/icon.ico"
+      "icon": "public/NEON RETRO Player.ico"
     },
     "mac": {
       "target": "dmg"

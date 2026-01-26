@@ -76,7 +76,7 @@ const FileManagement: React.FC<FileManagementProps> = ({
           </Tooltip>
           
           <Tooltip content="LOAD AUDIO" position="top">
-            <button onClick={() => audioInputRef.current?.click()} className="w-full flex flex-col items-center justify-center p-2 bg-theme-panel border border-theme-border rounded text-theme-muted hover:text-theme-text hover:border-theme-primary transition-colors min-h-[50px]">
+            <button id="tutorial-load-audio-btn" onClick={() => audioInputRef.current?.click()} className="w-full flex flex-col items-center justify-center p-2 bg-theme-panel border border-theme-border rounded text-theme-muted hover:text-theme-text hover:border-theme-primary transition-colors min-h-[50px]">
                 <Music size={16} className="text-theme-primary mb-1" /> <span className="font-mono text-[9px]">AUDIO</span>
             </button>
           </Tooltip>

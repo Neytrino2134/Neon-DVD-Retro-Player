@@ -1,13 +1,14 @@
 
 import React, { useEffect, useState, useRef } from 'react';
-import { HelpCircle, X, Keyboard, User, Mail, Github } from 'lucide-react';
+import { HelpCircle, X, Keyboard, User, Mail, Github, Terminal } from 'lucide-react';
 import { useLanguage } from '../../contexts/LanguageContext';
 
 interface HelpModalProps {
   onClose: () => void;
+  onRestartTutorial: () => void;
 }
 
-const HelpModal: React.FC<HelpModalProps> = ({ onClose }) => {
+const HelpModal: React.FC<HelpModalProps> = ({ onClose, onRestartTutorial }) => {
   const { t } = useLanguage();
   
   // Animation Phases:
@@ -51,12 +52,17 @@ const HelpModal: React.FC<HelpModalProps> = ({ onClose }) => {
     timeoutsRef.current.push(t1, t2, t3, t4);
   };
 
+  const handleRestart = () => {
+      onRestartTutorial();
+      handleClose();
+  };
+
   // Styles calculation based on phase
   const overlayClass = `fixed inset-0 z-[100] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 transition-opacity duration-500 ${animPhase >= 1 ? 'opacity-100' : 'opacity-0'}`;
   
   const windowStyle: React.CSSProperties = {
     width: animPhase >= 2 ? '100%' : '0px',
-    height: animPhase >= 3 ? '550px' : '2px', // Approximate max height or sufficient fixed height
+    height: animPhase >= 3 ? '700px' : '2px', // Approximate max height or sufficient fixed height
     opacity: animPhase >= 2 ? 1 : 0,
     transition: 'width 0.5s cubic-bezier(0.23, 1, 0.32, 1), height 0.5s cubic-bezier(0.23, 1, 0.32, 1), opacity 0.2s',
   };
@@ -127,6 +133,19 @@ const HelpModal: React.FC<HelpModalProps> = ({ onClose }) => {
                     </div>
                 </div>
             </div>
+
+            <div className="h-px bg-theme-border"></div>
+
+            {/* Tutorial Restart */}
+            <div className="pt-2">
+               <button 
+                 onClick={handleRestart}
+                 className="w-full py-3 bg-theme-primary/10 border border-theme-primary text-theme-primary font-mono font-bold rounded hover:bg-theme-primary hover:text-black transition-all flex items-center justify-center gap-2"
+               >
+                  <Terminal size={16} /> START TUTORIAL
+               </button>
+            </div>
+
             </div>
         </div>
       </div>

@@ -17,6 +17,20 @@
   --color-toggle-knob: #ffffff; /* Default fallback */
 }
 
+/* ELECTRON DRAG REGIONS */
+.app-drag-region {
+  -webkit-app-region: drag;
+}
+
+.app-no-drag {
+  -webkit-app-region: no-drag;
+}
+
+/* FORCE SYSTEM CURSOR */
+.system-cursor {
+  cursor: default !important;
+}
+
 /* 
    === GLOBAL FONT SCALING === 
    1. Увеличиваем базовый шрифт html. По умолчанию он 16px.

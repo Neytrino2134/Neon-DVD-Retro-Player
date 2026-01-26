@@ -1,5 +1,6 @@
-import React, { useRef, useState } from 'react';
-import { Play, Pause, Square, SkipBack, SkipForward, FolderOpen, Music, Volume2, VolumeX, Trash2, ArrowDownAZ, Shuffle, Plus, X } from 'lucide-react';
+
+import React, { useRef, useState, useEffect } from 'react';
+import { Play, Pause, Square, SkipBack, SkipForward, FolderOpen, Music, Volume2, VolumeX, Trash2, ArrowDownAZ, Shuffle, Plus, X, Lock, Unlock, Upload } from 'lucide-react';
 import { AudioTrack, Playlist } from '../types';
 import { Tooltip } from './ui/Tooltip';
 import { TranslatedText } from './ui/TranslatedText';
@@ -34,6 +35,13 @@ interface ControlsProps {
   onRenamePlaylist: (id: string, name: string) => void;
   onSwitchPlaylist: (id: string) => void;
   onReorderPlaylists: (dragIndex: number, hoverIndex: number) => void;
+  // New actions
+  removeTracks: (playlistId: string, trackIds: string[]) => void;
+  reorderTracks: (playlistId: string, sourceIndices: number[], targetIndex: number) => void;
+  moveTracksToPlaylist: (sourcePlaylistId: string, trackIds: string[], targetPlaylistId: string) => void;
+  // Drop to create
+  onNewPlaylistWithTracks: (trackIds: string[], sourcePlaylistId: string) => void;
+  onNewPlaylistWithFiles: (files: File[]) => void;
 }
 
 // Updated NeonButton to use theme colors primarily
@@ -42,9 +50,10 @@ interface NeonButtonProps {
   children: React.ReactNode;
   className?: string;
   variant?: 'primary' | 'secondary' | 'accent' | 'danger'; // Replaced specific colors with semantic variants
+  id?: string;
 }
 
-const NeonButton: React.FC<NeonButtonProps> = ({ onClick, children, className = "", variant = 'primary' }) => {
+const NeonButton: React.FC<NeonButtonProps> = ({ onClick, children, className = "", variant = 'primary', id }) => {
   let colorClasses = "";
   
   switch(variant) {
@@ -64,6 +73,7 @@ const NeonButton: React.FC<NeonButtonProps> = ({ onClick, children, className = 
 
   return (
     <button
+      id={id}
       onClick={onClick}
       className={`p-3 rounded-full border-2 transition-all active:scale-95 hover:text-black flex items-center justify-center ${colorClasses} ${className}`}
     >
@@ -106,14 +116,44 @@ const Controls: React.FC<ControlsProps> = ({
   onRemovePlaylist,
   onRenamePlaylist,
   onSwitchPlaylist,
-  onReorderPlaylists
+  onReorderPlaylists,
+  removeTracks,
+  reorderTracks,
+  moveTracksToPlaylist,
+  onNewPlaylistWithTracks,
+  onNewPlaylistWithFiles
 }) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [showClearConfirm, setShowClearConfirm] = useState(false);
+  const [showTabDeleteConfirm, setShowTabDeleteConfirm] = useState(false);
+  const [tabToDelete, setTabToDelete] = useState<string | null>(null);
   
   // Tab Editing State
   const [editingTabId, setEditingTabId] = useState<string | null>(null);
   const [editingName, setEditingName] = useState("");
+
+  // Lock State
+  const [isLocked, setIsLocked] = useState(false);
+
+  // Track Selection State
+  const [selectedTrackIds, setSelectedTrackIds] = useState<Set<string>>(new Set());
+  const [lastSelectedTrackIndex, setLastSelectedTrackIndex] = useState<number>(-1);
+
+  // Drag State for Tracks
+  const [draggedTrackIds, setDraggedTrackIds] = useState<string[]>([]);
+  const [dragSourcePlaylistId, setDragSourcePlaylistId] = useState<string | null>(null);
+  
+  // Drag State for List Drop Zone
+  const [isListDragOver, setIsListDragOver] = useState(false);
+  
+  // Drag State for Tabs
+  const [dragOverTabId, setDragOverTabId] = useState<string | null>(null);
+  const [draggedTabId, setDraggedTabId] = useState<string | null>(null);
+  
+  // Drag State for Plus Button
+  const [isPlusDragOver, setIsPlusDragOver] = useState(false);
+
+  const tabSwitchTimeoutRef = useRef<number | null>(null);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files.length > 0) {
@@ -123,7 +163,7 @@ const Controls: React.FC<ControlsProps> = ({
   };
 
   const requestClear = () => {
-    if (tracks.length > 0) {
+    if (tracks.length > 0 && !isLocked) {
       setShowClearConfirm(true);
     }
   };
@@ -133,34 +173,115 @@ const Controls: React.FC<ControlsProps> = ({
     setShowClearConfirm(false);
   };
 
+  const requestDeleteTab = (id: string) => {
+      setTabToDelete(id);
+      setShowTabDeleteConfirm(true);
+  };
+
+  const confirmDeleteTab = () => {
+      if (tabToDelete) {
+          onRemovePlaylist(tabToDelete);
+      }
+      setTabToDelete(null);
+      setShowTabDeleteConfirm(false);
+  };
+
   const remainingTime = Math.max(0, duration - currentTime);
 
   // Drag and Drop for Tabs
-  const [draggedTabId, setDraggedTabId] = useState<string | null>(null);
-
-  const handleDragStart = (e: React.DragEvent, id: string) => {
+  const handleTabDragStart = (e: React.DragEvent, id: string) => {
+    if (isLocked) { e.preventDefault(); return; }
     setDraggedTabId(id);
     e.dataTransfer.effectAllowed = 'move';
   };
 
-  const handleDragOver = (e: React.DragEvent) => {
+  const handleTabDragOver = (e: React.DragEvent, targetId: string) => {
     e.preventDefault();
+    if (isLocked) return;
+    
+    // Highlight effect logic
+    if (dragOverTabId !== targetId) setDragOverTabId(targetId);
+
+    // Logic for dragging TRACKS onto TABS
+    if (draggedTrackIds.length > 0 && targetId !== activePlaylistId) {
+        if (!tabSwitchTimeoutRef.current) {
+            tabSwitchTimeoutRef.current = window.setTimeout(() => {
+                onSwitchPlaylist(targetId);
+                tabSwitchTimeoutRef.current = null;
+            }, 600); // 600ms delay to switch tab
+        }
+    }
   };
 
-  const handleDrop = (e: React.DragEvent, targetId: string) => {
+  const handleTabDragLeave = () => {
+      if (tabSwitchTimeoutRef.current) {
+          clearTimeout(tabSwitchTimeoutRef.current);
+          tabSwitchTimeoutRef.current = null;
+      }
+      setDragOverTabId(null);
+  };
+
+  const handleTabDrop = (e: React.DragEvent, targetId: string) => {
     e.preventDefault();
-    if (!draggedTabId || draggedTabId === targetId) return;
-    
-    const dragIndex = playlists.findIndex(p => p.id === draggedTabId);
-    const hoverIndex = playlists.findIndex(p => p.id === targetId);
-    
-    if (dragIndex !== -1 && hoverIndex !== -1) {
-        onReorderPlaylists(dragIndex, hoverIndex);
+    setDragOverTabId(null);
+    if (isLocked) return;
+
+    if (draggedTabId) {
+        // Tab Reordering Logic
+        if (draggedTabId === targetId) return;
+        const dragIndex = playlists.findIndex(p => p.id === draggedTabId);
+        const hoverIndex = playlists.findIndex(p => p.id === targetId);
+        
+        if (dragIndex !== -1 && hoverIndex !== -1) {
+            onReorderPlaylists(dragIndex, hoverIndex);
+        }
+        setDraggedTabId(null);
+    } else if (draggedTrackIds.length > 0) {
+        // Moving tracks to another playlist via Tab Drop
+        if (targetId !== activePlaylistId) {
+            moveTracksToPlaylist(activePlaylistId, draggedTrackIds, targetId);
+            setDraggedTrackIds([]);
+            setSelectedTrackIds(new Set());
+            setDragSourcePlaylistId(null);
+        }
+    } else if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+        // Dropping files directly on a tab - Switch to tab and add files
+        onSwitchPlaylist(targetId);
+        onFilesSelected(e.dataTransfer.files);
     }
-    setDraggedTabId(null);
+  };
+
+  // --- PLUS BUTTON DRAG HANDLERS ---
+  const handlePlusDragOver = (e: React.DragEvent) => {
+      e.preventDefault();
+      if (!isPlusDragOver) setIsPlusDragOver(true);
+  };
+
+  const handlePlusDragLeave = () => {
+      setIsPlusDragOver(false);
+  };
+
+  const handlePlusDrop = (e: React.DragEvent) => {
+      e.preventDefault();
+      setIsPlusDragOver(false);
+      
+      // 1. Files Drop
+      if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+          onNewPlaylistWithFiles(Array.from(e.dataTransfer.files));
+          return;
+      }
+
+      // 2. Tracks Drop
+      if (draggedTrackIds.length > 0 && dragSourcePlaylistId) {
+          onNewPlaylistWithTracks(draggedTrackIds, dragSourcePlaylistId);
+          setDraggedTrackIds([]);
+          setSelectedTrackIds(new Set());
+          setDragSourcePlaylistId(null);
+      }
   };
 
   const startRename = (id: string, name: string) => {
+      if (isLocked) return;
       setEditingTabId(id);
       setEditingName(name);
   };
@@ -172,14 +293,201 @@ const Controls: React.FC<ControlsProps> = ({
       setEditingTabId(null);
   };
 
-  return (
-    <div className="relative w-full h-full flex flex-col bg-theme-bg border-l-4 border-theme-panel p-4 shadow-inner">
+  // --- TRACK LIST HANDLERS ---
+
+  const handleTrackClick = (e: React.MouseEvent, index: number, trackId: string) => {
+      if (isLocked) return;
+
+      const newSelection = new Set(selectedTrackIds);
+
+      if (e.shiftKey && lastSelectedTrackIndex !== -1) {
+          // Range selection
+          const start = Math.min(lastSelectedTrackIndex, index);
+          const end = Math.max(lastSelectedTrackIndex, index);
+          
+          // If ctrl not held, clear others first
+          if (!e.ctrlKey && !e.metaKey) {
+              newSelection.clear();
+          }
+
+          for (let i = start; i <= end; i++) {
+              if (tracks[i]) newSelection.add(tracks[i].id);
+          }
+      } else if (e.ctrlKey || e.metaKey) {
+          // Toggle selection
+          if (newSelection.has(trackId)) {
+              newSelection.delete(trackId);
+          } else {
+              newSelection.add(trackId);
+          }
+          setLastSelectedTrackIndex(index);
+      } else {
+          // Single selection
+          newSelection.clear();
+          newSelection.add(trackId);
+          setLastSelectedTrackIndex(index);
+      }
+
+      setSelectedTrackIds(newSelection);
+  };
+
+  const handleTrackDoubleClick = (index: number) => {
+      if (!isLocked) {
+          onTrackSelect(index);
+      }
+  };
+
+  const handleDeleteSelected = () => {
+      if (isLocked || selectedTrackIds.size === 0) return;
+      removeTracks(activePlaylistId, Array.from(selectedTrackIds));
+      setSelectedTrackIds(new Set());
+  };
+
+  const handleDeleteTrack = (e: React.MouseEvent, id: string) => {
+      e.stopPropagation();
+      if (isLocked) return;
+      removeTracks(activePlaylistId, [id]);
+  };
+
+  // --- KEYBOARD LISTENERS ---
+  useEffect(() => {
+      const handleKeyDown = (e: KeyboardEvent) => {
+          if (e.key === 'Delete' && selectedTrackIds.size > 0 && !isLocked) {
+              handleDeleteSelected();
+          }
+      };
+      window.addEventListener('keydown', handleKeyDown);
+      return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [selectedTrackIds, isLocked, activePlaylistId]);
+
+  // --- TRACK DRAG & DROP ---
+  const handleTrackDragStart = (e: React.DragEvent, _index: number, trackId: string) => {
+      if (isLocked) { e.preventDefault(); return; }
       
-      {/* Animated Confirmation Modal */}
+      // Store which playlist the drag originated from
+      setDragSourcePlaylistId(activePlaylistId);
+
+      // If dragging an unselected item, select it alone
+      if (!selectedTrackIds.has(trackId)) {
+          setSelectedTrackIds(new Set([trackId]));
+          setDraggedTrackIds([trackId]);
+      } else {
+          setDraggedTrackIds(Array.from(selectedTrackIds));
+      }
+      
+      e.dataTransfer.effectAllowed = 'move';
+  };
+
+  const handleTrackDragOver = (e: React.DragEvent, _index: number) => {
+      e.preventDefault(); // Allow dropping
+      e.stopPropagation();
+      e.dataTransfer.dropEffect = 'move';
+  };
+
+  const handleTrackDrop = (e: React.DragEvent, targetIndex: number) => {
+      e.preventDefault();
+      e.stopPropagation();
+      if (isLocked || draggedTrackIds.length === 0) return;
+
+      // Handle Cross-Playlist Drop (Moving tracks from source tab to current tab)
+      if (dragSourcePlaylistId && dragSourcePlaylistId !== activePlaylistId) {
+          moveTracksToPlaylist(dragSourcePlaylistId, draggedTrackIds, activePlaylistId);
+          setDraggedTrackIds([]);
+          setSelectedTrackIds(new Set());
+          setDragSourcePlaylistId(null);
+          return;
+      }
+
+      // Handle Reorder within same playlist
+      const sourceIndices = draggedTrackIds
+          .map(id => tracks.findIndex(t => t.id === id))
+          .filter(idx => idx !== -1);
+
+      if (sourceIndices.length > 0) {
+          reorderTracks(activePlaylistId, sourceIndices, targetIndex);
+      }
+      setDraggedTrackIds([]);
+      setDragSourcePlaylistId(null);
+  };
+
+  // --- LIST CONTAINER DRAG & DROP (For Files & Empty Space) ---
+  const handleListDragEnter = (e: React.DragEvent) => {
+      e.preventDefault();
+      e.stopPropagation(); // Stop propagation to prevent MainScreen highlight
+      if (!isLocked) setIsListDragOver(true);
+  };
+
+  const handleListDragOver = (e: React.DragEvent) => {
+      e.preventDefault();
+      e.stopPropagation(); // Stop propagation to prevent MainScreen highlight
+      if (!isLocked && !isListDragOver) setIsListDragOver(true);
+  };
+
+  const handleListDragLeave = (e: React.DragEvent) => {
+      e.preventDefault();
+      e.stopPropagation();
+      // Only set to false if we are actually leaving the container, not entering a child
+      if (e.currentTarget.contains(e.relatedTarget as Node)) return;
+      setIsListDragOver(false);
+  };
+
+  const handleListDrop = (e: React.DragEvent) => {
+      e.preventDefault();
+      e.stopPropagation();
+      setIsListDragOver(false);
+
+      if (isLocked) return;
+
+      // 1. Check for Files
+      if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+          onFilesSelected(e.dataTransfer.files);
+          return;
+      }
+
+      // 2. Check for Track Drag (dropping in empty space or cross-playlist)
+      if (draggedTrackIds.length > 0) {
+          if (dragSourcePlaylistId && dragSourcePlaylistId !== activePlaylistId) {
+              // Move from other playlist to this one
+              moveTracksToPlaylist(dragSourcePlaylistId, draggedTrackIds, activePlaylistId);
+          } else {
+              // Same playlist, dragged to empty space -> move to end
+              // Use the reorder logic targeting the end
+              const sourceIndices = draggedTrackIds
+                  .map(id => tracks.findIndex(t => t.id === id))
+                  .filter(idx => idx !== -1);
+              if (sourceIndices.length > 0) {
+                  reorderTracks(activePlaylistId, sourceIndices, tracks.length);
+              }
+          }
+          setDraggedTrackIds([]);
+          setSelectedTrackIds(new Set());
+          setDragSourcePlaylistId(null);
+      }
+  };
+
+  return (
+    <div 
+        id="tutorial-player" 
+        className="relative w-full h-full flex flex-col bg-theme-bg border-l-4 border-theme-panel p-4 shadow-inner"
+        onDragOver={(e) => { e.preventDefault(); e.stopPropagation(); }} // Stop drag bubbling for the whole panel
+        onDrop={(e) => { e.preventDefault(); e.stopPropagation(); }} 
+    >
+      
+      {/* Animated Confirmation Modal for Clear */}
       {showClearConfirm && (
         <ConfirmModal 
           onConfirm={confirmClear} 
           onCancel={() => setShowClearConfirm(false)} 
+          translationKey="confirm_clear"
+        />
+      )}
+
+      {/* Animated Confirmation Modal for Tab Delete */}
+      {showTabDeleteConfirm && (
+        <ConfirmModal 
+          onConfirm={confirmDeleteTab} 
+          onCancel={() => { setShowTabDeleteConfirm(false); setTabToDelete(null); }} 
+          translationKey="confirm_delete_tab"
         />
       )}
 
@@ -192,8 +500,9 @@ const Controls: React.FC<ControlsProps> = ({
         <div className="flex items-center gap-2 ml-auto">
           <Tooltip content="LOAD FILES" position="bottom">
             <button
-                onClick={() => fileInputRef.current?.click()}
-                className="flex items-center gap-2 px-3 py-2 bg-theme-panel border border-theme-accent text-theme-accent rounded hover:bg-theme-accent hover:text-black transition-colors"
+                onClick={() => !isLocked && fileInputRef.current?.click()}
+                disabled={isLocked}
+                className={`flex items-center gap-2 px-3 py-2 bg-theme-panel border border-theme-accent text-theme-accent rounded transition-colors ${isLocked ? 'opacity-50 cursor-not-allowed' : 'hover:bg-theme-accent hover:text-black'}`}
             >
                 <FolderOpen size={18} />
                 <span className="font-mono text-sm hidden lg:inline">LOAD</span>
@@ -251,13 +560,13 @@ const Controls: React.FC<ControlsProps> = ({
         
         {isPlaying ? (
           <Tooltip content="PAUSE" position="top">
-            <NeonButton onClick={onPause} variant="primary" className="w-16 h-16">
+            <NeonButton id="tutorial-play-btn" onClick={onPause} variant="primary" className="w-16 h-16">
                 <Pause size={32} />
             </NeonButton>
           </Tooltip>
         ) : (
           <Tooltip content="PLAY" position="top">
-            <NeonButton onClick={onPlay} variant="primary" className="w-16 h-16">
+            <NeonButton id="tutorial-play-btn" onClick={onPlay} variant="primary" className="w-16 h-16">
                 <Play size={32} className="ml-1" />
             </NeonButton>
           </Tooltip>
@@ -309,20 +618,26 @@ const Controls: React.FC<ControlsProps> = ({
       <div className="flex items-center gap-1 mb-2 overflow-x-auto custom-scrollbar pb-2">
          {playlists.map((playlist) => {
              const isPlayingThis = playlist.id === playingPlaylistId && isPlaying;
+             const isDragTarget = dragOverTabId === playlist.id;
+             
              return (
              <div 
                 key={playlist.id}
-                draggable
-                onDragStart={(e) => handleDragStart(e, playlist.id)}
-                onDragOver={handleDragOver}
-                onDrop={(e) => handleDrop(e, playlist.id)}
+                draggable={!isLocked}
+                onDragStart={(e) => handleTabDragStart(e, playlist.id)}
+                onDragOver={(e) => handleTabDragOver(e, playlist.id)}
+                onDragLeave={handleTabDragLeave}
+                onDrop={(e) => handleTabDrop(e, playlist.id)}
                 onClick={() => onSwitchPlaylist(playlist.id)}
                 onDoubleClick={() => startRename(playlist.id, playlist.name)}
                 className={`
                     group flex items-center gap-2 px-3 py-1.5 rounded-t-md text-xs font-mono cursor-pointer transition-all border-t border-l border-r shrink-0
-                    ${playlist.id === activePlaylistId 
-                        ? 'bg-theme-panel border-theme-secondary text-theme-secondary font-bold shadow-[0_-2px_10px_rgba(0,0,0,0.2)]' 
-                        : 'bg-theme-bg border-theme-border text-theme-muted hover:bg-theme-panel hover:text-theme-text'}
+                    ${isDragTarget
+                        ? 'bg-theme-accent text-black font-bold scale-105 shadow-[0_0_15px_var(--color-accent)] z-10 border-theme-accent'
+                        : playlist.id === activePlaylistId 
+                            ? 'bg-theme-panel border-theme-secondary text-theme-secondary font-bold shadow-[0_-2px_10px_rgba(0,0,0,0.2)]' 
+                            : 'bg-theme-bg border-theme-border text-theme-muted hover:bg-theme-panel hover:text-theme-text'
+                    }
                 `}
              >
                 {/* Audio indicator if this playlist is making sound but not active */}
@@ -344,9 +659,9 @@ const Controls: React.FC<ControlsProps> = ({
                     <span>{playlist.name}</span>
                 )}
                 
-                {playlists.length > 1 && (
+                {playlists.length > 1 && !isLocked && (
                     <button 
-                        onClick={(e) => { e.stopPropagation(); onRemovePlaylist(playlist.id); }}
+                        onClick={(e) => { e.stopPropagation(); requestDeleteTab(playlist.id); }}
                         className="opacity-0 group-hover:opacity-100 text-theme-muted hover:text-red-500 transition-opacity p-0.5"
                     >
                         <X size={10} />
@@ -355,21 +670,59 @@ const Controls: React.FC<ControlsProps> = ({
              </div>
          )})}
          
-         <button 
-            onClick={onAddPlaylist}
-            className="px-2 py-1.5 rounded-t-md bg-theme-panel border border-theme-border text-theme-muted hover:text-theme-accent hover:border-theme-accent transition-colors"
-         >
-            <Plus size={14} />
-         </button>
+         {!isLocked && (
+            <button 
+                onClick={onAddPlaylist}
+                onDragOver={handlePlusDragOver}
+                onDragLeave={handlePlusDragLeave}
+                onDrop={handlePlusDrop}
+                className={`
+                    px-2 py-1.5 rounded-t-md border transition-all duration-200
+                    ${isPlusDragOver 
+                        ? 'bg-theme-accent border-theme-accent text-black scale-110 shadow-[0_0_15px_var(--color-accent)]' 
+                        : 'bg-theme-panel border-theme-border text-theme-muted hover:text-theme-accent hover:border-theme-accent'
+                    }
+                `}
+            >
+                <Plus size={14} className={isPlusDragOver ? "animate-pulse" : ""} />
+            </button>
+         )}
       </div>
 
       {/* Playlist Content */}
-      <div className="flex-1 overflow-hidden flex flex-col border-t border-theme-border bg-theme-bg/50">
+      <div 
+        className={`flex-1 overflow-hidden flex flex-col border-t border-theme-border bg-theme-bg/50 transition-all duration-300 relative
+            ${isListDragOver ? 'border-2 border-theme-primary shadow-[inset_0_0_20px_var(--color-primary)]' : ''}
+        `}
+        onDragEnter={handleListDragEnter}
+        onDragOver={handleListDragOver}
+        onDragLeave={handleListDragLeave}
+        onDrop={handleListDrop}
+      >
+        
+        {/* TV Style Drop Overlay */}
+        {isListDragOver && !isLocked && (
+            <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm border-4 border-dashed border-theme-primary rounded-lg m-2 pointer-events-none animate-pulse">
+                <div className="flex flex-col items-center gap-4 text-theme-primary font-mono drop-shadow-[0_0_10px_var(--color-primary)]">
+                  <Upload size={48} />
+                  <span className="text-xl font-bold tracking-widest">DROP FILES HERE</span>
+                </div>
+            </div>
+        )}
+
         <div className="flex items-center justify-between p-2 border-b border-theme-border">
             <div className="flex items-center gap-2">
                 <h3 className="text-theme-text font-mono opacity-80 text-xs">TRACKS [{tracks.length}]</h3>
+                <Tooltip content={isLocked ? "UNLOCK PLAYLIST" : "LOCK PLAYLIST"} position="top">
+                    <button 
+                        onClick={() => setIsLocked(!isLocked)}
+                        className={`p-1 rounded transition-colors ${isLocked ? 'text-red-500 hover:text-red-400' : 'text-theme-muted hover:text-theme-primary'}`}
+                    >
+                        {isLocked ? <Lock size={12} /> : <Unlock size={12} />}
+                    </button>
+                </Tooltip>
             </div>
-            {tracks.length > 0 && (
+            {tracks.length > 0 && !isLocked && (
                 <div className="flex items-center gap-3">
                     <Tooltip content={<TranslatedText k="sort_az" />} position="top">
                         <button 
@@ -399,36 +752,59 @@ const Controls: React.FC<ControlsProps> = ({
                 </div>
             )}
         </div>
+        
+        {/* Track List */}
         <div className="flex-1 overflow-y-auto pr-2 space-y-1 p-1">
           {tracks.map((track, index) => {
-            const isCurrentTrack = index === currentTrackIndex && activePlaylistId === playingPlaylistId;
+            const isPlayingTrack = index === currentTrackIndex && activePlaylistId === playingPlaylistId;
+            const isSelected = selectedTrackIds.has(track.id);
+            
             return (
             <div
               key={track.id}
-              onClick={() => onTrackSelect(index)}
+              draggable={!isLocked}
+              onDragStart={(e) => handleTrackDragStart(e, index, track.id)}
+              onDragOver={(e) => handleTrackDragOver(e, index)}
+              onDrop={(e) => handleTrackDrop(e, index)}
+              onClick={(e) => handleTrackClick(e, index, track.id)}
+              onDoubleClick={() => handleTrackDoubleClick(index)}
               className={`
-                group flex items-center gap-3 p-2 rounded cursor-pointer transition-all border border-transparent
-                ${isCurrentTrack 
+                group flex items-center gap-3 p-2 rounded cursor-pointer transition-all border
+                ${isPlayingTrack 
                   ? 'bg-theme-panel border-theme-secondary shadow-[inset_0_0_5px_var(--color-secondary)]' 
-                  : 'hover:bg-theme-panel hover:border-theme-border'}
+                  : isSelected 
+                    ? 'bg-theme-primary/20 border-theme-primary' 
+                    : 'border-transparent hover:bg-theme-panel hover:border-theme-border'}
               `}
             >
               <div className={`
-                ${isCurrentTrack ? 'text-theme-secondary animate-pulse' : 'text-theme-muted group-hover:text-theme-primary'}
+                ${isPlayingTrack ? 'text-theme-secondary animate-pulse' : 'text-theme-muted group-hover:text-theme-primary'}
               `}>
                 <Music size={16} />
               </div>
               <span className={`
-                text-sm font-mono truncate w-full
-                ${isCurrentTrack ? 'text-theme-secondary' : 'text-theme-muted group-hover:text-theme-text'}
+                text-sm font-mono truncate w-full select-none
+                ${isPlayingTrack ? 'text-theme-secondary' : isSelected ? 'text-theme-primary font-bold' : 'text-theme-muted group-hover:text-theme-text'}
               `}>
                 {track.name}
               </span>
+              
+              {!isLocked && (
+                  <button 
+                    onClick={(e) => handleDeleteTrack(e, track.id)}
+                    className="opacity-0 group-hover:opacity-100 text-theme-muted hover:text-red-500 transition-opacity p-1"
+                    title="Delete Track"
+                  >
+                      <Trash2 size={14} />
+                  </button>
+              )}
             </div>
           )})}
-          {tracks.length === 0 && (
-            <div className="text-center py-10 text-theme-muted font-mono text-sm italic">
-              Drop files here...
+          
+          {/* Empty State / Drop Message (Visual fallback if overlay fails) */}
+          {tracks.length === 0 && !isListDragOver && (
+            <div className={`text-center py-10 font-mono text-sm italic transition-colors text-theme-muted`}>
+              {isLocked ? "List Locked" : "Drop files here..."}
             </div>
           )}
         </div>

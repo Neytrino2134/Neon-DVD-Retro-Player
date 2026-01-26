@@ -115,6 +115,21 @@ export const saveTrack = async (track: { id: string; playlistId: string; name: s
   });
 };
 
+export const saveTracksBulk = async (tracks: { id: string; playlistId: string; name: string; file: File }[]) => {
+    const db = await initDB();
+    return new Promise<void>((resolve, reject) => {
+      const transaction = db.transaction(STORES.TRACKS, 'readwrite');
+      const store = transaction.objectStore(STORES.TRACKS);
+      
+      tracks.forEach(track => {
+          store.put(track);
+      });
+  
+      transaction.oncomplete = () => resolve();
+      transaction.onerror = () => reject(transaction.error);
+    });
+};
+
 export const getAllTracks = async (): Promise<{ id: string; playlistId: string; name: string; file: File }[]> => {
   const db = await initDB();
   return new Promise((resolve, reject) => {
@@ -153,6 +168,21 @@ export const clearTracksInPlaylist = async (playlistId: string) => {
                 cursor.continue();
             }
         };
+        transaction.oncomplete = () => resolve();
+        transaction.onerror = () => reject(transaction.error);
+    });
+};
+
+export const deleteTracksBulk = async (trackIds: string[]) => {
+    const db = await initDB();
+    return new Promise<void>((resolve, reject) => {
+        const transaction = db.transaction(STORES.TRACKS, 'readwrite');
+        const store = transaction.objectStore(STORES.TRACKS);
+        
+        trackIds.forEach(id => {
+            store.delete(id);
+        });
+
         transaction.oncomplete = () => resolve();
         transaction.onerror = () => reject(transaction.error);
     });

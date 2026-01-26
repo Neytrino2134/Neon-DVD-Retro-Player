@@ -64,6 +64,7 @@ const VisualizerSettings: React.FC<VisualizerSettingsProps> = ({ config, update 
          <div className="grid grid-cols-3 gap-2">
             {(['top', 'center', 'bottom'] as VisualizerPosition[]).map((pos) => (
               <button 
+                id={`tutorial-vis-pos-${pos}`}
                 key={pos} 
                 onClick={() => update('position', pos)} 
                 className={`px-2 py-2 text-xs font-mono border ${wrapperRadius} capitalize transition-all ${

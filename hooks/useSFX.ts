@@ -1,5 +1,4 @@
 
-
 import { useState, useEffect, useCallback, useRef } from 'react';
 import JSZip from 'jszip';
 import { saveSFX, getAllSFX } from '../lib/db';
@@ -19,24 +18,58 @@ export const useSFX = () => {
   const activeAudioRef = useRef<HTMLAudioElement[]>([]);
   const { addNotification } = useNotification();
 
-  // Load SFX from DB on mount
+  // Load SFX from DB or Public Folder on mount
   useEffect(() => {
-    const loadFromDB = async () => {
+    const loadResources = async () => {
       try {
+        // 1. Load user-uploaded SFX from IndexedDB
         const storedSFX = await getAllSFX();
-        const newMap: Record<string, string> = {};
+        const loadedMap: Record<string, string> = {};
         
         storedSFX.forEach(item => {
-          newMap[item.id] = URL.createObjectURL(item.blob);
+          loadedMap[item.id] = URL.createObjectURL(item.blob);
         });
 
-        setSfxMap(newMap);
+        // 2. Load Default SFX from public/sfx folder if missing in DB
+        // We iterate through REQUIRED_SFX_FILES and try to fetch them
+        const promises = REQUIRED_SFX_FILES.map(async (baseName) => {
+            // Check if we already have this file (checking common extensions) from DB
+            const hasMp3 = loadedMap[`${baseName}.mp3`];
+            const hasWav = loadedMap[`${baseName}.wav`];
+            const hasRaw = loadedMap[baseName]; // Legacy check
+
+            if (hasMp3 || hasWav || hasRaw) return;
+
+            // Try to fetch mp3 default from public/sfx/
+            try {
+                // Using relative path ./sfx/ works with Vite's public folder serving in both Dev and Electron
+                const response = await fetch(`./sfx/${baseName}.mp3`);
+                if (response.ok) {
+                    const blob = await response.blob();
+                    // Store WITH EXTENSION to allow direct overwrites by Zip uploads
+                    loadedMap[`${baseName}.mp3`] = URL.createObjectURL(blob);
+                } else {
+                    // Try wav if mp3 missing
+                     const respWav = await fetch(`./sfx/${baseName}.wav`);
+                     if (respWav.ok) {
+                        const blob = await respWav.blob();
+                        loadedMap[`${baseName}.wav`] = URL.createObjectURL(blob);
+                     }
+                }
+            } catch (err) {
+                console.warn(`Could not load default SFX: ${baseName}`, err);
+            }
+        });
+
+        await Promise.all(promises);
+
+        setSfxMap(loadedMap);
         setIsLoaded(true);
       } catch (e) {
-        console.error("Failed to load SFX from DB", e);
+        console.error("Failed to load SFX resources", e);
       }
     };
-    loadFromDB();
+    loadResources();
   }, []);
 
   // Handle ZIP upload
@@ -66,7 +99,7 @@ export const useSFX = () => {
                // Save to DB
                await saveSFX({ id: fileName, blob });
                
-               // Update local state
+               // Update local state - This overwrites any existing key with the same name
                newMap[fileName] = URL.createObjectURL(blob);
                count++;
            });
@@ -100,11 +133,11 @@ export const useSFX = () => {
 
   // Play SFX with fuzzy matching for extensions
   const playSFX = useCallback((filenameWithExtension: string) => {
-    // 1. Try exact match
+    // 1. Try exact match (Priority 1)
     let url = sfxMap[filenameWithExtension];
 
     // 2. Fallback: Try matching base name if exact match fails
-    // (e.g. system asks for 'Start.wav' but user uploaded 'Start.mp3')
+    // (e.g. system asks for 'Start.mp3' but we might have 'Start.wav' or just 'Start')
     if (!url) {
         const baseName = filenameWithExtension.substring(0, filenameWithExtension.lastIndexOf('.'));
         const foundKey = Object.keys(sfxMap).find(k => k.startsWith(baseName));

@@ -6,6 +6,7 @@ interface Option {
   value: number | string;
   label: string; 
   color?: string; // Optional color for the icon
+  shape?: 'square' | 'rounded' | 'circle'; // Optional shape for the icon
 }
 
 interface CustomSelectProps {
@@ -34,6 +35,33 @@ const CustomSelect: React.FC<CustomSelectProps> = ({ label, value, options, onCh
 
   const selectedOption = options.find(opt => opt.value === value) || options[0];
 
+  const renderIcon = (option: Option, isSelectedInList: boolean = false) => {
+      if (option.shape) {
+          let radius = 'rounded-none';
+          if (option.shape === 'rounded') radius = 'rounded-[3px]';
+          if (option.shape === 'circle') radius = 'rounded-full';
+          
+          return (
+              <div 
+                  className={`w-3 h-3 border-[1.5px] ${radius} shrink-0 transition-colors`}
+                  style={{ 
+                      borderColor: 'currentColor', 
+                      backgroundColor: isSelectedInList ? 'currentColor' : 'transparent' 
+                  }}
+              />
+          );
+      }
+      if (option.color) {
+          return (
+              <div 
+                className={`w-2 h-2 rounded-full shrink-0 ${isSelectedInList ? 'shadow-none ring-1 ring-black' : 'shadow-[0_0_5px_currentColor]'}`} 
+                style={{ backgroundColor: option.color, color: option.color }}
+              ></div>
+          );
+      }
+      return null;
+  };
+
   return (
     <div className="mb-6 last:mb-2" ref={containerRef}>
       <div className="flex justify-between font-mono text-[10px] mb-2 px-0.5 tracking-tighter">
@@ -50,12 +78,7 @@ const CustomSelect: React.FC<CustomSelectProps> = ({ label, value, options, onCh
           `}
         >
           <div className="flex items-center gap-2 truncate">
-            {selectedOption?.color && (
-              <div 
-                className="w-2 h-2 rounded-full shrink-0 shadow-[0_0_5px_currentColor]" 
-                style={{ backgroundColor: selectedOption.color, color: selectedOption.color }}
-              ></div>
-            )}
+            {renderIcon(selectedOption)}
             <span className="truncate">{selectedOption?.label}</span>
           </div>
           <div className={`transition-transform duration-200 ${isOpen ? 'rotate-180 text-theme-secondary' : 'text-gray-500'}`}>
@@ -79,12 +102,7 @@ const CustomSelect: React.FC<CustomSelectProps> = ({ label, value, options, onCh
                     : 'text-theme-muted hover:bg-gray-900 hover:text-theme-primary'}
                 `}
               >
-                {option.color && (
-                  <div 
-                    className={`w-2 h-2 rounded-full shrink-0 ${option.value === value ? 'shadow-none ring-1 ring-black' : 'shadow-[0_0_5px_currentColor]'}`} 
-                    style={{ backgroundColor: option.color, color: option.color }}
-                  ></div>
-                )}
+                {renderIcon(option, option.value === value)}
                 {option.label}
               </div>
             ))}

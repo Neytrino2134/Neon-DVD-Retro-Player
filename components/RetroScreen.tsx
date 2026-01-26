@@ -1,6 +1,6 @@
 
 import React, { useRef, useEffect, forwardRef, useMemo, useState } from 'react';
-import { Upload, Minimize, Maximize, Monitor, Power } from 'lucide-react';
+import { Upload, Minimize, Maximize, Monitor, Power, List, Music } from 'lucide-react';
 import { AudioTrack, VisualizerConfig, EffectsConfig, DvdConfig, MarqueeConfig, PatternConfig, WatermarkConfig, BgTransitionType } from '../types';
 import DvdLogo from './DvdLogo';
 import Visualizer from './Visualizer';
@@ -23,7 +23,6 @@ import { useLanguage } from '../contexts/LanguageContext';
 import { useNotification } from '../contexts/NotificationContext';
 import { Tooltip } from './ui/Tooltip';
 import { useGestures } from '../hooks/useGestures';
-import { useAppConfig } from '../hooks/useAppConfig';
 
 const formatTime = (seconds: number) => {
   if (!seconds || isNaN(seconds) || seconds < 0) return "00:00";
@@ -37,6 +36,8 @@ interface RetroScreenProps {
   analyser: AnalyserNode | null;
   isPlaying: boolean;
   currentTrack: AudioTrack | undefined;
+  tracks: AudioTrack[];
+  onTrackSelect: (index: number) => void;
   bgMedia: { type: 'image' | 'video', url: string } | null;
   bgColor: string;
   bgPattern?: string;
@@ -80,7 +81,7 @@ interface RetroScreenProps {
 }
 
 const RetroScreen = forwardRef<HTMLDivElement, RetroScreenProps>(({
-  analyser, isPlaying, currentTrack, bgMedia, bgColor, bgPattern = 'none', bgPatternConfig,
+  analyser, isPlaying, currentTrack, tracks, onTrackSelect, bgMedia, bgColor, bgPattern = 'none', bgPatternConfig,
   visualizerConfig, showVisualizer, dvdConfig, showDvd, effectsConfig, marqueeConfig, watermarkConfig,
   progress = 0, currentTime, duration,
   focusMode, setFocusMode, isDragging,
@@ -93,6 +94,7 @@ const RetroScreen = forwardRef<HTMLDivElement, RetroScreenProps>(({
   const { notifications } = useNotification();
   
   const [bgTransition, setBgTransition] = useState<BgTransitionType>('glitch');
+  const [showPlaylist, setShowPlaylist] = useState(false);
 
   useEffect(() => {
       // Sync with storage on mount/update
@@ -309,7 +311,17 @@ const RetroScreen = forwardRef<HTMLDivElement, RetroScreenProps>(({
                 </div>
               )}
 
-              <div className="opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+              <div className="opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-center gap-2">
+                <Tooltip content="PLAYLIST VIEW" position="left">
+                  <button 
+                    onClick={() => setShowPlaylist(!showPlaylist)} 
+                    style={{ color: marqueeColor }}
+                    className="p-2 bg-transparent rounded-full transition-all border border-transparent hover:shadow-[0_0_15px_currentColor] active:scale-95"
+                  >
+                      <List size={20} />
+                  </button>
+                </Tooltip>
+
                 <Tooltip content={focusMode ? "EXIT FULL SCREEN" : "FULL SCREEN"} position="left">
                   <button 
                     onClick={() => setFocusMode(!focusMode)} 
@@ -364,6 +376,48 @@ const RetroScreen = forwardRef<HTMLDivElement, RetroScreenProps>(({
                         className="font-mono font-bold"
                      />
                    </div>
+                )}
+
+                {/* PLAYLIST OVERLAY (Big Screen Mode) */}
+                {showPlaylist && (
+                  <div className="absolute inset-0 z-[25] bg-black/90 backdrop-blur-md flex flex-col p-8 md:p-12 overflow-hidden animate-slide-in-right">
+                     {/* Header */}
+                     <div className="flex items-center justify-between border-b-2 border-theme-primary/50 pb-4 mb-4 shrink-0" style={{ borderColor: `${marqueeColor}80` }}>
+                        <h2 className="text-2xl font-mono font-bold tracking-widest flex items-center gap-3" style={{ color: marqueeColor }}>
+                           <Music className="animate-pulse" /> TRACK REPOSITORY
+                        </h2>
+                        <span className="font-mono text-theme-muted text-sm">{tracks.length} FILES FOUND</span>
+                     </div>
+                     
+                     {/* List */}
+                     <div className="flex-1 overflow-y-auto custom-scrollbar pr-2 space-y-2">
+                        {tracks.map((track, i) => (
+                           <div 
+                             key={track.id}
+                             onClick={() => { onTrackSelect(i); setShowPlaylist(false); }}
+                             className={`p-4 border-l-4 font-mono text-lg cursor-pointer transition-all flex items-center gap-4 group rounded-r
+                               ${currentTrack?.id === track.id 
+                                 ? 'bg-theme-secondary/20 shadow-[0_0_20px_var(--color-secondary)]' 
+                                 : 'border-transparent text-theme-muted hover:bg-white/5 hover:text-theme-primary hover:border-theme-primary'}
+                             `}
+                             style={currentTrack?.id === track.id ? { 
+                                borderColor: marqueeColor, 
+                                color: marqueeColor,
+                                textShadow: `0 0 10px ${marqueeColor}`
+                             } : {}}
+                           >
+                              <span className="text-xs opacity-50 w-8">{String(i + 1).padStart(2, '0')}</span>
+                              <span className="truncate flex-1">{track.name}</span>
+                              {currentTrack?.id === track.id && (
+                                  <div className="text-[10px] uppercase tracking-widest animate-pulse font-bold px-2 py-1 border border-current rounded">PLAYING</div>
+                              )}
+                           </div>
+                        ))}
+                        {tracks.length === 0 && (
+                            <div className="text-center opacity-50 py-10 text-xl font-mono">NO TRACKS LOADED</div>
+                        )}
+                     </div>
+                  </div>
                 )}
 
                 <GlitchEffect effects={effectsConfig} />

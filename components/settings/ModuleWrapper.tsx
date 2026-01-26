@@ -16,6 +16,7 @@ interface ModuleWrapperProps {
 }
 
 const ModuleWrapper: React.FC<ModuleWrapperProps> = ({
+  id, // Destructure ID
   label,
   icon: Icon,
   isEnabled,
@@ -59,7 +60,7 @@ const ModuleWrapper: React.FC<ModuleWrapperProps> = ({
   const wrapperRadius = controlStyle === 'round' ? 'rounded-lg' : 'rounded';
 
   return (
-    <div className={`relative ${wrapperRadius} border transition-all duration-300 flex flex-col ${activeStyle} ${isExpanded ? 'z-[50]' : 'z-0'}`}>
+    <div id={`tutorial-${id}`} className={`relative ${wrapperRadius} border transition-all duration-300 flex flex-col ${activeStyle} ${isExpanded ? 'z-[50]' : 'z-0'}`}>
       <div className="flex items-center justify-between p-3 min-h-[50px]">
         <div 
           className="flex items-center gap-3 cursor-pointer select-none flex-1"

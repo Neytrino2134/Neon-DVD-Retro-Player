@@ -112,6 +112,7 @@ const ConfigManager: React.FC<ConfigManagerProps> = ({ presets, onSave, onLoad, 
         />
         <Tooltip content={t('save_preset')} position="top">
             <button
+            id="tutorial-save-preset-btn"
             onClick={handleSave}
             disabled={!newName.trim()}
             className="flex items-center gap-1 px-3 py-1 bg-theme-primary/10 border border-theme-primary text-theme-primary rounded text-[10px] font-bold tracking-wider hover:bg-theme-primary hover:text-black disabled:opacity-50 disabled:hover:bg-transparent disabled:hover:text-theme-primary transition-all"
@@ -215,3 +216,4 @@ const ConfigManager: React.FC<ConfigManagerProps> = ({ presets, onSave, onLoad, 
 };
 
 export default ConfigManager;
+    

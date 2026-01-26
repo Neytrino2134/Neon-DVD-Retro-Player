@@ -1,4 +1,3 @@
-
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { LanguageProvider } from './contexts/LanguageContext';
 import { NotificationProvider, useNotification } from './contexts/NotificationContext';
@@ -10,6 +9,8 @@ import CustomCursor from './components/CustomCursor';
 import ContextMenu from './components/ContextMenu';
 import StartupOverlay from './components/StartupOverlay';
 import ShutdownOverlay from './components/ShutdownOverlay';
+import TitleBar from './components/TitleBar'; 
+import TutorialOverlay from './components/TutorialOverlay'; // Import Tutorial
 import { useAudioPlayer } from './hooks/useAudioPlayer';
 import { useAppConfig } from './hooks/useAppConfig';
 import { useSFX } from './hooks/useSFX';
@@ -17,6 +18,7 @@ import { useSFX } from './hooks/useSFX';
 function AppContent() {
   const [focusMode, setFocusMode] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
+  const [isFullscreen, setIsFullscreen] = useState(false); 
   const appContainerRef = useRef<HTMLDivElement>(null);
   const { addNotification } = useNotification();
   const { currentTheme, setTheme, controlStyle, setControlStyle } = useTheme();
@@ -32,6 +34,9 @@ function AppContent() {
   
   // Key to force remount of StartupOverlay
   const [startupKey, setStartupKey] = useState(0);
+
+  // Tutorial State
+  const [showTutorial, setShowTutorial] = useState(false);
 
   // Custom Hooks
   const player = useAudioPlayer();
@@ -58,13 +63,18 @@ function AppContent() {
   };
 
   // Called when StartupOverlay BEGINS to fade out.
-  // We turn on the main screen immediately so it's visible BEHIND the fading overlay.
   const handleOverlayFadeOut = () => {
       setIntroState(2);
   };
 
   // Called when StartupOverlay is completely gone.
   const handleBootComplete = () => {
+      // Check for first time tutorial
+      const tutorialDone = localStorage.getItem('neon_tutorial_complete');
+      if (!tutorialDone) {
+          setTimeout(() => setShowTutorial(true), 500);
+      }
+
       // Only show notification on the very first boot of the session
       if (!hasBootedRef.current) {
           hasBootedRef.current = true;
@@ -74,6 +84,12 @@ function AppContent() {
       }
   };
 
+  const handleTutorialComplete = () => {
+      setShowTutorial(false);
+      localStorage.setItem('neon_tutorial_complete', 'true');
+      addNotification("TUTORIAL COMPLETE", "success");
+  };
+
   const handleGoHome = () => {
       player.stop();
       setIntroState(0);
@@ -81,10 +97,18 @@ function AppContent() {
       setFocusMode(false);
   };
   
-  // FIX: Memoize handler to prevent re-renders of ShutdownOverlay
   const handlePlayRebootSfx = useCallback(() => {
       playSFX('Binary_Code_Sound_Effects_Reboot.mp3');
   }, [playSFX]);
+
+  // Monitor Fullscreen changes to hide TitleBar
+  useEffect(() => {
+      const handleFullscreenChange = () => {
+          setIsFullscreen(!!document.fullscreenElement);
+      };
+      document.addEventListener('fullscreenchange', handleFullscreenChange);
+      return () => document.removeEventListener('fullscreenchange', handleFullscreenChange);
+  }, []);
 
   // Keyboard Shortcuts
   useEffect(() => {
@@ -127,20 +151,43 @@ function AppContent() {
   const onDragOver = (e: React.DragEvent) => {
     e.preventDefault();
     e.stopPropagation();
+    
+    // Only highlight if files are dragged, not internal elements like tracks
+    if (!e.dataTransfer.types.includes('Files')) return;
+
+    // Check if dragging over the controls area - if so, don't show main screen highlight
+    const target = e.target as HTMLElement;
+    if (target.closest('#tutorial-player')) {
+        if (isDragging) setIsDragging(false);
+        return;
+    }
+
     if (!isDragging) setIsDragging(true);
   };
 
   const onDragEnter = (e: React.DragEvent) => {
     e.preventDefault();
     e.stopPropagation();
+    // Only highlight if files are dragged
+    if (!e.dataTransfer.types.includes('Files')) return;
     setIsDragging(true);
   };
 
   const onDragLeave = (e: React.DragEvent) => {
     e.preventDefault();
     e.stopPropagation();
-    if (appContainerRef.current && !appContainerRef.current.contains(e.relatedTarget as Node)) {
-       setIsDragging(false);
+    
+    // Logic to detect leaving the window OR entering the controls area
+    // e.relatedTarget is the element entered
+    if (appContainerRef.current) {
+        const related = e.relatedTarget as Node;
+        const isOutsideApp = !appContainerRef.current.contains(related);
+        // If we are still inside app, but entered the controls panel, turn off main highlight
+        const isInsideControls = related && (related as Element).closest('#tutorial-player');
+
+        if (isOutsideApp || isInsideControls) {
+            setIsDragging(false);
+        }
     }
   };
 
@@ -211,199 +258,229 @@ function AppContent() {
   return (
     <div 
       ref={appContainerRef}
-      className="flex flex-col md:flex-row h-screen w-full bg-theme-bg text-theme-text overflow-hidden relative"
+      className="flex flex-col h-screen w-full bg-theme-bg text-theme-text overflow-hidden relative"
       onDragOver={onDragOver}
       onDragEnter={onDragEnter}
       onDragLeave={onDragLeave}
       onDrop={onDrop}
     >
-      <CustomCursor style={config.cursorStyle} />
-      
-      <StartupOverlay 
-        key={startupKey}
-        onFadeOut={handleOverlayFadeOut}
-        onComplete={handleBootComplete} 
-        onPlaySfx={playSFX} 
-        onStopSfx={stopAllSFX}
-        apiKey={config.apiKey}
-        setApiKey={config.setApiKey}
-      />
-      <ShutdownOverlay 
-        active={rebootPhase === 'active'} 
-        onPlayRebootSfx={handlePlayRebootSfx}
-        onCancel={() => {
-            setRebootPhase('idle');
-            stopAllSFX();
-            addNotification("Reboot Cancelled", "info");
-        }} 
-      />
-      
-      {/* DUAL DECK AUDIO SYSTEM */}
-      <audio 
-        ref={player.audioRefA} 
-        onEnded={player.activeDeck === 'A' ? handleTrackEnded : undefined} 
-        onTimeUpdate={player.activeDeck === 'A' ? handleTimeUpdate : undefined}
-        onLoadedMetadata={player.activeDeck === 'A' ? handleTimeUpdate : undefined}
-        onPlay={player.onAudioPlay}
-        onPause={player.onAudioPause}
-        crossOrigin="anonymous" 
-      />
-      <audio 
-        ref={player.audioRefB} 
-        onEnded={player.activeDeck === 'B' ? handleTrackEnded : undefined} 
-        onTimeUpdate={player.activeDeck === 'B' ? handleTimeUpdate : undefined}
-        onLoadedMetadata={player.activeDeck === 'B' ? handleTimeUpdate : undefined}
-        onPlay={player.onAudioPlay}
-        onPause={player.onAudioPause}
-        crossOrigin="anonymous" 
-      />
-      
-      {/* Settings Panel - Left Side */}
-      <div 
-        className={`shrink-0 z-20 transition-all duration-700 ease-out
-          ${(focusMode || introState < 1) ? '-translate-x-full opacity-0' : 'translate-x-0 opacity-100'}
-          ${focusMode ? 'w-0 overflow-hidden' : 'w-full md:w-[460px]'}
-        `}
-      >
-        <div className="w-full h-full md:w-[460px]">
-           <SettingsPanel 
-             showVisualizer={config.showVisualizer} setShowVisualizer={config.setShowVisualizer}
-             showDvd={config.showDvd} setShowDvd={config.setShowDvd}
-             marqueeConfig={config.marqueeConfig} setMarqueeConfig={config.setMarqueeConfig}
-             visualizerConfig={config.visualizerConfig} setVisualizerConfig={config.setVisualizerConfig}
-             dvdConfig={config.dvdConfig} setDvdConfig={config.setDvdConfig}
-             effectsConfig={config.effectsConfig} setEffectsConfig={config.setEffectsConfig}
-             watermarkConfig={config.watermarkConfig} setWatermarkConfig={config.setWatermarkConfig}
-             bgColor={config.bgColor} setBgColor={config.setBgColor}
-             bgPattern={config.bgPattern} setBgPattern={config.setBgPattern}
-             bgPatternConfig={config.bgPatternConfig} setBgPatternConfig={config.setBgPatternConfig}
-             onBgMediaUpload={(f) => { config.handleBgUpload(f); addNotification(`${f.length} backgrounds added`, "success"); }} 
-             bgMedia={config.bgMedia} 
-             bgList={config.bgList}
-             currentBgIndex={config.currentBgIndex}
-             onRemoveBg={config.removeBg}
-             onMoveBg={config.moveBg}
-             onSelectBg={config.selectBg}
-             onDeselectBg={config.deselectBg}
-             onClearBgMedia={config.handleClearBg}
-             onExportConfig={() => config.exportConfig(currentTheme, controlStyle)}
-             bgAutoplayInterval={config.bgAutoplayInterval}
-             setBgAutoplayInterval={config.setBgAutoplayInterval}
-             onScheduleReload={handleScheduleReload}
-             onGoHome={handleGoHome}
-             onAudioUpload={handleFilesSelected}
-             crossfadeDuration={player.crossfadeDuration}
-             setCrossfadeDuration={player.setCrossfadeDuration}
-             savedPresets={config.savedPresets}
-             savePreset={(n) => { config.savePreset(n, currentTheme, controlStyle); addNotification(`Preset "${n}" saved`, "success"); }}
-             loadPreset={(id) => { 
-                 const loaded = config.loadPreset(id); 
-                 if (loaded) {
-                     if (loaded.theme) setTheme(loaded.theme);
-                     if (loaded.controlStyle) setControlStyle(loaded.controlStyle);
-                     addNotification("Preset loaded", "success"); 
-                 }
-             }}
-             deletePreset={config.deletePreset}
-             renamePreset={config.renamePreset}
-             onSfxUpload={handleZipUpload}
-             sfxMap={sfxMap}
-             cursorStyle={config.cursorStyle}
-             setCursorStyle={config.setCursorStyle}
-             apiKey={config.apiKey}
-             setApiKey={config.setApiKey}
-             bgTransition={config.bgTransition}
-             setBgTransition={config.setBgTransition}
-           />
-        </div>
-      </div>
+      {/* Custom Title Bar for Electron - Hidden in Fullscreen */}
+      {!isFullscreen && <TitleBar />}
 
-      {/* Main Screen - Center */}
-      <div className={`flex-grow flex flex-col relative transition-all duration-1000 ease-out overflow-hidden
-        ${introState >= 2 ? 'scale-100 opacity-100' : 'scale-75 opacity-0'}
-      `}>
-          <RetroScreen 
-            analyser={player.analyser}
-            isPlaying={player.isPlaying}
-            currentTrack={player.currentTrack} // Use the playing track, not list[index]
-            bgMedia={config.bgMedia}
-            bgColor={config.bgColor}
-            bgPattern={config.bgPattern}
-            bgPatternConfig={config.bgPatternConfig}
-            visualizerConfig={config.visualizerConfig}
-            showVisualizer={config.showVisualizer}
-            dvdConfig={config.dvdConfig}
-            showDvd={config.showDvd}
-            effectsConfig={config.effectsConfig}
-            marqueeConfig={config.marqueeConfig}
-            watermarkConfig={config.watermarkConfig}
-            progress={playbackPercentage}
-            focusMode={focusMode}
-            setFocusMode={(v) => { setFocusMode(v); addNotification(v ? "Cinema Mode Active" : "UI Restored", "info"); }}
-            isDragging={isDragging}
-            onDragOver={onDragOver}
-            onDragEnter={onDragEnter}
-            onDragLeave={onDragLeave}
-            onDrop={onDrop}
-            onScheduleReload={handleScheduleReload}
-            rebootPhase={rebootPhase}
-            currentTime={player.currentTime}
-            duration={player.duration}
-            onPlaySfx={playSFX}
-            volume={player.volume}
-            apiKey={config.apiKey}
-          />
-      </div>
-      
-      {/* Controls Panel - Right Side */}
-      <div 
-        className={`shrink-0 z-20 transition-all duration-700 ease-out
-           ${(introState < 1) ? 'translate-x-full opacity-0' : 'translate-x-0 opacity-100'}
-           ${focusMode ? 'w-0 overflow-hidden' : 'w-full md:w-72 lg:w-80'}
-        `}
-      >
-        <div className="w-full h-full md:w-72 lg:w-80">
-            <Controls 
-              tracks={player.tracks} 
-              playlists={player.playlists}
-              activePlaylistId={player.activePlaylistId}
-              playingPlaylistId={player.playingPlaylistId}
-              currentTrackIndex={player.currentTrackIndex} 
+      {/* Main Content Area */}
+      <div className="flex-1 flex flex-col md:flex-row overflow-hidden relative">
+        <CustomCursor style={config.cursorStyle} />
+        
+        <StartupOverlay 
+          key={startupKey}
+          onFadeOut={handleOverlayFadeOut}
+          onComplete={handleBootComplete} 
+          onPlaySfx={playSFX} 
+          onStopSfx={stopAllSFX}
+          apiKey={config.apiKey}
+          setApiKey={config.setApiKey}
+        />
+        <ShutdownOverlay 
+          active={rebootPhase === 'active'} 
+          onPlayRebootSfx={handlePlayRebootSfx}
+          onCancel={() => {
+              setRebootPhase('idle');
+              stopAllSFX();
+              addNotification("Reboot Cancelled", "info");
+          }} 
+        />
+        
+        {/* TUTORIAL OVERLAY */}
+        {showTutorial && (
+            <TutorialOverlay 
+                onComplete={handleTutorialComplete}
+                trackCount={player.tracks.length}
+                isPlaying={player.isPlaying}
+                visualizerConfig={config.visualizerConfig}
+                setVisualizerConfig={config.setVisualizerConfig}
+                setShowVisualizer={config.setShowVisualizer}
+                isSettingsOpen={!focusMode}
+                presetsCount={config.savedPresets.length}
+            />
+        )}
+        
+        {/* DUAL DECK AUDIO SYSTEM */}
+        <audio 
+          ref={player.audioRefA} 
+          onEnded={player.activeDeck === 'A' ? handleTrackEnded : undefined} 
+          onTimeUpdate={player.activeDeck === 'A' ? handleTimeUpdate : undefined}
+          onLoadedMetadata={player.activeDeck === 'A' ? handleTimeUpdate : undefined}
+          onPlay={player.onAudioPlay}
+          onPause={player.onAudioPause}
+          crossOrigin="anonymous" 
+        />
+        <audio 
+          ref={player.audioRefB} 
+          onEnded={player.activeDeck === 'B' ? handleTrackEnded : undefined} 
+          onTimeUpdate={player.activeDeck === 'B' ? handleTimeUpdate : undefined}
+          onLoadedMetadata={player.activeDeck === 'B' ? handleTimeUpdate : undefined}
+          onPlay={player.onAudioPlay}
+          onPause={player.onAudioPause}
+          crossOrigin="anonymous" 
+        />
+        
+        {/* Settings Panel - Left Side */}
+        <div 
+          className={`shrink-0 z-20 transition-all duration-700 ease-out
+            ${(focusMode || introState < 1) ? '-translate-x-full opacity-0' : 'translate-x-0 opacity-100'}
+            ${focusMode ? 'w-0 overflow-hidden' : 'w-full md:w-[460px]'}
+          `}
+        >
+          <div className="w-full h-full md:w-[460px]">
+             <SettingsPanel 
+               showVisualizer={config.showVisualizer} setShowVisualizer={config.setShowVisualizer}
+               showDvd={config.showDvd} setShowDvd={config.setShowDvd}
+               marqueeConfig={config.marqueeConfig} setMarqueeConfig={config.setMarqueeConfig}
+               visualizerConfig={config.visualizerConfig} setVisualizerConfig={config.setVisualizerConfig}
+               dvdConfig={config.dvdConfig} setDvdConfig={config.setDvdConfig}
+               effectsConfig={config.effectsConfig} setEffectsConfig={config.setEffectsConfig}
+               watermarkConfig={config.watermarkConfig} setWatermarkConfig={config.setWatermarkConfig}
+               bgColor={config.bgColor} setBgColor={config.setBgColor}
+               bgPattern={config.bgPattern} setBgPattern={config.setBgPattern}
+               bgPatternConfig={config.bgPatternConfig} setBgPatternConfig={config.setBgPatternConfig}
+               onBgMediaUpload={(f) => { config.handleBgUpload(f); addNotification(`${f.length} backgrounds added`, "success"); }} 
+               bgMedia={config.bgMedia} 
+               bgList={config.bgList}
+               currentBgIndex={config.currentBgIndex}
+               onRemoveBg={config.removeBg}
+               onMoveBg={config.moveBg}
+               onSelectBg={config.selectBg}
+               onDeselectBg={config.deselectBg}
+               onClearBgMedia={config.handleClearBg}
+               onExportConfig={() => config.exportConfig(currentTheme, controlStyle)}
+               bgAutoplayInterval={config.bgAutoplayInterval}
+               setBgAutoplayInterval={config.setBgAutoplayInterval}
+               onScheduleReload={handleScheduleReload}
+               onGoHome={handleGoHome}
+               onAudioUpload={handleFilesSelected}
+               crossfadeDuration={player.crossfadeDuration}
+               setCrossfadeDuration={player.setCrossfadeDuration}
+               savedPresets={config.savedPresets}
+               savePreset={(n) => { config.savePreset(n, currentTheme, controlStyle); addNotification(`Preset "${n}" saved`, "success"); }}
+               loadPreset={(id) => { 
+                   const loaded = config.loadPreset(id); 
+                   if (loaded) {
+                       if (loaded.theme) setTheme(loaded.theme);
+                       if (loaded.controlStyle) setControlStyle(loaded.controlStyle);
+                       addNotification("Preset loaded", "success"); 
+                   }
+               }}
+               deletePreset={config.deletePreset}
+               renamePreset={config.renamePreset}
+               onSfxUpload={handleZipUpload}
+               sfxMap={sfxMap}
+               cursorStyle={config.cursorStyle}
+               setCursorStyle={config.setCursorStyle}
+               apiKey={config.apiKey}
+               setApiKey={config.setApiKey}
+               bgTransition={config.bgTransition}
+               setBgTransition={config.setBgTransition}
+               onRestartTutorial={() => setShowTutorial(true)}
+             />
+          </div>
+        </div>
+
+        {/* Main Screen - Center */}
+        <div 
+          id="tutorial-screen"
+          className={`flex-grow flex flex-col relative transition-all duration-1000 ease-out overflow-hidden
+          ${introState >= 2 ? 'scale-100 opacity-100' : 'scale-75 opacity-0'}
+        `}>
+            <RetroScreen 
+              analyser={player.analyser}
+              isPlaying={player.isPlaying}
               currentTrack={player.currentTrack}
-              isPlaying={player.isPlaying} 
-              volume={player.volume} 
+              tracks={player.tracks}
+              onTrackSelect={player.selectTrack}
+              bgMedia={config.bgMedia}
+              bgColor={config.bgColor}
+              bgPattern={config.bgPattern}
+              bgPatternConfig={config.bgPatternConfig}
+              visualizerConfig={config.visualizerConfig}
+              showVisualizer={config.showVisualizer}
+              dvdConfig={config.dvdConfig}
+              showDvd={config.showDvd}
+              effectsConfig={config.effectsConfig}
+              marqueeConfig={config.marqueeConfig}
+              watermarkConfig={config.watermarkConfig}
+              progress={playbackPercentage}
+              focusMode={focusMode}
+              setFocusMode={(v) => { setFocusMode(v); addNotification(v ? "Cinema Mode Active" : "UI Restored", "info"); }}
+              isDragging={isDragging}
+              onDragOver={onDragOver}
+              onDragEnter={onDragEnter}
+              onDragLeave={onDragLeave}
+              onDrop={onDrop}
+              onScheduleReload={handleScheduleReload}
+              rebootPhase={rebootPhase}
               currentTime={player.currentTime}
               duration={player.duration}
-              onVolumeChange={player.setVolume} 
-              onSeek={player.seek}
-              onPlay={player.togglePlay} 
-              onPause={player.togglePlay} 
-              onStop={player.stop} 
-              onNext={player.nextTrack} 
-              onPrev={player.prevTrack} 
-              onTrackSelect={player.selectTrack} 
-              onFilesSelected={handleFilesSelected}
-              onClearPlaylist={() => { player.clearPlaylist(); addNotification("Playlist cleared", "warning"); }}
-              onSort={() => { player.sortTracks(); addNotification("Playlist sorted A-Z", "info"); }}
-              onShuffle={() => { player.shuffleTracks(); addNotification("Playlist shuffled", "info"); }}
-              // Playlist Actions
-              onAddPlaylist={player.addPlaylist}
-              onRemovePlaylist={player.removePlaylist}
-              onRenamePlaylist={player.renamePlaylist}
-              onSwitchPlaylist={player.switchPlaylist}
-              onReorderPlaylists={player.reorderPlaylists}
+              onPlaySfx={playSFX}
+              volume={player.volume}
+              apiKey={config.apiKey}
             />
         </div>
-      </div>
+        
+        {/* Controls Panel - Right Side */}
+        <div 
+          className={`shrink-0 z-20 transition-all duration-700 ease-out
+             ${(introState < 1) ? 'translate-x-full opacity-0' : 'translate-x-0 opacity-100'}
+             ${focusMode ? 'w-0 overflow-hidden' : 'w-full md:w-72 lg:w-80'}
+          `}
+        >
+          <div className="w-full h-full md:w-72 lg:w-80">
+              <Controls 
+                tracks={player.tracks} 
+                playlists={player.playlists}
+                activePlaylistId={player.activePlaylistId}
+                playingPlaylistId={player.playingPlaylistId}
+                currentTrackIndex={player.currentTrackIndex} 
+                currentTrack={player.currentTrack}
+                isPlaying={player.isPlaying} 
+                volume={player.volume} 
+                currentTime={player.currentTime}
+                duration={player.duration}
+                onVolumeChange={player.setVolume} 
+                onSeek={player.seek}
+                onPlay={player.togglePlay} 
+                onPause={player.togglePlay} 
+                onStop={player.stop} 
+                onNext={player.nextTrack} 
+                onPrev={player.prevTrack} 
+                onTrackSelect={player.selectTrack} 
+                onFilesSelected={handleFilesSelected}
+                onClearPlaylist={() => { player.clearPlaylist(); addNotification("Playlist cleared", "warning"); }}
+                onSort={() => { player.sortTracks(); addNotification("Playlist sorted A-Z", "info"); }}
+                onShuffle={() => { player.shuffleTracks(); addNotification("Playlist shuffled", "info"); }}
+                // Playlist Actions
+                onAddPlaylist={player.addPlaylist}
+                onRemovePlaylist={player.removePlaylist}
+                onRenamePlaylist={player.renamePlaylist}
+                onSwitchPlaylist={player.switchPlaylist}
+                onReorderPlaylists={player.reorderPlaylists}
+                removeTracks={player.removeTracks}
+                reorderTracks={player.reorderTracks}
+                moveTracksToPlaylist={player.moveTracksToPlaylist}
+                onNewPlaylistWithTracks={player.createPlaylistFromMove}
+                onNewPlaylistWithFiles={player.createPlaylistFromFiles}
+              />
+          </div>
+        </div>
 
-      {/* Context Menu */}
-      <ContextMenu 
-        onNextTrack={player.nextTrack}
-        onPrevTrack={player.prevTrack}
-        onNextBg={config.nextBg}
-        onPrevBg={config.prevBg}
-        onToggleFullScreen={() => setFocusMode(!focusMode)}
-      />
+        {/* Context Menu */}
+        <ContextMenu 
+          onNextTrack={player.nextTrack}
+          onPrevTrack={player.prevTrack}
+          onNextBg={config.nextBg}
+          onPrevBg={config.prevBg}
+          onToggleFullScreen={() => setFocusMode(!focusMode)}
+        />
+      </div>
     </div>
   );
 }

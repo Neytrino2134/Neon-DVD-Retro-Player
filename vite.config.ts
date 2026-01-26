@@ -10,8 +10,9 @@ export default defineConfig(({ mode }) => {
 
   return {
     plugins: [react()],
-    // Base must match your GitHub repository name for Pages to work correctly
-    base: '/Neon-DVD-Retro-Player/', 
+    // Using './' ensures assets are loaded relatively, which is required for Electron (file:// protocol)
+    // This also works for most static hosting environments.
+    base: './', 
     server: {
       host: true, 
       open: false, 

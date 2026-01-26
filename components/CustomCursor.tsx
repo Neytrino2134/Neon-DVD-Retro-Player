@@ -1,3 +1,4 @@
+
 import React, { useEffect, useRef } from 'react';
 import { CursorStyle } from '../types';
 
@@ -34,7 +35,14 @@ const CustomCursor: React.FC<CustomCursorProps> = ({ style = 'default' }) => {
   const cursorRef = useRef<HTMLDivElement>(null);
   
   // Shared state for mouse tracking
-  const mouseRef = useRef({ x: -100, y: -100, isClicked: false, isHovering: false, hideCrosshair: false });
+  const mouseRef = useRef({ 
+      x: -100, 
+      y: -100, 
+      isClicked: false, 
+      isHovering: false, 
+      hideCrosshair: false,
+      forceSystemCursor: false // New flag to detect system cursor override
+  });
   
   // Refs for store mutable state for Canvas cursor
   const stateRef = useRef({
@@ -52,6 +60,12 @@ const CustomCursor: React.FC<CustomCursorProps> = ({ style = 'default' }) => {
       // Update DOM cursor immediately for responsiveness
       if (cursorRef.current) {
           cursorRef.current.style.transform = `translate(${e.clientX}px, ${e.clientY}px)`;
+          // Hide custom cursor if system cursor is forced
+          if (mouseRef.current.forceSystemCursor) {
+              cursorRef.current.style.opacity = '0';
+          } else {
+              cursorRef.current.style.opacity = '1';
+          }
       }
     };
 
@@ -70,8 +84,18 @@ const CustomCursor: React.FC<CustomCursorProps> = ({ style = 'default' }) => {
         target.closest('a');
       
       mouseRef.current.isHovering = !!isInteractive;
+      
       const hideZone = target.closest('.cursor-hide-center');
       mouseRef.current.hideCrosshair = !!hideZone;
+
+      // Check if we are hovering an element that demands the system cursor
+      const isSystemCursor = target.closest('.system-cursor');
+      mouseRef.current.forceSystemCursor = !!isSystemCursor;
+      
+      // Immediate update for DOM cursors
+      if (cursorRef.current) {
+          cursorRef.current.style.opacity = isSystemCursor ? '0' : '1';
+      }
     };
 
     const onMouseLeave = () => {
@@ -155,7 +179,7 @@ const CustomCursor: React.FC<CustomCursorProps> = ({ style = 'default' }) => {
     };
 
     const render = () => {
-      const { x: mouseX, y: mouseY, isClicked, isHovering, hideCrosshair } = mouseRef.current;
+      const { x: mouseX, y: mouseY, isClicked, isHovering, hideCrosshair, forceSystemCursor } = mouseRef.current;
       const { particles } = stateRef.current;
       stateRef.current.frame++;
 
@@ -214,7 +238,8 @@ const CustomCursor: React.FC<CustomCursorProps> = ({ style = 'default' }) => {
         }
       }
 
-      if (mouseX > 0 && !hideCrosshair) {
+      // Draw Cursor ONLY if system cursor is not forced
+      if (mouseX > 0 && !hideCrosshair && !forceSystemCursor) {
           ctx.globalAlpha = 0.8;
           ctx.strokeStyle = isClicked ? '#bc13fe' : '#00f3ff'; 
           ctx.lineWidth = 2;

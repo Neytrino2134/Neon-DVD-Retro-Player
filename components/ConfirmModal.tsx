@@ -2,13 +2,15 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { AlertTriangle } from 'lucide-react';
 import { TranslatedText } from './ui/TranslatedText';
+import { en } from '../locales/en';
 
 interface ConfirmModalProps {
   onConfirm: () => void;
   onCancel: () => void;
+  translationKey?: keyof typeof en;
 }
 
-const ConfirmModal: React.FC<ConfirmModalProps> = ({ onConfirm, onCancel }) => {
+const ConfirmModal: React.FC<ConfirmModalProps> = ({ onConfirm, onCancel, translationKey = 'confirm_clear' }) => {
   // Animation Phases:
   // 0: Init (Invisible)
   // 1: Overlay Fade In
@@ -79,7 +81,7 @@ const ConfirmModal: React.FC<ConfirmModalProps> = ({ onConfirm, onCancel }) => {
             <h3 className="text-white font-mono font-bold text-lg uppercase tracking-widest mb-2">Warning</h3>
             
             <p className="text-gray-300 font-mono text-xs mb-6">
-                <TranslatedText k="confirm_clear" />
+                <TranslatedText k={translationKey} />
             </p>
             
             <div className="flex gap-4 w-full justify-center">
