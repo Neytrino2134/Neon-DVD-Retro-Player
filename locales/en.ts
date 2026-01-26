@@ -35,6 +35,8 @@ export const en = {
   leaks_config: "LEAKS CONFIG",
   signal_processor: "SIGNAL PROCESSOR",
   background: "BACKGROUND",
+  cat_backgrounds: "BACKGROUNDS", // NEW
+  cat_sound_effects: "SOUND EFFECTS", // NEW
   load_img: "LOAD IMG/VIDEO",
   load_sfx_zip: "LOAD SFX (ZIP)",
   export_config: "EXPORT NRP CONFIG",
@@ -42,6 +44,7 @@ export const en = {
   crossfade_duration: "CROSSFADE (SEC)",
   constant_power_hint: "Uses Constant Power curve for smooth transitions.",
   config_manager: "CONFIG PRESETS",
+  file_management: "FILE MANAGEMENT",
   
   // Controls
   size: "SIZE",
@@ -51,6 +54,7 @@ export const en = {
   thickness: "THICKNESS",
   print_speed: "PRINT SPEED",
   scale: "SCALE",
+  width: "WIDTH", 
   bg_opacity: "BG OPACITY",
   fps_limit: "FPS LIMIT",
   pixelation: "PIXELATION",
@@ -70,6 +74,8 @@ export const en = {
   flash_intensity: "FLASH ANIMATION",
   api_key_label: "GEMINI API KEY",
   api_key_placeholder: "PASTE KEY HERE",
+  start_session: "START SESSION",
+  stop_session: "STOP SESSION",
   
   // Hologram Categories
   cat_system: "SYSTEM",
@@ -160,6 +166,10 @@ export const en = {
 
   // Background
   auto_timer: "AUTO SWAP (MIN)",
+  transition_type: "TRANSITION",
+  trans_glitch: "GLITCH - DEFAULT",
+  trans_leaks: "LEAKS - FADE",
+  trans_none: "NONE (CUT)",
 
   // Config Manager
   save_preset: "SAVE CURRENT",

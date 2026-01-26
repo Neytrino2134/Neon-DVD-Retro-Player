@@ -1,6 +1,6 @@
 
 import { useState, useEffect, useCallback } from 'react';
-import { VisualizerConfig, DvdConfig, EffectsConfig, MarqueeConfig, BackgroundMedia, PatternConfig, AppPreset, CursorStyle, WatermarkConfig, ThemeType, ControlStyle } from '../types';
+import { VisualizerConfig, DvdConfig, EffectsConfig, MarqueeConfig, BackgroundMedia, PatternConfig, AppPreset, CursorStyle, WatermarkConfig, ThemeType, ControlStyle, BgTransitionType } from '../types';
 import { getAllBackgrounds, saveBackground, clearBackgrounds, deleteBackground } from '../lib/db';
 
 const STORAGE_KEYS = {
@@ -17,7 +17,8 @@ const STORAGE_KEYS = {
   BG_AUTOPLAY: 'neon_bg_autoplay_interval',
   PRESETS: 'neon_config_presets',
   CURSOR: 'neon_cursor_style',
-  API_KEY: 'neon_gemini_api_key' // New Key
+  API_KEY: 'neon_gemini_api_key',
+  BG_TRANSITION: 'neon_bg_transition' // New Key
 };
 
 const DEFAULT_PRESETS: AppPreset[] = [
@@ -43,7 +44,7 @@ const DEFAULT_PRESETS: AppPreset[] = [
           categories: { system: true, interactive: true, music: true, motivational: true, philosophy: false, space: false }
         },
         geminiChat: {
-          enabled: false, opacity: 0.9, scale: 1.0, typingSpeed: 1.0, 
+          enabled: false, opacity: 0.9, scale: 1.0, width: 350, typingSpeed: 1.0, 
           categories: { system: false, interactive: true, music: true, motivational: true, philosophy: true, space: true }
         },
         lightLeaks: { enabled: false, intensity: 0.5, speed: 0.5, number: 6 }
@@ -61,7 +62,8 @@ const DEFAULT_PRESETS: AppPreset[] = [
       bgAutoplayInterval: 5,
       cursorStyle: 'default',
       theme: 'neon-retro',
-      controlStyle: 'default'
+      controlStyle: 'default',
+      bgTransition: 'glitch'
     }
   },
   {
@@ -147,7 +149,7 @@ const DEFAULT_PRESETS: AppPreset[] = [
           }
         },
         geminiChat: {
-          enabled: false, opacity: 0.9, scale: 1.0, typingSpeed: 1.0,
+          enabled: false, opacity: 0.9, scale: 1.0, width: 350, typingSpeed: 1.0,
           categories: { system: false, interactive: true, music: true, motivational: true, philosophy: true, space: true }
         },
         lightLeaks: {
@@ -184,7 +186,8 @@ const DEFAULT_PRESETS: AppPreset[] = [
       bgAutoplayInterval: 5,
       cursorStyle: "classic-blue",
       theme: "neon-blue",
-      controlStyle: "round"
+      controlStyle: "round",
+      bgTransition: 'leaks'
     }
   }
 ];
@@ -200,6 +203,7 @@ export const useAppConfig = () => {
   const [showVisualizer, setShowVisualizer] = useState(() => getInitial(STORAGE_KEYS.SHOW_VISUALIZER, true));
   const [showDvd, setShowDvd] = useState(() => getInitial(STORAGE_KEYS.SHOW_DVD, true));
   const [cursorStyle, setCursorStyle] = useState<CursorStyle>(() => getInitial(STORAGE_KEYS.CURSOR, 'default'));
+  const [bgTransition, setBgTransition] = useState<BgTransitionType>(() => getInitial(STORAGE_KEYS.BG_TRANSITION, 'glitch'));
   
   const [marqueeConfig, setMarqueeConfig] = useState<MarqueeConfig>(() => {
     const defaults = {
@@ -254,7 +258,7 @@ export const useAppConfig = () => {
           categories: { system: true, interactive: true, music: true, motivational: true, philosophy: false, space: false }
         },
         geminiChat: {
-          enabled: false, opacity: 0.9, scale: 1.0, typingSpeed: 1.0,
+          enabled: false, opacity: 0.9, scale: 1.0, width: 350, typingSpeed: 1.0,
           categories: { system: false, interactive: true, music: true, motivational: true, philosophy: true, space: true }
         },
         lightLeaks: { enabled: false, intensity: 0.5, speed: 0.5, number: 6 }
@@ -264,7 +268,7 @@ export const useAppConfig = () => {
       const hologramDefaults = { enabled: false, opacity: 0.8, speed: 1.0, interval: 15, scale: 1.0, enableIcons: false };
       const lightLeaksDefaults = { enabled: false, intensity: 0.5, speed: 0.5, number: 6 };
       const geminiDefaults = {
-          enabled: false, opacity: 0.9, scale: 1.0, typingSpeed: 1.0,
+          enabled: false, opacity: 0.9, scale: 1.0, width: 350, typingSpeed: 1.0,
           categories: { system: false, interactive: true, music: true, motivational: true, philosophy: true, space: true }
       };
 
@@ -286,7 +290,7 @@ export const useAppConfig = () => {
             ...(initial.holograms || {}),
             categories: mergedCategories
           },
-          geminiChat: initial.geminiChat || geminiDefaults,
+          geminiChat: { ...geminiDefaults, ...initial.geminiChat },
           lightLeaks: initial.lightLeaks || lightLeaksDefaults
       }
   });
@@ -330,7 +334,8 @@ export const useAppConfig = () => {
     localStorage.setItem(STORAGE_KEYS.WATERMARK, JSON.stringify(watermarkConfig));
     localStorage.setItem(STORAGE_KEYS.BG_AUTOPLAY, JSON.stringify(bgAutoplayInterval));
     localStorage.setItem(STORAGE_KEYS.CURSOR, JSON.stringify(cursorStyle));
-  }, [visualizerConfig, dvdConfig, effectsConfig, bgColor, bgPattern, bgPatternConfig, showVisualizer, showDvd, marqueeConfig, watermarkConfig, bgAutoplayInterval, cursorStyle]);
+    localStorage.setItem(STORAGE_KEYS.BG_TRANSITION, JSON.stringify(bgTransition));
+  }, [visualizerConfig, dvdConfig, effectsConfig, bgColor, bgPattern, bgPatternConfig, showVisualizer, showDvd, marqueeConfig, watermarkConfig, bgAutoplayInterval, cursorStyle, bgTransition]);
 
   useEffect(() => {
     localStorage.setItem(STORAGE_KEYS.PRESETS, JSON.stringify(savedPresets));
@@ -459,7 +464,8 @@ export const useAppConfig = () => {
         bgAutoplayInterval,
         cursorStyle,
         theme,
-        controlStyle
+        controlStyle,
+        bgTransition
       }
     };
     setSavedPresets(prev => [...prev, newPreset]);
@@ -483,6 +489,7 @@ export const useAppConfig = () => {
     setBgAutoplayInterval(config.bgAutoplayInterval);
     if (config.cursorStyle) setCursorStyle(config.cursorStyle);
     if (config.watermarkConfig) setWatermarkConfig(config.watermarkConfig);
+    if (config.bgTransition) setBgTransition(config.bgTransition);
     
     return config;
   };
@@ -501,7 +508,7 @@ export const useAppConfig = () => {
 
   const exportConfig = (theme: ThemeType, controlStyle: ControlStyle) => {
     const config = {
-      visualizerConfig, dvdConfig, effectsConfig, bgColor, bgPattern, bgPatternConfig, showVisualizer, showDvd, marqueeConfig, watermarkConfig, bgAutoplayInterval, cursorStyle, theme, controlStyle, version: '1.1'
+      visualizerConfig, dvdConfig, effectsConfig, bgColor, bgPattern, bgPatternConfig, showVisualizer, showDvd, marqueeConfig, watermarkConfig, bgAutoplayInterval, cursorStyle, theme, controlStyle, bgTransition, version: '1.2'
     };
     // Note: API Key is purposely excluded from export for security
     const blob = new Blob([JSON.stringify(config, null, 2)], { type: 'application/json' });
@@ -532,6 +539,7 @@ export const useAppConfig = () => {
         if (typeof content.bgAutoplayInterval === 'number') setBgAutoplayInterval(content.bgAutoplayInterval);
         if (content.cursorStyle) setCursorStyle(content.cursorStyle);
         if (content.watermarkConfig) setWatermarkConfig(content.watermarkConfig);
+        if (content.bgTransition) setBgTransition(content.bgTransition);
         
         // Pass the full content to callback so App can handle theme/style
         if (onLoadCallback) onLoadCallback(content);
@@ -569,6 +577,7 @@ export const useAppConfig = () => {
     loadPreset,
     deletePreset,
     renamePreset,
-    cursorStyle, setCursorStyle
+    cursorStyle, setCursorStyle,
+    bgTransition, setBgTransition
   };
 };

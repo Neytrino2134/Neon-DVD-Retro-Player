@@ -312,6 +312,8 @@ function AppContent() {
              setCursorStyle={config.setCursorStyle}
              apiKey={config.apiKey}
              setApiKey={config.setApiKey}
+             bgTransition={config.bgTransition}
+             setBgTransition={config.setBgTransition}
            />
         </div>
       </div>

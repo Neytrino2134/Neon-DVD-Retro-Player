@@ -1,7 +1,7 @@
 
 import React, { useRef, useEffect, forwardRef, useMemo, useState } from 'react';
 import { Upload, Minimize, Maximize, Monitor, Power } from 'lucide-react';
-import { AudioTrack, VisualizerConfig, EffectsConfig, DvdConfig, MarqueeConfig, PatternConfig, WatermarkConfig } from '../types';
+import { AudioTrack, VisualizerConfig, EffectsConfig, DvdConfig, MarqueeConfig, PatternConfig, WatermarkConfig, BgTransitionType } from '../types';
 import DvdLogo from './DvdLogo';
 import Visualizer from './Visualizer';
 import MediaRenderer from './MediaRenderer';
@@ -23,6 +23,7 @@ import { useLanguage } from '../contexts/LanguageContext';
 import { useNotification } from '../contexts/NotificationContext';
 import { Tooltip } from './ui/Tooltip';
 import { useGestures } from '../hooks/useGestures';
+import { useAppConfig } from '../hooks/useAppConfig';
 
 const formatTime = (seconds: number) => {
   if (!seconds || isNaN(seconds) || seconds < 0) return "00:00";
@@ -90,6 +91,21 @@ const RetroScreen = forwardRef<HTMLDivElement, RetroScreenProps>(({
   
   const { t } = useLanguage();
   const { notifications } = useNotification();
+  
+  const [bgTransition, setBgTransition] = useState<BgTransitionType>('glitch');
+
+  useEffect(() => {
+      // Sync with storage on mount/update
+      const load = () => {
+          const stored = localStorage.getItem('neon_bg_transition');
+          if (stored) {
+              try { setBgTransition(JSON.parse(stored)); } catch {}
+          }
+      };
+      load();
+      window.addEventListener('storage', load); // Listen for cross-tab or self-updates
+  }, [bgMedia]); // Re-check when BG changes
+
   const internalRef = useRef<HTMLDivElement>(null);
   const containerRef = (externalRef as React.RefObject<HTMLDivElement>) || internalRef;
   const signalLayerRef = useRef<HTMLDivElement>(null);
@@ -111,6 +127,16 @@ const RetroScreen = forwardRef<HTMLDivElement, RetroScreenProps>(({
   useEffect(() => {
     if (activeMedia === bgMedia) return;
 
+    // Refresh config setting before transition starts
+    const stored = localStorage.getItem('neon_bg_transition');
+    const currentTransition = stored ? JSON.parse(stored) as BgTransitionType : 'glitch';
+    setBgTransition(currentTransition);
+
+    if (currentTransition === 'none') {
+        setActiveMedia(bgMedia);
+        return;
+    }
+
     setTransitionPhase('out');
 
     const timeout1 = setTimeout(() => {
@@ -127,7 +153,7 @@ const RetroScreen = forwardRef<HTMLDivElement, RetroScreenProps>(({
     return () => clearTimeout(timeout1);
   }, [bgMedia]); 
 
-  // Screen Shake Loop
+  // Screen Shake Loop (Only for Glitch)
   useEffect(() => {
     let aid: number;
     const loop = () => {
@@ -139,7 +165,7 @@ const RetroScreen = forwardRef<HTMLDivElement, RetroScreenProps>(({
         y += (Math.random()-0.5) * effectsConfig.vhsJitter * 2;
       }
 
-      if (transitionPhase !== 'idle') {
+      if (transitionPhase !== 'idle' && bgTransition === 'glitch') {
         const shakeIntensity = 8; 
         x += (Math.random() - 0.5) * shakeIntensity;
         y += (Math.random() - 0.5) * shakeIntensity;
@@ -153,7 +179,7 @@ const RetroScreen = forwardRef<HTMLDivElement, RetroScreenProps>(({
     };
     loop();
     return () => cancelAnimationFrame(aid);
-  }, [effectsConfig.vhsJitter, transitionPhase]);
+  }, [effectsConfig.vhsJitter, transitionPhase, bgTransition]);
 
   const aberrationValue = effectsConfig.chromaticAberration || 0;
 
@@ -197,6 +223,28 @@ const RetroScreen = forwardRef<HTMLDivElement, RetroScreenProps>(({
       animationDuration: watermarkConfig?.flashIntensity ? `${21 - (watermarkConfig.flashIntensity * 20)}s` : '0s'
   };
 
+  // --- Dynamic Effects Config Calculation ---
+  // If transition is 'leaks', we override light leaks settings during transition
+  const activeLightLeaksConfig = useMemo(() => {
+      if (transitionPhase !== 'idle' && bgTransition === 'leaks') {
+          return {
+              enabled: true,
+              intensity: 1.0,
+              speed: 2.0,
+              number: 15
+          };
+      }
+      return effectsConfig.lightLeaks;
+  }, [effectsConfig.lightLeaks, transitionPhase, bgTransition]);
+
+  // Media Opacity for Leaks Transition
+  const mediaOpacity = (transitionPhase === 'out' && bgTransition === 'leaks') ? 0 : 1;
+  // Use a CSS transition to smooth the opacity change
+  const mediaStyle = {
+      opacity: mediaOpacity,
+      transition: bgTransition === 'leaks' ? 'opacity 0.8s ease-in-out' : 'none'
+  };
+
   return (
     <div 
       className={`flex-grow flex items-center justify-center relative bg-gray-950 transition-all duration-500 ${focusMode ? 'p-0' : 'p-1 md:p-3'}`}
@@ -234,16 +282,28 @@ const RetroScreen = forwardRef<HTMLDivElement, RetroScreenProps>(({
                 <div className="flex items-center gap-3 animate-slide-in-right pointer-events-none pr-2">
                   <div className="flex flex-col items-end">
                      <div className="flex items-center gap-2">
-                       <span className="text-[10px] font-mono font-bold text-neon-green tracking-widest leading-none drop-shadow-[0_0_5px_rgba(0,255,0,0.8)]">
+                       <span 
+                          className="text-[10px] font-mono font-bold tracking-widest leading-none"
+                          style={{ color: marqueeColor, filter: `drop-shadow(0 0 5px ${marqueeColor})` }}
+                       >
                          {t('reboot_scheduled')}
                        </span>
-                       <div className="w-1.5 h-1.5 bg-neon-green rounded-full shadow-[0_0_5px_#00ff00] animate-pulse"></div>
+                       <div 
+                          className="w-1.5 h-1.5 rounded-full animate-pulse"
+                          style={{ backgroundColor: marqueeColor, boxShadow: `0 0 5px ${marqueeColor}` }}
+                       ></div>
                      </div>
-                     <span className="text-[8px] font-mono text-neon-green/70 tracking-wider leading-none mt-1 animate-pulse">
+                     <span 
+                        className="text-[8px] font-mono tracking-wider leading-none mt-1 animate-pulse"
+                        style={{ color: marqueeColor, opacity: 0.7 }}
+                     >
                        {t('waiting_stream')}
                      </span>
                   </div>
-                  <div className="text-3xl font-mono font-bold text-neon-green tabular-nums leading-none drop-shadow-[0_0_8px_rgba(0,255,0,0.6)]">
+                  <div 
+                      className="text-3xl font-mono font-bold tabular-nums leading-none"
+                      style={{ color: marqueeColor, filter: `drop-shadow(0 0 8px ${marqueeColor}99)` }}
+                  >
                     -{formatTime(Math.max(0, duration - currentTime))}
                   </div>
                 </div>
@@ -270,13 +330,16 @@ const RetroScreen = forwardRef<HTMLDivElement, RetroScreenProps>(({
                 className="absolute inset-0 w-full h-full"
                 style={aberrationValue > 0 ? { filter: 'url(#chromatic-aberration-filter)' } : undefined}
             >
-                <MediaRenderer type={activeMedia ? activeMedia.type : 'color'} url={activeMedia?.url} bgColor={bgColor} effects={effectsConfig} />
+                {/* Media Wrapper for Opacity Transition */}
+                <div className="absolute inset-0 w-full h-full" style={mediaStyle}>
+                    <MediaRenderer type={activeMedia ? activeMedia.type : 'color'} url={activeMedia?.url} bgColor={bgColor} effects={effectsConfig} />
+                </div>
                 
                 <PatternOverlay pattern={bgPattern} config={bgPatternConfig} />
                 
-                <TransitionEffect phase={transitionPhase} />
+                <TransitionEffect phase={transitionPhase} mode={bgTransition} />
                 
-                <LightLeaksEffect config={effectsConfig.lightLeaks} />
+                <LightLeaksEffect config={activeLightLeaksConfig} />
 
                 {showVisualizer && <Visualizer analyser={analyser} isPlaying={isPlaying} config={visualizerConfig} fps={120} volume={volume} />}
                 {showDvd && <DvdLogo containerRef={containerRef} fps={effectsConfig.fps} effectsConfig={effectsConfig} config={dvdConfig} onPlaySfx={onPlaySfx} />}

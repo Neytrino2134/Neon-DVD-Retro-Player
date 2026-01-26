@@ -1,8 +1,9 @@
 import React, { useRef, useState } from 'react';
-import { Play, Pause, Square, SkipBack, SkipForward, FolderOpen, Music, Volume2, VolumeX, Trash2, AlertTriangle, ArrowDownAZ, Shuffle, Plus, X } from 'lucide-react';
+import { Play, Pause, Square, SkipBack, SkipForward, FolderOpen, Music, Volume2, VolumeX, Trash2, ArrowDownAZ, Shuffle, Plus, X } from 'lucide-react';
 import { AudioTrack, Playlist } from '../types';
 import { Tooltip } from './ui/Tooltip';
 import { TranslatedText } from './ui/TranslatedText';
+import ConfirmModal from './ConfirmModal';
 
 interface ControlsProps {
   tracks: AudioTrack[];
@@ -174,33 +175,12 @@ const Controls: React.FC<ControlsProps> = ({
   return (
     <div className="relative w-full h-full flex flex-col bg-theme-bg border-l-4 border-theme-panel p-4 shadow-inner">
       
-      {/* Confirmation Modal Overlay */}
+      {/* Animated Confirmation Modal */}
       {showClearConfirm && (
-        <div className="absolute inset-0 z-50 bg-black/90 backdrop-blur-sm flex items-center justify-center p-4 rounded-lg">
-          <div className="w-full bg-theme-panel border-2 border-red-500 rounded-lg p-4 shadow-[0_0_20px_rgba(255,0,0,0.4)] animate-pulse-fast">
-            <div className="flex flex-col items-center text-center gap-3">
-              <AlertTriangle className="text-red-500 w-10 h-10" />
-              <h3 className="text-white font-mono font-bold text-lg uppercase">Warning</h3>
-              <p className="text-gray-300 font-mono text-xs mb-2">
-                <TranslatedText k="confirm_clear" />
-              </p>
-              <div className="flex gap-3 w-full justify-center">
-                <button 
-                  onClick={confirmClear}
-                  className="px-4 py-2 bg-red-500 text-black font-mono font-bold rounded hover:bg-red-400 hover:shadow-[0_0_10px_#ff0000] transition-all"
-                >
-                  YES
-                </button>
-                <button 
-                  onClick={() => setShowClearConfirm(false)}
-                  className="px-4 py-2 border border-gray-500 text-gray-300 font-mono rounded hover:bg-gray-800 hover:text-white transition-all"
-                >
-                  NO
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
+        <ConfirmModal 
+          onConfirm={confirmClear} 
+          onCancel={() => setShowClearConfirm(false)} 
+        />
       )}
 
       {/* Header */}

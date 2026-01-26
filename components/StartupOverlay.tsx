@@ -30,7 +30,7 @@ const StartupOverlay: React.FC<StartupOverlayProps> = ({ onComplete, onFadeOut, 
   const [standbyOpacity, setStandbyOpacity] = useState(0);
   const [isTransitioning, setIsTransitioning] = useState(false);
 
-  const { language, t } = useLanguage();
+  const { language, setLanguage, t } = useLanguage();
   const linesEndRef = useRef<HTMLDivElement>(null);
   const timeoutsRef = useRef<number[]>([]);
   const skippedRef = useRef(false);
@@ -252,6 +252,37 @@ const StartupOverlay: React.FC<StartupOverlayProps> = ({ onComplete, onFadeOut, 
                  >
                     <Power size={48} className="text-neon-blue" />
                  </div>
+
+                 {/* Language Switcher */}
+                 <div className="z-20 border border-neon-blue/50 rounded flex overflow-hidden relative bg-black/40 backdrop-blur-sm shadow-[0_0_10px_rgba(0,243,255,0.1)]">
+                    {/* Sliding Highlight */}
+                    <div 
+                        className={`absolute top-0 bottom-0 w-1/2 bg-neon-blue/20 transition-transform duration-300 ease-out
+                            ${language === 'ru' ? 'translate-x-full' : 'translate-x-0'}
+                        `}
+                    />
+                    
+                    <button 
+                        onClick={(e) => { e.stopPropagation(); setLanguage('en'); }}
+                        className={`relative z-10 w-12 py-1.5 font-mono text-xs font-bold tracking-widest transition-colors duration-300 text-center
+                            ${language === 'en' ? 'text-neon-blue drop-shadow-[0_0_5px_rgba(0,243,255,0.8)]' : 'text-gray-600 hover:text-gray-400'}
+                        `}
+                    >
+                        EN
+                    </button>
+                    
+                    {/* Divider */}
+                    <div className="w-px bg-neon-blue/30 relative z-10"></div>
+
+                    <button 
+                        onClick={(e) => { e.stopPropagation(); setLanguage('ru'); }}
+                        className={`relative z-10 w-12 py-1.5 font-mono text-xs font-bold tracking-widest transition-colors duration-300 text-center
+                            ${language === 'ru' ? 'text-neon-blue drop-shadow-[0_0_5px_rgba(0,243,255,0.8)]' : 'text-gray-600 hover:text-gray-400'}
+                        `}
+                    >
+                        RU
+                    </button>
+                 </div>
                  
                  <div className="text-center space-y-6 w-full flex flex-col items-center">
                      
@@ -279,7 +310,7 @@ const StartupOverlay: React.FC<StartupOverlayProps> = ({ onComplete, onFadeOut, 
                         onClick={handleStart}
                         className="inline-block px-6 py-2 rounded cursor-pointer hover:bg-neon-blue/10 transition-colors"
                      >
-                        <p className="text-neon-blue font-mono text-sm md:text-lg tracking-widest font-bold">
+                        <p className="text-neon-blue font-mono text-sm md:text-lg tracking-widest font-bold whitespace-nowrap">
                             {language === 'ru' ? 'НАЖМИТЕ ENTER ДЛЯ ЗАПУСКА' : 'PRESS ENTER TO INITIALIZE SYSTEM'}
                         </p>
                      </div>

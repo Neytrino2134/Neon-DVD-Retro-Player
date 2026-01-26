@@ -1,11 +1,13 @@
 
 import React, { useEffect, useRef } from 'react';
+import { BgTransitionType } from '../../types';
 
 interface TransitionEffectProps {
   phase: 'idle' | 'out' | 'in';
+  mode?: BgTransitionType; // New prop
 }
 
-const TransitionEffect: React.FC<TransitionEffectProps> = ({ phase }) => {
+const TransitionEffect: React.FC<TransitionEffectProps> = ({ phase, mode = 'glitch' }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const frameRef = useRef<number>(0);
 
@@ -15,14 +17,15 @@ const TransitionEffect: React.FC<TransitionEffectProps> = ({ phase }) => {
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
+    // Clear and exit if idle OR if mode is not 'glitch' (leaks handled elsewhere)
+    if (phase === 'idle' || mode !== 'glitch') {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        return;
+    }
+
     const render = () => {
       const w = canvas.width;
       const h = canvas.height;
-
-      if (phase === 'idle') {
-        ctx.clearRect(0, 0, w, h);
-        return;
-      }
 
       // --- CONFIGURATION ---
       // We limit the number of blocks drawn per frame to ensure a gradual effect
@@ -93,7 +96,8 @@ const TransitionEffect: React.FC<TransitionEffectProps> = ({ phase }) => {
             canvas.height = canvas.offsetHeight;
         }
         
-        if (phase === 'out') {
+        // Clean start on Out phase for Glitch
+        if (phase === 'out' && mode === 'glitch') {
             ctx.clearRect(0, 0, canvas.width, canvas.height);
         }
     }
@@ -101,9 +105,9 @@ const TransitionEffect: React.FC<TransitionEffectProps> = ({ phase }) => {
     frameRef.current = requestAnimationFrame(render);
 
     return () => cancelAnimationFrame(frameRef.current);
-  }, [phase]);
+  }, [phase, mode]);
 
-  if (phase === 'idle') return null;
+  if (phase === 'idle' || mode !== 'glitch') return null;
 
   return (
     <canvas 

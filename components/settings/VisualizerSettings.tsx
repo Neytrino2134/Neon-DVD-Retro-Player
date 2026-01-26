@@ -1,5 +1,4 @@
 
-
 import React, { useState } from 'react';
 import { Maximize, Split, Square, Minus, Grid, ChevronDown, Zap } from 'lucide-react';
 import { VisualizerConfig, VisualizerPosition } from '../../types';
@@ -121,29 +120,35 @@ const VisualizerSettings: React.FC<VisualizerSettingsProps> = ({ config, update 
              </div>
              
              {/* Collapsible Segment Settings */}
-             <div className={`transition-[max-height,opacity,padding] duration-300 ease-in-out overflow-hidden ${config.segmented && expandSegmented ? 'max-h-80 opacity-100 p-3 pt-0' : 'max-h-0 opacity-0 p-0'}`}>
-                <div className="pl-8 pt-2 space-y-3 border-l-2 border-theme-muted ml-2">
-                    <RangeControl 
-                        label={t('seg_height')} 
-                        value={config.segmentHeight || 4} 
-                        min={2} max={30} step={1} 
-                        onChange={(v) => update('segmentHeight', v)} 
-                        className="mb-0"
-                    />
-                    <RangeControl 
-                        label={t('seg_gap')} 
-                        value={config.segmentGap || 2} 
-                        min={0} max={10} step={1} 
-                        onChange={(v) => update('segmentGap', v)} 
-                        className="mb-0"
-                    />
-                    <ToggleSwitch 
-                        label={t('highlight_brick')} 
-                        icon={Zap} 
-                        value={config.highlightLastBrick} 
-                        onChange={(v) => update('highlightLastBrick', v)} 
-                        color="blue"
-                    />
+             <div 
+                className={`grid transition-[grid-template-rows,padding,opacity] duration-300 ease-in-out
+                    ${config.segmented && expandSegmented ? 'grid-rows-[1fr] opacity-100 p-3 pt-0' : 'grid-rows-[0fr] opacity-0 p-0'}
+                `}
+             >
+                <div className="overflow-hidden">
+                    <div className="pl-8 pt-2 space-y-3 border-l-2 border-theme-muted ml-2">
+                        <RangeControl 
+                            label={t('seg_height')} 
+                            value={config.segmentHeight || 4} 
+                            min={2} max={30} step={1} 
+                            onChange={(v) => update('segmentHeight', v)} 
+                            className="mb-0"
+                        />
+                        <RangeControl 
+                            label={t('seg_gap')} 
+                            value={config.segmentGap || 2} 
+                            min={0} max={10} step={1} 
+                            onChange={(v) => update('segmentGap', v)} 
+                            className="mb-0"
+                        />
+                        <ToggleSwitch 
+                            label={t('highlight_brick')} 
+                            icon={Zap} 
+                            value={config.highlightLastBrick} 
+                            onChange={(v) => update('highlightLastBrick', v)} 
+                            color="blue"
+                        />
+                    </div>
                 </div>
              </div>
          </div>
@@ -176,35 +181,41 @@ const VisualizerSettings: React.FC<VisualizerSettingsProps> = ({ config, update 
              </div>
 
              {/* Collapsible Tip Settings */}
-             <div className={`transition-[max-height,opacity,padding] duration-300 ease-in-out overflow-hidden ${config.showTips && expandTips ? 'max-h-96 opacity-100 p-3 pt-0' : 'max-h-0 opacity-0 p-0'}`}>
-                <div className="pl-8 pt-2 space-y-3 border-l-2 border-theme-muted ml-2">
-                    <CustomSelect 
-                        label={t('tip_color')} 
-                        value={config.tipColor || 'white'} 
-                        options={colorOptions} 
-                        onChange={(v) => update('tipColor', v)} 
-                    />
-                    <ToggleSwitch 
-                        label={t('tip_glow')} 
-                        icon={Zap} 
-                        value={config.tipGlow} 
-                        onChange={(v) => update('tipGlow', v)} 
-                        color="green"
-                    />
-                    <RangeControl 
-                        label={t('tip_height')} 
-                        value={config.tipHeight || 2} 
-                        min={1} max={20} step={1} 
-                        onChange={(v) => update('tipHeight', v)} 
-                        className="mb-0"
-                    />
-                    <RangeControl 
-                        label={t('tip_speed')} 
-                        value={config.tipSpeed || 15} 
-                        min={1} max={50} step={1} 
-                        onChange={(v) => update('tipSpeed', v)} 
-                        className="mb-0"
-                    />
+             <div 
+                className={`grid transition-[grid-template-rows,padding,opacity] duration-300 ease-in-out
+                    ${config.showTips && expandTips ? 'grid-rows-[1fr] opacity-100 p-3 pt-0' : 'grid-rows-[0fr] opacity-0 p-0'}
+                `}
+             >
+                <div className="overflow-hidden">
+                    <div className="pl-8 pt-2 space-y-3 border-l-2 border-theme-muted ml-2">
+                        <CustomSelect 
+                            label={t('tip_color')} 
+                            value={config.tipColor || 'white'} 
+                            options={colorOptions} 
+                            onChange={(v) => update('tipColor', v)} 
+                        />
+                        <ToggleSwitch 
+                            label={t('tip_glow')} 
+                            icon={Zap} 
+                            value={config.tipGlow} 
+                            onChange={(v) => update('tipGlow', v)} 
+                            color="green"
+                        />
+                        <RangeControl 
+                            label={t('tip_height')} 
+                            value={config.tipHeight || 2} 
+                            min={1} max={20} step={1} 
+                            onChange={(v) => update('tipHeight', v)} 
+                            className="mb-0"
+                        />
+                        <RangeControl 
+                            label={t('tip_speed')} 
+                            value={config.tipSpeed || 15} 
+                            min={1} max={50} step={1} 
+                            onChange={(v) => update('tipSpeed', v)} 
+                            className="mb-0"
+                        />
+                    </div>
                 </div>
              </div>
          </div>

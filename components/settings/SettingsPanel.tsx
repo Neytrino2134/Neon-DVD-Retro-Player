@@ -1,6 +1,7 @@
+
 import React, { useState } from 'react';
-import { Settings, Disc, Activity, Zap, Terminal, AlertTriangle, Tv, Type, Bug, Power, MessageSquare, AudioWaveform, HelpCircle, Save, ChevronUp, ChevronDown, Home, Sun, Palette, MousePointer2, Sliders, Stamp, Bot } from 'lucide-react';
-import { VisualizerConfig, EffectsConfig, DvdConfig, MarqueeConfig, PatternConfig, BackgroundMedia, AppPreset, CursorStyle, WatermarkConfig, ThemeType, ControlStyle } from '../../types';
+import { Settings, Disc, Activity, Zap, Terminal, AlertTriangle, Tv, Type, Bug, Power, MessageSquare, AudioWaveform, HelpCircle, Save, ChevronUp, ChevronDown, Home, Sun, Palette, MousePointer2, Sliders, Stamp, Bot, Layers, Image as ImageIcon, Files } from 'lucide-react';
+import { VisualizerConfig, EffectsConfig, DvdConfig, MarqueeConfig, PatternConfig, BackgroundMedia, AppPreset, CursorStyle, WatermarkConfig, ThemeType, ControlStyle, BgTransitionType } from '../../types';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { useTheme } from '../../contexts/ThemeContext';
 import { APP_VERSION } from '../../lib/version';
@@ -16,6 +17,7 @@ import MarqueeSettings from './modules/MarqueeSettings';
 import HologramSettings from './modules/HologramSettings';
 import GeminiSettings from './modules/GeminiSettings';
 import ConfigManager from './modules/ConfigManager';
+import FileManagement from './modules/FileManagement';
 import { MixerSettings, DvdSettings, DebugSettings, ScanlineSettings, CyberSettings, GlitchSettings, SignalSettings, LightLeaksSettings } from './modules/EffectModules';
 import CustomSelect from './CustomSelect';
 import RangeControl from './RangeControl';
@@ -77,6 +79,10 @@ interface SettingsPanelProps {
   // API
   apiKey: string;
   setApiKey: (k: string) => void;
+
+  // Transition (New)
+  bgTransition: BgTransitionType;
+  setBgTransition: (t: BgTransitionType) => void;
 }
 
 const SettingsPanel: React.FC<SettingsPanelProps> = ({
@@ -88,12 +94,12 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
   crossfadeDuration, setCrossfadeDuration,
   savedPresets, savePreset, loadPreset, deletePreset, renamePreset,
   sfxMap,
-  cursorStyle, setCursorStyle, apiKey, setApiKey
+  cursorStyle, setCursorStyle, apiKey, setApiKey,
+  bgTransition, setBgTransition
 }) => {
-  const [expandedState, setExpandedState] = useState<Record<string, boolean>>({ mixer: true });
+  const [expandedState, setExpandedState] = useState<Record<string, boolean>>({});
   const [expandWatermark, setExpandWatermark] = useState(false);
   const [showHelp, setShowHelp] = useState(false);
-  const [showPresets, setShowPresets] = useState(false);
   const { language, setLanguage, t } = useLanguage();
   const { currentTheme, setTheme, controlStyle, setControlStyle } = useTheme();
 
@@ -112,19 +118,19 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
   };
 
   const themeOptions = [
-    { value: 'neon-retro', label: 'Default - Neon Retro' },
-    { value: 'neon-blue', label: 'Neon Blue' },
-    { value: 'warm-cozy', label: 'Warm & Cozy' },
-    { value: 'neutral-gray', label: t('theme_neutral') },
-    { value: 'neutral-ocean', label: t('theme_ocean') },
+    { value: 'neon-retro', label: 'Default - Neon Retro', color: '#00f3ff' },
+    { value: 'neon-blue', label: 'Neon Blue', color: '#3b82f6' },
+    { value: 'warm-cozy', label: 'Warm & Cozy', color: '#fbbf24' },
+    { value: 'neutral-gray', label: t('theme_neutral'), color: '#d4d4d4' },
+    { value: 'neutral-ocean', label: t('theme_ocean'), color: '#4B8CA8' },
   ];
 
   const cursorOptions = [
-    { value: 'default', label: t('cursor_default') },
-    { value: 'classic-blue', label: t('cursor_classic') },
-    { value: 'classic-warm', label: t('cursor_warm') },
-    { value: 'classic-white', label: t('cursor_white') },
-    { value: 'classic-ocean', label: t('cursor_ocean') },
+    { value: 'default', label: t('cursor_default'), color: '#00f3ff' },
+    { value: 'classic-blue', label: t('cursor_classic'), color: '#00f3ff' },
+    { value: 'classic-warm', label: t('cursor_warm'), color: '#ff8c00' },
+    { value: 'classic-white', label: t('cursor_white'), color: '#ffffff' },
+    { value: 'classic-ocean', label: t('cursor_ocean'), color: '#4B8CA8' },
   ];
 
   const controlStyleOptions = [
@@ -188,7 +194,7 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
             <div className="relative flex items-center bg-theme-panel border border-theme-border rounded h-7 w-20 cursor-pointer overflow-hidden shadow-inner">
                 {/* The Sliding Pill */}
                 <div 
-                    className={`absolute top-0.5 bottom-0.5 w-[calc(50%-2px)] bg-theme-primary rounded-sm transition-all duration-300 ease-out shadow-[0_0_10px_var(--color-primary)] opacity-90`}
+                    className={`absolute top-0 bottom-0 w-1/2 bg-theme-primary rounded-sm transition-all duration-300 ease-out shadow-[0_0_10px_var(--color-primary)] opacity-90`}
                     style={{
                         transform: language === 'en' ? 'translateX(2px)' : 'translateX(calc(100% + 2px))'
                     }}
@@ -220,6 +226,28 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
         <h3 className="text-xs font-mono text-theme-text mb-2 opacity-80 sticky top-0 bg-theme-bg pb-2 z-10 border-b border-theme-border">
             <TranslatedText k="system_params" />
         </h3>
+
+        {/* FILE MANAGEMENT (New Module at Top) */}
+        <ModuleWrapper id="files" label={<TranslatedText k="file_management" />} icon={Files} isEnabled={true} isAlwaysOn={true} isExpanded={expandedState['files']} onToggleExpand={() => toggleExpand('files')} onToggleEnable={() => {}}>
+            <FileManagement 
+                onBgMediaUpload={onBgMediaUpload}
+                onAudioUpload={onAudioUpload}
+                onSfxUpload={onSfxUpload}
+                onExportConfig={onExportConfig}
+                sfxMap={sfxMap}
+            />
+        </ModuleWrapper>
+
+        {/* PRESETS */}
+        <ModuleWrapper id="presets" label={<TranslatedText k="config_manager" />} icon={Save} isEnabled={true} isAlwaysOn={true} isExpanded={expandedState['presets']} onToggleExpand={() => toggleExpand('presets')} onToggleEnable={() => {}}>
+             <ConfigManager 
+                presets={savedPresets}
+                onSave={savePreset}
+                onLoad={loadPreset}
+                onDelete={deletePreset}
+                onRename={renamePreset}
+            />
+        </ModuleWrapper>
 
         {/* Color Schemes & Styles Module */}
         <ModuleWrapper id="themes" label={<TranslatedText k="color_schemes" />} icon={Palette} isEnabled={true} isAlwaysOn={true} isExpanded={expandedState['themes']} onToggleExpand={() => toggleExpand('themes')} onToggleEnable={() => {}}>
@@ -276,11 +304,17 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
                                 <ChevronDown size={14} className={`text-theme-primary opacity-70 transition-transform ${expandWatermark ? 'rotate-180' : ''}`} />
                              </div>
                              
-                             <div className={`transition-[max-height,opacity,padding] duration-300 ease-in-out overflow-hidden ${expandWatermark ? 'max-h-60 opacity-100 p-3 pt-0' : 'max-h-0 opacity-0 p-0'}`}>
-                                <div className="pl-4 pt-2 space-y-3 border-l-2 border-theme-muted ml-2">
-                                    <RangeControl label={<TranslatedText k="scale" />} value={watermarkConfig.scale} min={0.5} max={2.0} step={0.1} onChange={(v) => updateWatermark('scale', v)} className="mb-0" />
-                                    <RangeControl label={<TranslatedText k="opacity" />} value={watermarkConfig.opacity} min={0} max={1.0} step={0.1} onChange={(v) => updateWatermark('opacity', v)} className="mb-0" />
-                                    <RangeControl label={<TranslatedText k="flash_intensity" />} value={watermarkConfig.flashIntensity} min={0} max={1.0} step={0.1} onChange={(v) => updateWatermark('flashIntensity', v)} className="mb-0" />
+                             <div 
+                                className={`grid transition-[grid-template-rows,padding,opacity] duration-300 ease-in-out 
+                                    ${expandWatermark ? 'grid-rows-[1fr] opacity-100 p-3 pt-0' : 'grid-rows-[0fr] opacity-0 p-0'}
+                                `}
+                             >
+                                <div className="overflow-hidden">
+                                    <div className="pl-4 pt-2 space-y-3 border-l-2 border-theme-muted ml-2">
+                                        <RangeControl label={<TranslatedText k="scale" />} value={watermarkConfig.scale} min={0.5} max={2.0} step={0.1} onChange={(v) => updateWatermark('scale', v)} className="mb-0" />
+                                        <RangeControl label={<TranslatedText k="opacity" />} value={watermarkConfig.opacity} min={0} max={1.0} step={0.1} onChange={(v) => updateWatermark('opacity', v)} className="mb-0" />
+                                        <RangeControl label={<TranslatedText k="flash_intensity" />} value={watermarkConfig.flashIntensity} min={0} max={1.0} step={0.1} onChange={(v) => updateWatermark('flashIntensity', v)} className="mb-0" />
+                                    </div>
                                 </div>
                              </div>
                         </div>
@@ -289,16 +323,40 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
             </div>
         </ModuleWrapper>
 
+        {/* Background Header */}
+        <h3 className="text-xs font-mono text-theme-text mb-2 opacity-80 sticky top-0 bg-theme-bg pb-2 z-10 border-b border-theme-border mt-6">
+            <TranslatedText k="cat_backgrounds" />
+        </h3>
+
+        {/* Background Settings Module */}
+        <ModuleWrapper id="bg" label={<TranslatedText k="background" />} icon={ImageIcon} isEnabled={true} isAlwaysOn={true} isExpanded={expandedState['bg']} onToggleExpand={() => toggleExpand('bg')} onToggleEnable={() => {}}>
+            <BackgroundSettings 
+                bgColor={bgColor} setBgColor={setBgColor}
+                bgPattern={bgPattern} setBgPattern={setBgPattern}
+                bgPatternConfig={bgPatternConfig} setBgPatternConfig={setBgPatternConfig}
+                bgMedia={bgMedia} bgList={bgList} currentBgIndex={currentBgIndex}
+                onRemoveBg={onRemoveBg} onMoveBg={onMoveBg} onSelectBg={onSelectBg} onDeselectBg={onDeselectBg}
+                onClearBgMedia={onClearBgMedia}
+                bgAutoplayInterval={bgAutoplayInterval} setBgAutoplayInterval={setBgAutoplayInterval}
+                bgTransition={bgTransition} setBgTransition={setBgTransition}
+            />
+        </ModuleWrapper>
+
+        {/* SOUND EFFECTS HEADER (NEW) */}
+        <h3 className="text-xs font-mono text-theme-text mb-2 opacity-80 sticky top-0 bg-theme-bg pb-2 z-10 border-b border-theme-border mt-6">
+            <TranslatedText k="cat_sound_effects" />
+        </h3>
+
+        {/* MIXER (Moved Here) */}
+        <ModuleWrapper id="mixer" label={<TranslatedText k="mixer_deck" />} icon={AudioWaveform} isEnabled={true} isAlwaysOn={true} isExpanded={expandedState['mixer']} onToggleExpand={() => toggleExpand('mixer')} onToggleEnable={() => {}}>
+            <MixerSettings crossfadeDuration={crossfadeDuration} setCrossfadeDuration={setCrossfadeDuration} />
+        </ModuleWrapper>
+
         {/* Modules Header */}
         <h3 className="text-xs font-mono text-theme-text mb-2 opacity-80 sticky top-0 bg-theme-bg pb-2 z-10 border-b border-theme-border mt-6">
             <TranslatedText k="modules" />
         </h3>
         
-        {/* MIXER */}
-        <ModuleWrapper id="mixer" label={<TranslatedText k="mixer_deck" />} icon={AudioWaveform} isEnabled={true} isAlwaysOn={true} isExpanded={expandedState['mixer']} onToggleExpand={() => toggleExpand('mixer')} onToggleEnable={() => {}}>
-            <MixerSettings crossfadeDuration={crossfadeDuration} setCrossfadeDuration={setCrossfadeDuration} />
-        </ModuleWrapper>
-
         {/* WAVEFORM */}
         <ModuleWrapper id="wave" label={<TranslatedText k="waveform" />} icon={Activity} isEnabled={showVisualizer} isExpanded={expandedState['wave']} onToggleExpand={() => toggleExpand('wave')} onToggleEnable={() => setShowVisualizer(!showVisualizer)}>
             <VisualizerSettings config={visualizerConfig} update={updateVisualizer} />
@@ -359,47 +417,6 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
             <SignalSettings config={effectsConfig} update={updateEffect} />
         </ModuleWrapper>
       </div>
-
-      {/* Config Presets Panel */}
-      <div className="bg-theme-bg border-t border-theme-border shrink-0 z-20">
-        <button 
-          onClick={() => setShowPresets(!showPresets)}
-          className="w-full flex items-center justify-between p-3 text-xs font-mono text-theme-muted hover:text-theme-text hover:bg-theme-panel transition-colors"
-        >
-          <div className="flex items-center gap-2">
-            <Save size={14} className="text-theme-secondary" />
-            <span className="font-bold tracking-widest uppercase">
-                <TranslatedText k="config_manager" />
-            </span>
-          </div>
-          <ChevronUp size={14} className={`transition-transform duration-300 ${showPresets ? 'rotate-180' : ''}`} />
-        </button>
-        
-        <div className={`transition-all duration-300 ease-in-out overflow-hidden bg-theme-panel/30 ${showPresets ? 'max-h-[300px] border-b border-theme-border' : 'max-h-0'}`}>
-          <div className="p-4">
-             <ConfigManager 
-                presets={savedPresets}
-                onSave={savePreset}
-                onLoad={loadPreset}
-                onDelete={deletePreset}
-                onRename={renamePreset}
-            />
-          </div>
-        </div>
-      </div>
-
-      <BackgroundSettings 
-        bgColor={bgColor} setBgColor={setBgColor}
-        bgPattern={bgPattern} setBgPattern={setBgPattern}
-        bgPatternConfig={bgPatternConfig} setBgPatternConfig={setBgPatternConfig}
-        onBgMediaUpload={onBgMediaUpload} onAudioUpload={onAudioUpload}
-        onSfxUpload={onSfxUpload}
-        bgMedia={bgMedia} bgList={bgList} currentBgIndex={currentBgIndex}
-        onRemoveBg={onRemoveBg} onMoveBg={onMoveBg} onSelectBg={onSelectBg} onDeselectBg={onDeselectBg}
-        onClearBgMedia={onClearBgMedia} onExportConfig={onExportConfig}
-        bgAutoplayInterval={bgAutoplayInterval} setBgAutoplayInterval={setBgAutoplayInterval}
-        sfxMap={sfxMap}
-      />
       
       {showHelp && <HelpModal onClose={() => setShowHelp(false)} />}
     </div>

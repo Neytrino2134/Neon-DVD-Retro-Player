@@ -35,6 +35,8 @@ export const ru = {
   leaks_config: "НАСТРОЙКИ БЛИКОВ",
   signal_processor: "ОБРАБОТКА СИГНАЛА",
   background: "ФОНОВЫЙ РЕЖИМ",
+  cat_backgrounds: "ФОНЫ", // NEW
+  cat_sound_effects: "ЗВУКОВЫЕ ЭФФЕКТЫ", // NEW
   load_img: "ЗАГРУЗИТЬ ФОН",
   load_sfx_zip: "SFX АРХИВ (ZIP)",
   export_config: "ЭКСПОРТ КОНФИГА",
@@ -42,6 +44,7 @@ export const ru = {
   crossfade_duration: "КРОССФЕЙД (СЕК)",
   constant_power_hint: "Использует кривую постоянной мощности для плавности.",
   config_manager: "СОХРАНЕННЫЕ ПРЕСЕТЫ",
+  file_management: "УПРАВЛЕНИЕ ФАЙЛАМИ",
   
   // Controls
   size: "РАЗМЕР",
@@ -51,6 +54,7 @@ export const ru = {
   thickness: "ТОЛЩИНА",
   print_speed: "СКОР. ПЕЧАТИ",
   scale: "МАСШТАБ",
+  width: "ШИРИНА", 
   bg_opacity: "ПРОЗР. ФОНА",
   fps_limit: "ЛИМИТ FPS",
   pixelation: "ПИКСЕЛИЗАЦИЯ",
@@ -70,6 +74,8 @@ export const ru = {
   flash_intensity: "СИЛА ВСПЫШКИ",
   api_key_label: "API КЛЮЧ GEMINI",
   api_key_placeholder: "ВСТАВЬТЕ КЛЮЧ",
+  start_session: "НАЧАТЬ СЕССИЮ",
+  stop_session: "ОСТАНОВИТЬ",
 
   // Hologram Categories
   cat_system: "СИСТЕМНЫЕ",
@@ -160,6 +166,10 @@ export const ru = {
 
   // Background
   auto_timer: "АВТО-СМЕНА (МИН)",
+  transition_type: "ПЕРЕХОД",
+  trans_glitch: "ГЛИТЧ - СТАНДАРТ",
+  trans_leaks: "БЛИКИ - FADE",
+  trans_none: "НЕТ (РЕЗКО)",
 
   // Config Manager
   save_preset: "СОХРАНИТЬ",

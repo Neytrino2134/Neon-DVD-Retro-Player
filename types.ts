@@ -44,6 +44,7 @@ export type CursorStyle = 'default' | 'classic-blue' | 'classic-warm' | 'classic
 
 export type ThemeType = 'neon-retro' | 'neon-blue' | 'warm-cozy' | 'neutral-gray' | 'neutral-ocean';
 export type ControlStyle = 'default' | 'round' | 'circle';
+export type BgTransitionType = 'glitch' | 'leaks' | 'none'; // NEW
 
 export interface VisualizerConfig {
   style: VisualizerStyle;
@@ -102,7 +103,8 @@ export type HologramCategory = 'system' | 'interactive' | 'music' | 'motivationa
 export interface GeminiChatConfig {
   enabled: boolean;
   opacity: number;
-  scale: number;
+  scale: number; // Deprecated in UI but kept for type safety
+  width?: number; // New: Width in pixels
   typingSpeed: number; // 1 = Normal
   color?: string;
   categories: Record<HologramCategory, boolean>;
@@ -185,5 +187,6 @@ export interface AppPreset {
     cursorStyle?: CursorStyle;
     theme?: ThemeType;
     controlStyle?: ControlStyle;
+    bgTransition?: BgTransitionType; // New
   }
 }

@@ -81,31 +81,37 @@ const MarqueeSettings: React.FC<MarqueeSettingsProps> = ({ config, update }) => 
           </div>
           
           {/* Collapsible Progress Bar Settings */}
-          <div className={`transition-[max-height,opacity,padding] duration-300 ease-in-out overflow-hidden ${config.showProgress && expandTimeScale ? 'max-h-60 opacity-100 p-3 pt-0' : 'max-h-0 opacity-0 p-0'}`}>
-            <div className="pl-4 pt-2 space-y-3 border-l-2 border-theme-muted ml-2">
-               <CustomSelect 
-                  label={t('prog_mode')}
-                  value={config.progressMode || 'continuous'}
-                  options={[
-                    { value: 'continuous', label: t('prog_cont') },
-                    { value: 'blocks', label: t('prog_blocks') }
-                  ]}
-                  onChange={v => update('progressMode', v)}
-               />
-               <RangeControl 
-                  label={t('prog_height')} 
-                  value={config.progressHeight || 4} 
-                  min={2} max={20} step={1} 
-                  onChange={v => update('progressHeight', v)} 
-                  className="mb-0"
-               />
-               <RangeControl 
-                  label={t('prog_opacity')} 
-                  value={config.progressOpacity || 0.8} 
-                  min={0.1} max={1} step={0.1} 
-                  onChange={v => update('progressOpacity', v)} 
-                  className="mb-0"
-               />
+          <div 
+            className={`grid transition-[grid-template-rows,padding,opacity] duration-300 ease-in-out
+                ${config.showProgress && expandTimeScale ? 'grid-rows-[1fr] opacity-100 p-3 pt-0' : 'grid-rows-[0fr] opacity-0 p-0'}
+            `}
+          >
+            <div className="overflow-hidden">
+                <div className="pl-4 pt-2 space-y-3 border-l-2 border-theme-muted ml-2">
+                <CustomSelect 
+                    label={t('prog_mode')}
+                    value={config.progressMode || 'continuous'}
+                    options={[
+                        { value: 'continuous', label: t('prog_cont') },
+                        { value: 'blocks', label: t('prog_blocks') }
+                    ]}
+                    onChange={v => update('progressMode', v)}
+                />
+                <RangeControl 
+                    label={t('prog_height')} 
+                    value={config.progressHeight || 4} 
+                    min={2} max={20} step={1} 
+                    onChange={v => update('progressHeight', v)} 
+                    className="mb-0"
+                />
+                <RangeControl 
+                    label={t('prog_opacity')} 
+                    value={config.progressOpacity || 0.8} 
+                    min={0.1} max={1} step={0.1} 
+                    onChange={v => update('progressOpacity', v)} 
+                    className="mb-0"
+                />
+                </div>
             </div>
           </div>
         </div>

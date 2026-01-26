@@ -1,3 +1,4 @@
+
 import React, { useEffect, useRef } from 'react';
 import { EffectsConfig } from '../../types';
 
@@ -23,6 +24,16 @@ const LightLeaksEffect: React.FC<LightLeaksEffectProps> = ({ config }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const leaksRef = useRef<Leak[]>([]);
   const animationRef = useRef<number>(0);
+  
+  // Master opacity for smooth transitions (0 to 1)
+  const fadeLevelRef = useRef<number>(0);
+  
+  // Store config in ref to allow access inside render loop without restarting it
+  const configRef = useRef(config);
+
+  useEffect(() => {
+      configRef.current = config;
+  }, [config]);
 
   // Cinematic Color Palette (H, S, L)
   const PALETTE = [
@@ -55,11 +66,6 @@ const LightLeaksEffect: React.FC<LightLeaksEffectProps> = ({ config }) => {
   };
 
   useEffect(() => {
-    if (!config.enabled) {
-        leaksRef.current = [];
-        return;
-    }
-
     const canvas = canvasRef.current;
     if (!canvas) return;
     const ctx = canvas.getContext('2d');
@@ -68,14 +74,42 @@ const LightLeaksEffect: React.FC<LightLeaksEffectProps> = ({ config }) => {
     let w = canvas.width = canvas.offsetWidth;
     let h = canvas.height = canvas.offsetHeight;
 
-    leaksRef.current = initLeaks(w, h, config.number);
-
-    const render = (_timestamp: number) => {
+    const render = () => {
         // Handle Resize
         if (canvas.width !== canvas.offsetWidth || canvas.height !== canvas.offsetHeight) {
              w = canvas.width = canvas.offsetWidth;
              h = canvas.height = canvas.offsetHeight;
-             // Re-init if drastic change, or just let them float back in
+        }
+
+        const cfg = configRef.current;
+        const targetFade = cfg.enabled ? 1.0 : 0.0;
+        
+        // Smooth Interpolation for appearance/disappearance
+        // 0.05 factor gives a nice smooth fade over ~1-1.5 seconds
+        const delta = (targetFade - fadeLevelRef.current) * 0.05;
+        fadeLevelRef.current += delta;
+
+        // Snap to target if very close to avoid endless micro-calcs
+        if (Math.abs(targetFade - fadeLevelRef.current) < 0.001) {
+            fadeLevelRef.current = targetFade;
+        }
+
+        // Optimization: If completely faded out and disabled, stop drawing details
+        if (fadeLevelRef.current <= 0 && !cfg.enabled) {
+             ctx.clearRect(0, 0, w, h);
+             leaksRef.current = []; // Cleanup memory
+             animationRef.current = requestAnimationFrame(render);
+             return;
+        }
+
+        // Initialize leaks if needed
+        // 1. If we have opacity but no leaks (e.g. appearing)
+        if (leaksRef.current.length === 0 && fadeLevelRef.current > 0) {
+             leaksRef.current = initLeaks(w, h, cfg.number);
+        } 
+        // 2. If config number changed AND we are enabled (don't shift count while fading out to avoid pop)
+        else if (cfg.enabled && leaksRef.current.length !== cfg.number) {
+             leaksRef.current = initLeaks(w, h, cfg.number);
         }
 
         ctx.clearRect(0, 0, w, h);
@@ -83,7 +117,7 @@ const LightLeaksEffect: React.FC<LightLeaksEffectProps> = ({ config }) => {
         // Critical for the "Light" look
         ctx.globalCompositeOperation = 'screen'; 
 
-        const speedMultiplier = config.speed * 2;
+        const speedMultiplier = cfg.speed * 2;
 
         leaksRef.current.forEach((leak) => {
             // Physics Update
@@ -98,15 +132,15 @@ const LightLeaksEffect: React.FC<LightLeaksEffectProps> = ({ config }) => {
             leak.y += hoverY;
 
             // Bounce / Wrap Logic
-            // We actually want them to go off screen slightly, but wrap around for continuous flow
             if (leak.x < -leak.radius) leak.x = w + leak.radius;
             if (leak.x > w + leak.radius) leak.x = -leak.radius;
             if (leak.y < -leak.radius) leak.y = h + leak.radius;
             if (leak.y > h + leak.radius) leak.y = -leak.radius;
 
             // Draw
-            // Opacity oscillation
-            const currentOpacity = (leak.opacity + Math.sin(leak.phase * 0.5) * 0.1) * config.intensity;
+            // Opacity oscillation combined with Master Fade
+            const osc = Math.sin(leak.phase * 0.5) * 0.1;
+            const currentOpacity = (leak.opacity + osc) * cfg.intensity * fadeLevelRef.current;
             
             if (currentOpacity > 0) {
                 const gradient = ctx.createRadialGradient(leak.x, leak.y, 0, leak.x, leak.y, leak.radius);
@@ -120,14 +154,13 @@ const LightLeaksEffect: React.FC<LightLeaksEffectProps> = ({ config }) => {
 
                 ctx.fillStyle = gradient;
                 
-                // Optional: Draw slightly larger rectangle to ensure gradient covers
                 ctx.beginPath();
                 ctx.arc(leak.x, leak.y, leak.radius, 0, Math.PI * 2);
                 ctx.fill();
             }
         });
         
-        // Reset composite for next frame safety (though clearRect handles it usually)
+        // Reset composite for next frame safety
         ctx.globalCompositeOperation = 'source-over';
 
         animationRef.current = requestAnimationFrame(render);
@@ -138,21 +171,7 @@ const LightLeaksEffect: React.FC<LightLeaksEffectProps> = ({ config }) => {
     return () => {
         if (animationRef.current) cancelAnimationFrame(animationRef.current);
     };
-  }, [config.enabled, config.speed, config.intensity, config.number]);
-
-  // Handle re-init when count changes
-  useEffect(() => {
-      if (config.enabled && canvasRef.current) {
-          const w = canvasRef.current.width;
-          const h = canvasRef.current.height;
-          // Only re-init if count changed drastically or empty
-          if (leaksRef.current.length !== config.number) {
-              leaksRef.current = initLeaks(w, h, config.number);
-          }
-      }
-  }, [config.number]);
-
-  if (!config.enabled) return null;
+  }, []); // Run once on mount
 
   return (
     <canvas 

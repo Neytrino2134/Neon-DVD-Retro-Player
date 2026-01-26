@@ -93,7 +93,7 @@ const GeminiSettings: React.FC<GeminiSettingsProps> = ({ config, update, apiKey,
        
        <div className="border-t border-theme-border pt-2">
          <RangeControl label={t('opacity')} value={config.opacity} min={0.1} max={1} step={0.1} onChange={v => update({ ...config, opacity: v })} />
-         <RangeControl label={t('scale')} value={config.scale ?? 1.0} min={0.5} max={1.5} step={0.1} onChange={v => update({ ...config, scale: v })} />
+         <RangeControl label={t('width')} value={config.width || 350} min={300} max={800} step={10} onChange={v => update({ ...config, width: v })} />
          <RangeControl label={t('print_speed')} value={config.typingSpeed} min={0.5} max={3} step={0.5} onChange={v => update({ ...config, typingSpeed: v })} />
        </div>
     </div>

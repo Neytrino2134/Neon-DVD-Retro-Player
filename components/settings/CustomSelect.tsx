@@ -4,7 +4,8 @@ import { ChevronDown } from 'lucide-react';
 
 interface Option {
   value: number | string;
-  label: string; // Keep options as strings for now to simplify logic, usually options are static
+  label: string; 
+  color?: string; // Optional color for the icon
 }
 
 interface CustomSelectProps {
@@ -48,7 +49,15 @@ const CustomSelect: React.FC<CustomSelectProps> = ({ label, value, options, onCh
             }
           `}
         >
-          <span className="truncate">{selectedOption?.label}</span>
+          <div className="flex items-center gap-2 truncate">
+            {selectedOption?.color && (
+              <div 
+                className="w-2 h-2 rounded-full shrink-0 shadow-[0_0_5px_currentColor]" 
+                style={{ backgroundColor: selectedOption.color, color: selectedOption.color }}
+              ></div>
+            )}
+            <span className="truncate">{selectedOption?.label}</span>
+          </div>
           <div className={`transition-transform duration-200 ${isOpen ? 'rotate-180 text-theme-secondary' : 'text-gray-500'}`}>
              <ChevronDown size={14} />
           </div>
@@ -64,12 +73,18 @@ const CustomSelect: React.FC<CustomSelectProps> = ({ label, value, options, onCh
                   setIsOpen(false);
                 }}
                 className={`
-                  px-3 py-2 text-xs font-mono cursor-pointer transition-colors border-b border-gray-900 last:border-0
+                  px-3 py-2 text-xs font-mono cursor-pointer transition-colors border-b border-gray-900 last:border-0 flex items-center gap-2
                   ${option.value === value 
                     ? 'bg-theme-primary text-black font-bold' 
                     : 'text-theme-muted hover:bg-gray-900 hover:text-theme-primary'}
                 `}
               >
+                {option.color && (
+                  <div 
+                    className={`w-2 h-2 rounded-full shrink-0 ${option.value === value ? 'shadow-none ring-1 ring-black' : 'shadow-[0_0_5px_currentColor]'}`} 
+                    style={{ backgroundColor: option.color, color: option.color }}
+                  ></div>
+                )}
                 {option.label}
               </div>
             ))}

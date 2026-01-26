@@ -31,8 +31,8 @@ const ModuleWrapper: React.FC<ModuleWrapperProps> = ({
   useEffect(() => {
     let timeout: ReturnType<typeof setTimeout>;
     if (isExpanded && isEnabled) {
-      // Delay setting overflow to visible until animation likely finishes
-      timeout = setTimeout(() => setAllowOverflow(true), 350); 
+      // Delay setting overflow to visible until animation finishes
+      timeout = setTimeout(() => setAllowOverflow(true), 300); 
     } else {
       setAllowOverflow(false);
     }
@@ -97,14 +97,16 @@ const ModuleWrapper: React.FC<ModuleWrapperProps> = ({
         )}
       </div>
 
+      {/* Grid Transition for Smooth Height Animation */}
       <div 
-        className={`transition-[max-height,opacity] duration-300 ease-in-out
-          ${isExpanded && isEnabled ? 'max-h-[3000px] opacity-100' : 'max-h-0 opacity-0'}
-          ${allowOverflow && isExpanded && isEnabled ? 'overflow-visible' : 'overflow-hidden'}
+        className={`grid transition-[grid-template-rows,opacity,padding] duration-300 ease-in-out
+          ${isExpanded && isEnabled ? 'grid-rows-[1fr] opacity-100' : 'grid-rows-[0fr] opacity-0'}
         `}
       >
-        <div className="p-3 pt-0 border-t border-theme-border">
-          {children}
+        <div className={`${allowOverflow && isExpanded && isEnabled ? 'overflow-visible' : 'overflow-hidden'}`}>
+            <div className="p-3 pt-0 border-t border-theme-border">
+              {children}
+            </div>
         </div>
       </div>
     </div>

@@ -1,9 +1,10 @@
+
 import React, { useEffect, useState, useRef } from 'react';
 import { EffectsConfig } from '../../types';
 import { GoogleGenAI } from "@google/genai";
 import { questionsEn, questionsRu, offlineAnswersEn, offlineAnswersRu } from '../../data/geminiQuestions';
 import { useLanguage } from '../../contexts/LanguageContext';
-import { Bot, User, Send, Cpu, WifiOff } from 'lucide-react';
+import { Bot, User, Send, Cpu, WifiOff, Play, Square } from 'lucide-react';
 
 interface GeminiChatEffectProps {
   effects: EffectsConfig;
@@ -23,17 +24,19 @@ const MAX_INTERVAL = 15;
 
 const GeminiChatEffect: React.FC<GeminiChatEffectProps> = ({ effects, apiKey }) => {
   const config = effects.geminiChat;
-  const { language } = useLanguage();
+  const { language, t } = useLanguage();
   
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputText, setInputText] = useState("");
   const [isAiProcessing, setIsAiProcessing] = useState(false);
   const [isOfflineMode, setIsOfflineMode] = useState(false); // Track connectivity
+  const [isSessionActive, setIsSessionActive] = useState(false); // Manages session state
   
   // Refs for State machine
-  const nextTriggerTime = useRef<number>(Date.now() + 5000); // Start soon after load
+  const nextTriggerTime = useRef<number>(0); 
   const isActionInProgress = useRef(false);
   const chatBottomRef = useRef<HTMLDivElement>(null);
+  const intervalRef = useRef<number | null>(null);
 
   // Dynamic Color
   const baseColor = (!config.color || config.color === 'theme') ? 'var(--color-primary)' : config.color;
@@ -45,17 +48,47 @@ const GeminiChatEffect: React.FC<GeminiChatEffectProps> = ({ effects, apiKey }) 
 
   // --- AUTOMATION LOOP ---
   useEffect(() => {
-    if (!config.enabled) return;
+    if (!config.enabled || !isSessionActive) {
+        if (intervalRef.current) {
+            clearInterval(intervalRef.current);
+            intervalRef.current = null;
+        }
+        return;
+    }
 
-    const intervalId = setInterval(() => {
+    // Trigger immediately if just started
+    if (nextTriggerTime.current === 0) {
+        triggerAutomatedSession();
+    }
+
+    intervalRef.current = window.setInterval(() => {
         const now = Date.now();
         if (now >= nextTriggerTime.current && !isActionInProgress.current) {
             triggerAutomatedSession();
         }
     }, 1000);
 
-    return () => clearInterval(intervalId);
-  }, [config.enabled, language, config.categories, apiKey]); // Add apiKey dependency
+    return () => {
+        if (intervalRef.current) {
+            clearInterval(intervalRef.current);
+            intervalRef.current = null;
+        }
+    };
+  }, [config.enabled, isSessionActive, language, config.categories, apiKey]); 
+
+  const startSession = () => {
+      setIsSessionActive(true);
+      // Reset trigger time to 0 so it starts immediately in the effect
+      nextTriggerTime.current = 0;
+  };
+
+  const stopSession = () => {
+      setIsSessionActive(false);
+      isActionInProgress.current = false;
+      setIsAiProcessing(false);
+      setInputText("");
+      if (intervalRef.current) clearInterval(intervalRef.current);
+  };
 
   const triggerAutomatedSession = async () => {
       isActionInProgress.current = true;
@@ -120,6 +153,12 @@ const GeminiChatEffect: React.FC<GeminiChatEffectProps> = ({ effects, apiKey }) 
           const speed = 50 / (config.typingSpeed || 1); // Base typing speed for input
 
           const typeLoop = () => {
+              // Safety check if stopped
+              if (!isSessionActive) {
+                  setInputText("");
+                  return;
+              }
+
               if (i < text.length) {
                   current += text[i];
                   setInputText(current);
@@ -144,6 +183,11 @@ const GeminiChatEffect: React.FC<GeminiChatEffectProps> = ({ effects, apiKey }) 
           const speed = 30 / (config.typingSpeed || 1); // Faster reading speed
 
           const typeLoop = () => {
+              if (!isSessionActive) {
+                  setMessages(prev => prev.map(m => m.id === msgId ? { ...m, isTyping: false } : m));
+                  return;
+              }
+
               if (i < text.length) {
                   current += text[i];
                   // Update the specific message
@@ -192,13 +236,15 @@ const GeminiChatEffect: React.FC<GeminiChatEffectProps> = ({ effects, apiKey }) 
 
   if (!config.enabled) return null;
 
+  const width = config.width || 350;
+
   return (
     <div 
-        className="absolute right-8 top-24 bottom-24 z-20 flex flex-col w-[350px] pointer-events-none transition-all duration-500 backdrop-blur-sm"
+        className="absolute right-8 top-24 bottom-24 z-20 flex flex-col pointer-events-auto transition-all duration-500 backdrop-blur-sm"
         style={{
+            width: `${width}px`,
             opacity: config.opacity,
-            transform: `scale(${config.scale})`,
-            transformOrigin: 'center right',
+            // Removed scale transform, handled by width
             backgroundColor: `color-mix(in srgb, ${baseColor}, transparent 95%)`,
             border: `1px solid color-mix(in srgb, ${baseColor}, transparent 60%)`,
             boxShadow: `0 0 30px color-mix(in srgb, ${baseColor}, transparent 80%)`,
@@ -225,7 +271,7 @@ const GeminiChatEffect: React.FC<GeminiChatEffectProps> = ({ effects, apiKey }) 
                     {isOfflineMode ? "NEURAL LINK // SIMULATION" : "NEURAL LINK // GEMINI-LIVE"}
                 </span>
             </div>
-            <div className={`w-2 h-2 rounded-full ${isOfflineMode ? 'bg-yellow-500' : 'animate-pulse'}`} style={{ backgroundColor: isOfflineMode ? undefined : baseColor }}></div>
+            <div className={`w-2 h-2 rounded-full ${isSessionActive ? (isOfflineMode ? 'bg-yellow-500' : 'animate-pulse') : 'bg-red-500'}`} style={{ backgroundColor: (isSessionActive && !isOfflineMode) ? baseColor : undefined }}></div>
         </div>
 
         {/* Chat History */}
@@ -237,6 +283,13 @@ const GeminiChatEffect: React.FC<GeminiChatEffectProps> = ({ effects, apiKey }) 
                     backgroundImage: `linear-gradient(color-mix(in srgb, ${baseColor}, transparent 80%) 1px, transparent 1px)`
                 }}
             ></div>
+
+            {messages.length === 0 && !isSessionActive && (
+                <div className="flex-1 flex flex-col items-center justify-center opacity-50 text-center gap-2 select-none">
+                    <Bot size={32} style={{ color: baseColor }} />
+                    <span style={{ color: baseColor }} className="text-[10px] tracking-widest">SYSTEM STANDBY</span>
+                </div>
+            )}
 
             {messages.map(msg => (
                 <div 
@@ -276,23 +329,50 @@ const GeminiChatEffect: React.FC<GeminiChatEffectProps> = ({ effects, apiKey }) 
             <div ref={chatBottomRef}></div>
         </div>
 
-        {/* Footer Input */}
+        {/* Footer / Controls */}
         <div 
-            className="p-3 border-t relative"
+            className="p-2 border-t relative"
             style={{ 
                 borderColor: `color-mix(in srgb, ${baseColor}, transparent 70%)`,
                 backgroundColor: `color-mix(in srgb, ${baseColor}, transparent 95%)`,
                 borderBottomLeftRadius: '19px'
             }}
         >
-            <div className="flex items-center gap-2">
-                <span style={{ color: baseColor }}>{'>'}</span>
-                <div className="flex-1 font-mono text-xs text-white h-4 flex items-center">
-                    {inputText}
-                    <span className="w-1.5 h-3 animate-pulse ml-0.5" style={{ backgroundColor: baseColor }}></span>
+            {isSessionActive ? (
+                <div className="flex items-center gap-2">
+                    {/* Simulated Input Display */}
+                    <div className="flex-1 flex items-center gap-2 px-2 py-1 bg-black/20 rounded border border-transparent">
+                        <span style={{ color: baseColor }}>{'>'}</span>
+                        <div className="flex-1 font-mono text-xs text-white h-4 flex items-center truncate">
+                            {inputText}
+                            <span className="w-1.5 h-3 animate-pulse ml-0.5" style={{ backgroundColor: baseColor }}></span>
+                        </div>
+                        <Send size={12} style={{ color: baseColor, opacity: 0.5 }} />
+                    </div>
+                    {/* Stop Button */}
+                    <button 
+                        onClick={stopSession}
+                        className="p-1.5 rounded border transition-all hover:opacity-100 opacity-70 flex items-center gap-1 group"
+                        style={{ borderColor: `color-mix(in srgb, ${baseColor}, transparent 70%)`, color: baseColor }}
+                        title={t('stop_session')}
+                    >
+                        <Square size={12} fill="currentColor" />
+                    </button>
                 </div>
-                <Send size={14} style={{ color: baseColor, opacity: 0.5 }} />
-            </div>
+            ) : (
+                <button 
+                    onClick={startSession}
+                    className="w-full py-2 flex items-center justify-center gap-2 rounded border transition-all hover:opacity-100 opacity-80"
+                    style={{ 
+                        borderColor: baseColor, 
+                        backgroundColor: `color-mix(in srgb, ${baseColor}, transparent 90%)`,
+                        color: baseColor 
+                    }}
+                >
+                    <Play size={12} fill="currentColor" />
+                    <span className="font-mono text-[10px] font-bold tracking-widest">{t('start_session')}</span>
+                </button>
+            )}
         </div>
     </div>
   );
