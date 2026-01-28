@@ -11,13 +11,15 @@ export const en = {
   cursor_warm: "CLASSIC WARM",
   cursor_white: "CLASSIC WHITE",
   cursor_ocean: "CLASSIC OCEAN",
+  cursor_dos: "DOS TERMINAL",
+  cursor_system: "SYSTEM DEFAULT", // NEW
   control_style: "CONTROLS STYLE",
   style_default: "SQUARE (DEFAULT)",
   style_round: "ROUNDED",
   style_circle: "CIRCLE",
   waveform: "WAVEFORM",
   dvd_saver: "DVD SAVER",
-  top_marquee: "TOP MARQUEE",
+  top_marquee: "TOP TEXT LINE", // Renamed
   watermark_settings: "WATERMARK SETTINGS",
   scanlines: "SCANLINES",
   cyber_hack: "CYBER HACK",
@@ -35,8 +37,8 @@ export const en = {
   leaks_config: "LEAKS CONFIG",
   signal_processor: "SIGNAL PROCESSOR",
   background: "BACKGROUND",
-  cat_backgrounds: "BACKGROUNDS", // NEW
-  cat_sound_effects: "SOUND EFFECTS", // NEW
+  cat_backgrounds: "BACKGROUNDS", 
+  cat_sound_effects: "SOUND EFFECTS", 
   load_img: "LOAD IMG/VIDEO",
   load_sfx_zip: "LOAD SFX (ZIP)",
   export_config: "EXPORT NRP CONFIG",
@@ -45,6 +47,20 @@ export const en = {
   constant_power_hint: "Uses Constant Power curve for smooth transitions.",
   config_manager: "CONFIG PRESETS",
   file_management: "FILE MANAGEMENT",
+  
+  // Ambience
+  ambience: "AMBIENCE (BG SOUND)",
+  error_no_ambience: "NO AMBIENCE FILES LOADED",
+  no_ambience_files: "LOAD AUDIO FILES (MP3/WAV)",
+  enable_ambience: "PLAYBACK ACTIVE", 
+  
+  // Screen Capture
+  sys_audio_input: "SYSTEM AUDIO INPUT",
+  capture_audio: "CAPTURE AUDIO",
+  capture_video: "SCREEN VIDEO",
+  start_screen: "START SCREEN SHARE",
+  stop_screen: "STOP SHARING",
+  volume: "VOLUME",
   
   // Controls
   size: "SIZE",
@@ -142,6 +158,7 @@ export const en = {
   style_gray: "NEUTRAL (GRAY)",
   style_ocean: "OCEAN (TEAL)",
   style_theme_blue: "ROYAL BLUE",
+  style_theme_sync: "THEME SYNC",
   
   pos_top: "TOP",
   pos_center: "CENTER",

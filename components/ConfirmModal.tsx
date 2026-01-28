@@ -56,7 +56,7 @@ const ConfirmModal: React.FC<ConfirmModalProps> = ({ onConfirm, onCancel, transl
   const handleCancel = () => triggerClose(onCancel);
 
   // Styles calculation based on phase
-  const overlayClass = `fixed inset-0 z-[100] flex items-center justify-center bg-black/90 backdrop-blur-sm p-4 transition-opacity duration-500 ${animPhase >= 1 ? 'opacity-100' : 'opacity-0'}`;
+  const overlayClass = `absolute inset-0 z-[100] flex items-center justify-center bg-black/90 backdrop-blur-sm p-4 transition-opacity duration-500 ${animPhase >= 1 ? 'opacity-100' : 'opacity-0'}`;
   
   const windowStyle: React.CSSProperties = {
     width: animPhase >= 2 ? '100%' : '0px',
@@ -67,6 +67,7 @@ const ConfirmModal: React.FC<ConfirmModalProps> = ({ onConfirm, onCancel, transl
 
   const contentClass = `flex flex-col h-full items-center justify-center text-center p-6 overflow-hidden transition-opacity duration-500 ${animPhase >= 4 ? 'opacity-100' : 'opacity-0'}`;
 
+  // Render inline (absolute to parent) instead of Portal to contain it within specific panels
   return (
     <div className={overlayClass} onClick={handleCancel}>
       <div 

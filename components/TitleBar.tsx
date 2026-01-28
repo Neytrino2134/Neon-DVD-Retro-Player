@@ -1,8 +1,16 @@
 
 import React, { useState, useEffect } from 'react';
-import { Minus, Square, X, Disc } from 'lucide-react';
+import { Minus, Square, X, Disc, Maximize2, Radio } from 'lucide-react';
+import { ViewMode, AudioTrack } from '../types';
+import { Tooltip } from './ui/Tooltip';
 
-const TitleBar: React.FC = () => {
+interface TitleBarProps {
+  viewMode?: ViewMode;
+  onRestore?: () => void;
+  currentTrack?: AudioTrack;
+}
+
+const TitleBar: React.FC<TitleBarProps> = ({ viewMode = 'default', onRestore, currentTrack }) => {
   const [isElectron, setIsElectron] = useState(false);
   const [ipcRenderer, setIpcRenderer] = useState<any>(null);
 
@@ -25,33 +33,95 @@ const TitleBar: React.FC = () => {
   const handleMaximize = () => ipcRenderer?.send('window-maximize');
   const handleClose = () => ipcRenderer?.send('window-close');
 
+  // --- MINI MODE HEADER ---
+  if (viewMode === 'mini') {
+      return (
+        <div className="h-8 bg-[#111827] flex items-center justify-between select-none z-[99999] w-full shrink-0">
+            {/* Draggable Area - Mini */}
+            <div className="flex-1 h-full flex items-center px-3 gap-2 app-drag-region overflow-hidden">
+                <Radio size={14} className="text-theme-primary animate-pulse shrink-0" />
+                <div className="flex-1 overflow-hidden relative h-full flex items-center">
+                    {currentTrack ? (
+                        <div className="whitespace-nowrap text-[10px] font-mono font-bold text-theme-text animate-marquee w-full">
+                            {currentTrack.name.toUpperCase()}  ***  {currentTrack.name.toUpperCase()}
+                        </div>
+                    ) : (
+                        <span className="text-[10px] font-mono font-bold text-theme-muted tracking-widest">
+                            NEON PLAYER // MINI
+                        </span>
+                    )}
+                </div>
+            </div>
+
+            {/* Window Controls - Mini */}
+            <div className="flex h-full app-no-drag">
+                {/* RESTORE BUTTON */}
+                <Tooltip content="RESTORE FULL VIEW" position="bottom">
+                    <button 
+                        onClick={onRestore}
+                        className="system-cursor w-10 h-full flex items-center justify-center text-theme-accent transition-all duration-200 hover:bg-white/5 hover:text-white focus:outline-none"
+                    >
+                        <Maximize2 size={12} />
+                    </button>
+                </Tooltip>
+
+                <button 
+                    onClick={handleMinimize}
+                    className="system-cursor w-10 h-full flex items-center justify-center text-theme-muted transition-all duration-200 hover:bg-white/5 hover:text-theme-primary focus:outline-none"
+                >
+                    <Minus size={12} />
+                </button>
+                
+                <button 
+                    onClick={handleClose}
+                    className="system-cursor w-10 h-full flex items-center justify-center text-theme-muted transition-all duration-200 hover:bg-white/5 hover:text-red-500 focus:outline-none"
+                >
+                    <X size={12} />
+                </button>
+            </div>
+        </div>
+      );
+  }
+
+  // --- DEFAULT HEADER ---
   return (
-    <div className="h-8 bg-theme-bg border-b border-theme-border flex items-center justify-between select-none z-[99999] w-full shrink-0">
+    <div className="h-8 bg-gray-950 flex items-center justify-between select-none z-[99999] w-full shrink-0 transition-colors duration-500">
       {/* Draggable Area */}
-      <div className="flex-1 h-full flex items-center px-3 gap-2 app-drag-region">
-        <Disc size={16} className="text-theme-primary animate-spin-slow" />
-        <span className="text-[10px] font-mono font-bold text-theme-text tracking-widest opacity-80 pt-0.5">
+      <div className="flex-1 h-full flex items-center px-3 gap-2 app-drag-region overflow-hidden">
+        {/* Logo Icon - Uses Theme Accent Color */}
+        <Disc size={16} className="text-theme-accent animate-spin-slow shrink-0" />
+        
+        {/* Title Text - Uses Theme Primary Color */}
+        <span className="text-[10px] font-mono font-bold text-theme-primary tracking-widest pt-0.5 truncate drop-shadow-[0_0_5px_rgba(0,0,0,0.5)]">
           NEON RETRO PLAYER
         </span>
       </div>
 
       {/* Window Controls (No Drag) */}
       <div className="flex h-full app-no-drag">
+        {/* Minimize Button - Theme Highlight on Hover */}
         <button 
           onClick={handleMinimize}
-          className="system-cursor w-10 h-full flex items-center justify-center text-theme-muted hover:bg-theme-panel hover:text-theme-text transition-colors focus:outline-none"
+          className="system-cursor w-12 h-full flex items-center justify-center text-theme-muted transition-all duration-200 hover:bg-white/5 hover:text-theme-primary hover:shadow-[inset_0_-2px_0_var(--color-primary)] focus:outline-none"
+          title="Minimize"
         >
           <Minus size={14} />
         </button>
+        
+        {/* Maximize Button - Theme Highlight on Hover */}
         <button 
           onClick={handleMaximize}
-          className="system-cursor w-10 h-full flex items-center justify-center text-theme-muted hover:bg-theme-panel hover:text-theme-text transition-colors focus:outline-none"
+          className="system-cursor w-12 h-full flex items-center justify-center text-theme-muted transition-all duration-200 hover:bg-white/5 hover:text-theme-primary hover:shadow-[inset_0_-2px_0_var(--color-primary)] focus:outline-none"
+          title="Maximize"
         >
           <Square size={12} />
         </button>
+        
+        {/* Close Button - Red Icon + Red Underline on Hover */}
         <button 
           onClick={handleClose}
-          className="system-cursor w-10 h-full flex items-center justify-center text-theme-muted hover:bg-red-500 hover:text-white transition-colors focus:outline-none"
+          className="system-cursor w-12 h-full flex items-center justify-center text-theme-muted transition-all duration-200 hover:bg-white/5 hover:text-red-500 hover:shadow-[inset_0_-2px_0_#ef4444] focus:outline-none"
+          title="Close"
         >
           <X size={14} />
         </button>

@@ -84,7 +84,7 @@ const BackgroundSettings: React.FC<BackgroundSettingsProps> = ({
                   setBgColor(c); 
                   if (onDeselectBg) onDeselectBg(); 
                   }} 
-                  className={`h-6 rounded-sm border ${bgColor === c && !bgMedia ? 'border-theme-secondary shadow-[0_0_10px_var(--color-secondary)] scale-105' : 'border-gray-600 hover:border-theme-text'}`} 
+                  className={`h-6 rounded-sm border ${bgColor === c && !bgMedia ? 'border-theme-secondary shadow-[0_0_10px_var(--color-secondary)] scale-105' : 'border-gray-600 hover:border-theme-primary'}`} 
                   style={{ backgroundColor: c }} 
               />
               ))}
@@ -103,7 +103,7 @@ const BackgroundSettings: React.FC<BackgroundSettingsProps> = ({
                       px-1 py-1 text-[9px] font-mono border rounded-sm transition-all
                       ${bgPattern === p.id 
                           ? 'border-theme-primary bg-theme-primary/20 text-theme-primary shadow-[0_0_5px_var(--color-primary)]' 
-                          : 'border-theme-border bg-black/20 text-theme-muted hover:border-theme-text'}
+                          : 'border-theme-border bg-black/20 text-theme-muted hover:border-theme-primary hover:text-theme-text'}
                   `}
               >
                   {p.label}
@@ -134,7 +134,7 @@ const BackgroundSettings: React.FC<BackgroundSettingsProps> = ({
 
       {/* BG List Resource (Collapsible) */}
       {bgList.length > 0 && (
-          <div className="rounded border border-theme-border bg-theme-panel/40 overflow-hidden mt-4 hover:border-theme-primary transition-colors duration-300">
+          <div className="rounded bg-theme-panel/40 overflow-hidden mt-4 transition-all duration-300 border border-theme-border hover:border-theme-primary hover:shadow-[0_0_5px_var(--color-primary)]">
               <button 
                   onClick={() => setShowBgList(!showBgList)}
                   className="w-full flex items-center justify-between p-2 text-xs font-mono text-theme-muted hover:text-theme-text hover:bg-theme-panel transition-colors"

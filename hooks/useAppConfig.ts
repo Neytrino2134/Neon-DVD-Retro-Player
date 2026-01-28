@@ -2,120 +2,54 @@
 import { useState, useEffect, useCallback } from 'react';
 import { VisualizerConfig, DvdConfig, EffectsConfig, MarqueeConfig, BackgroundMedia, PatternConfig, AppPreset, CursorStyle, WatermarkConfig, ThemeType, ControlStyle, BgTransitionType } from '../types';
 import { getAllBackgrounds, saveBackground, clearBackgrounds, deleteBackground } from '../lib/db';
+import { 
+  DEFAULT_VISUALIZER_CONFIG, 
+  DEFAULT_REACTOR_CONFIG,
+  DEFAULT_DVD_CONFIG, 
+  DEFAULT_EFFECTS_CONFIG, 
+  DEFAULT_MARQUEE_CONFIG, 
+  DEFAULT_WATERMARK_CONFIG 
+} from '../config/defaults';
+import { DEFAULT_PRESETS, DEFAULT_SYSTEM_PRESET } from '../config/presets';
 
 const STORAGE_KEYS = {
   VISUALIZER: 'neon_visualizer_config',
+  REACTOR: 'neon_reactor_config', // NEW
   DVD: 'neon_dvd_config',
   EFFECTS: 'neon_effects_config',
   BG_COLOR: 'neon_bg_color',
   BG_PATTERN: 'neon_bg_pattern',
   BG_PATTERN_CONFIG: 'neon_bg_pattern_config',
   SHOW_VISUALIZER: 'neon_show_visualizer',
+  SHOW_VISUALIZER_3D: 'neon_show_visualizer_3d', 
   SHOW_DVD: 'neon_show_dvd',
   MARQUEE: 'neon_marquee_config',
   WATERMARK: 'neon_watermark_config',
   BG_AUTOPLAY: 'neon_bg_autoplay_interval',
   PRESETS: 'neon_config_presets',
+  ACTIVE_PRESET: 'neon_active_preset_id', 
   CURSOR: 'neon_cursor_style',
   API_KEY: 'neon_gemini_api_key',
   BG_TRANSITION: 'neon_bg_transition'
 };
 
-// --- DEFAULT CONFIGURATIONS (Source of Truth) ---
-
-const DEFAULT_VISUALIZER_CONFIG: VisualizerConfig = {
-  style: 'blue', position: 'bottom', barCount: 128, sensitivity: 1.5, fillOpacity: 0.3,
-  strokeEnabled: true, strokeOpacity: 0.8, showTips: true, normalize: false, preventVolumeScaling: false, minFrequency: 0, maxFrequency: 100, 
-  barGap: 2, mirror: false, segmented: false, segmentHeight: 4, segmentGap: 2,
-  tipHeight: 2, tipSpeed: 15, highlightLastBrick: false, tipColor: 'white', tipGlow: false, barGravity: 5
-};
-
-const DEFAULT_DVD_CONFIG: DvdConfig = { 
-  size: 150, speed: 2, opacity: 0.7, enableSfx: false, logoType: 'neon_waves' 
-};
-
-const DEFAULT_EFFECTS_CONFIG: EffectsConfig = {
-  fps: 60, pixelation: 1, noise: 0, chromaticAberration: 0, vhsJitter: 0, scanlineEnabled: true, scanlineIntensity: 0.2, scanlineThickness: 4,
-  glitch: { enabled: false, intensity: 0.5, speed: 0.2, opacity: 1.0, variant: 'v1' },
-  cyberHack: { enabled: false, speed: 5, opacity: 0.7, density: 0.5, scale: 1.0, backgroundOpacity: 0.4 },
-  debugConsole: { enabled: false, opacity: 0.9, scale: 1.0 },
-  holograms: { 
-    enabled: false, opacity: 0.8, speed: 1.0, interval: 15, scale: 1.0, enableIcons: false,
-    categories: { system: true, interactive: true, music: true, motivational: true, philosophy: false, space: false }
-  },
-  geminiChat: {
-    enabled: false, opacity: 0.9, scale: 1.0, width: 350, typingSpeed: 1.0,
-    categories: { system: false, interactive: true, music: true, motivational: true, philosophy: true, space: true }
-  },
-  lightLeaks: { enabled: false, intensity: 0.5, speed: 0.5, number: 6 }
-};
-
-const DEFAULT_MARQUEE_CONFIG: MarqueeConfig = {
-  enabled: true, style: 'matrix', showProgress: true, progressMode: 'blocks', progressHeight: 20, progressOpacity: 0.6,
-  speed: 1, opacity: 0.9, fontSize: 40
-};
-
-const DEFAULT_WATERMARK_CONFIG: WatermarkConfig = { 
-  scale: 1.0, opacity: 1.0, flashIntensity: 0.5 
-};
-
-const DEFAULT_PRESETS: AppPreset[] = [
-  {
-    id: 'default_system',
-    name: 'Default System',
-    createdAt: Date.now(),
-    config: {
-      visualizerConfig: DEFAULT_VISUALIZER_CONFIG,
-      dvdConfig: DEFAULT_DVD_CONFIG,
-      effectsConfig: DEFAULT_EFFECTS_CONFIG,
-      marqueeConfig: DEFAULT_MARQUEE_CONFIG,
-      watermarkConfig: DEFAULT_WATERMARK_CONFIG,
-      bgColor: '#0f172a',
-      bgPattern: 'none',
-      bgPatternConfig: { intensity: 0.25, scale: 1.0 },
-      showVisualizer: true,
-      showDvd: true,
-      bgAutoplayInterval: 5,
-      cursorStyle: 'default',
-      theme: 'neon-retro',
-      controlStyle: 'default',
-      bgTransition: 'glitch'
-    }
-  },
-  // ... (Other presets can be reconstructed similarly using defaults + overrides if needed)
-];
-
 // --- HELPER: SAFE MERGE ---
-// Recursively merges 'source' into 'defaults'. 
-// If a key is missing in 'source', 'defaults' value is kept.
-// If type mismatches, 'defaults' value is kept.
-// Extra keys in 'source' are ignored.
 const safeMerge = <T>(defaults: T, source: any): T => {
   if (source === undefined || source === null) return defaults;
-  
-  // Primitives: strict type check (allow number <-> float, ignore strings for numbers)
   if (typeof defaults !== 'object' || defaults === null) {
-      // Special case: allow older configs to load if simple types match
       return (typeof source === typeof defaults) ? source : defaults;
   }
-
-  // Arrays: Replace entirely (assuming arrays are lists of items, not settings structures)
   if (Array.isArray(defaults)) {
       return Array.isArray(source) ? source as unknown as T : defaults;
   }
-
-  // Objects: Recursive merge
   const result: any = { ...defaults }; 
   for (const key in defaults) {
       if (Object.prototype.hasOwnProperty.call(defaults, key)) {
-          // If source has the key, try to merge it
           if (Object.prototype.hasOwnProperty.call(source, key)) {
               result[key] = safeMerge(defaults[key], source[key]);
           }
-          // Else: keep default value (already in result)
       }
   }
-  
   return result as T;
 };
 
@@ -124,7 +58,6 @@ const getInitial = <T,>(key: string, defaultValue: T): T => {
   if (!saved) return defaultValue;
   try { 
       const parsed = JSON.parse(saved);
-      // Validate/Repair on load to prevent crashes from bad localStorage data
       return safeMerge(defaultValue, parsed);
   } catch { 
       return defaultValue; 
@@ -134,13 +67,18 @@ const getInitial = <T,>(key: string, defaultValue: T): T => {
 export const useAppConfig = () => {
   const [apiKey, setApiKey] = useState(() => localStorage.getItem(STORAGE_KEYS.API_KEY) || '');
   const [showVisualizer, setShowVisualizer] = useState(() => getInitial(STORAGE_KEYS.SHOW_VISUALIZER, true));
+  const [showVisualizer3D, setShowVisualizer3D] = useState(() => getInitial(STORAGE_KEYS.SHOW_VISUALIZER_3D, false)); 
   const [showDvd, setShowDvd] = useState(() => getInitial(STORAGE_KEYS.SHOW_DVD, true));
-  const [cursorStyle, setCursorStyle] = useState<CursorStyle>(() => getInitial(STORAGE_KEYS.CURSOR, 'default'));
+  const [cursorStyle, setCursorStyle] = useState<CursorStyle>(() => getInitial(STORAGE_KEYS.CURSOR, 'theme-sync'));
   const [bgTransition, setBgTransition] = useState<BgTransitionType>(() => getInitial(STORAGE_KEYS.BG_TRANSITION, 'glitch'));
   
   const [marqueeConfig, setMarqueeConfig] = useState<MarqueeConfig>(() => getInitial(STORAGE_KEYS.MARQUEE, DEFAULT_MARQUEE_CONFIG));
   const [watermarkConfig, setWatermarkConfig] = useState<WatermarkConfig>(() => getInitial(STORAGE_KEYS.WATERMARK, DEFAULT_WATERMARK_CONFIG));
+  
+  // Independent Configs
   const [visualizerConfig, setVisualizerConfig] = useState<VisualizerConfig>(() => getInitial(STORAGE_KEYS.VISUALIZER, DEFAULT_VISUALIZER_CONFIG));
+  const [reactorConfig, setReactorConfig] = useState<VisualizerConfig>(() => getInitial(STORAGE_KEYS.REACTOR, DEFAULT_REACTOR_CONFIG));
+  
   const [dvdConfig, setDvdConfig] = useState<DvdConfig>(() => getInitial(STORAGE_KEYS.DVD, DEFAULT_DVD_CONFIG));
   const [effectsConfig, setEffectsConfig] = useState<EffectsConfig>(() => getInitial(STORAGE_KEYS.EFFECTS, DEFAULT_EFFECTS_CONFIG));
   
@@ -153,13 +91,19 @@ export const useAppConfig = () => {
   
   const [bgAutoplayInterval, setBgAutoplayInterval] = useState<number>(() => getInitial(STORAGE_KEYS.BG_AUTOPLAY, 5));
 
+  // Active Preset State
+  const [activePresetId, setActivePresetId] = useState<string | null>(() => {
+      // Default to 'default_system' if nothing saved
+      return localStorage.getItem(STORAGE_KEYS.ACTIVE_PRESET) || 'default_system';
+  });
+
   const [savedPresets, setSavedPresets] = useState<AppPreset[]>(() => {
     const saved = localStorage.getItem(STORAGE_KEYS.PRESETS);
     if (saved) {
       try {
         const parsed = JSON.parse(saved);
-        // We generally trust presets list structure, but could validate individual configs on load
-        return parsed.length > 0 ? parsed : DEFAULT_PRESETS;
+        if (parsed.length > 0) return parsed;
+        return DEFAULT_PRESETS;
       } catch {
         return DEFAULT_PRESETS;
       }
@@ -173,23 +117,33 @@ export const useAppConfig = () => {
 
   useEffect(() => {
     localStorage.setItem(STORAGE_KEYS.VISUALIZER, JSON.stringify(visualizerConfig));
+    localStorage.setItem(STORAGE_KEYS.REACTOR, JSON.stringify(reactorConfig));
     localStorage.setItem(STORAGE_KEYS.DVD, JSON.stringify(dvdConfig));
     localStorage.setItem(STORAGE_KEYS.EFFECTS, JSON.stringify(effectsConfig));
     localStorage.setItem(STORAGE_KEYS.BG_COLOR, bgColor);
     localStorage.setItem(STORAGE_KEYS.BG_PATTERN, bgPattern);
     localStorage.setItem(STORAGE_KEYS.BG_PATTERN_CONFIG, JSON.stringify(bgPatternConfig));
     localStorage.setItem(STORAGE_KEYS.SHOW_VISUALIZER, JSON.stringify(showVisualizer));
+    localStorage.setItem(STORAGE_KEYS.SHOW_VISUALIZER_3D, JSON.stringify(showVisualizer3D));
     localStorage.setItem(STORAGE_KEYS.SHOW_DVD, JSON.stringify(showDvd));
     localStorage.setItem(STORAGE_KEYS.MARQUEE, JSON.stringify(marqueeConfig));
     localStorage.setItem(STORAGE_KEYS.WATERMARK, JSON.stringify(watermarkConfig));
     localStorage.setItem(STORAGE_KEYS.BG_AUTOPLAY, JSON.stringify(bgAutoplayInterval));
     localStorage.setItem(STORAGE_KEYS.CURSOR, JSON.stringify(cursorStyle));
     localStorage.setItem(STORAGE_KEYS.BG_TRANSITION, JSON.stringify(bgTransition));
-  }, [visualizerConfig, dvdConfig, effectsConfig, bgColor, bgPattern, bgPatternConfig, showVisualizer, showDvd, marqueeConfig, watermarkConfig, bgAutoplayInterval, cursorStyle, bgTransition]);
+  }, [visualizerConfig, reactorConfig, dvdConfig, effectsConfig, bgColor, bgPattern, bgPatternConfig, showVisualizer, showVisualizer3D, showDvd, marqueeConfig, watermarkConfig, bgAutoplayInterval, cursorStyle, bgTransition]);
 
   useEffect(() => {
     localStorage.setItem(STORAGE_KEYS.PRESETS, JSON.stringify(savedPresets));
   }, [savedPresets]);
+
+  useEffect(() => {
+    if (activePresetId) {
+        localStorage.setItem(STORAGE_KEYS.ACTIVE_PRESET, activePresetId);
+    } else {
+        localStorage.removeItem(STORAGE_KEYS.ACTIVE_PRESET);
+    }
+  }, [activePresetId]);
 
   useEffect(() => {
     const hydrate = async () => {
@@ -296,12 +250,14 @@ export const useAppConfig = () => {
   // --- PRESET MANAGEMENT ---
 
   const savePreset = (name: string, theme: ThemeType, controlStyle: ControlStyle) => {
+    const id = crypto.randomUUID();
     const newPreset: AppPreset = {
-      id: crypto.randomUUID(),
+      id,
       name,
       createdAt: Date.now(),
       config: {
         visualizerConfig,
+        reactorConfig, // Save Reactor Config
         dvdConfig,
         effectsConfig,
         marqueeConfig,
@@ -310,6 +266,7 @@ export const useAppConfig = () => {
         bgPattern,
         bgPatternConfig,
         showVisualizer,
+        showVisualizer3D,
         showDvd,
         bgAutoplayInterval,
         cursorStyle,
@@ -319,16 +276,59 @@ export const useAppConfig = () => {
       }
     };
     setSavedPresets(prev => [...prev, newPreset]);
+    setActivePresetId(id); 
+  };
+
+  const overwritePreset = (id: string, currentTheme: ThemeType, currentControlStyle: ControlStyle) => {
+      setSavedPresets(prev => prev.map(p => {
+          if (p.id === id) {
+              return {
+                  ...p,
+                  config: {
+                    visualizerConfig,
+                    reactorConfig,
+                    dvdConfig,
+                    effectsConfig,
+                    marqueeConfig,
+                    watermarkConfig,
+                    bgColor,
+                    bgPattern,
+                    bgPatternConfig,
+                    showVisualizer,
+                    showVisualizer3D,
+                    showDvd,
+                    bgAutoplayInterval,
+                    cursorStyle,
+                    theme: currentTheme,
+                    controlStyle: currentControlStyle,
+                    bgTransition
+                  }
+              };
+          }
+          return p;
+      }));
+      setActivePresetId(id);
+  };
+
+  const resetDefaultPreset = () => {
+      setSavedPresets(prev => prev.map(p => 
+          p.id === 'default_system' ? DEFAULT_SYSTEM_PRESET : p
+      ));
+      setActivePresetId('default_system');
+      return DEFAULT_SYSTEM_PRESET.config;
   };
 
   const loadPreset = (id: string): AppPreset['config'] | null => {
     const preset = savedPresets.find(p => p.id === id);
     if (!preset) return null;
 
+    setActivePresetId(id);
+
     // Sanitize preset config before applying
     const config = preset.config;
     
     setVisualizerConfig(safeMerge(DEFAULT_VISUALIZER_CONFIG, config.visualizerConfig));
+    setReactorConfig(safeMerge(DEFAULT_REACTOR_CONFIG, config.reactorConfig || DEFAULT_REACTOR_CONFIG));
     setDvdConfig(safeMerge(DEFAULT_DVD_CONFIG, config.dvdConfig));
     setEffectsConfig(safeMerge(DEFAULT_EFFECTS_CONFIG, config.effectsConfig));
     setMarqueeConfig(safeMerge(DEFAULT_MARQUEE_CONFIG, config.marqueeConfig));
@@ -339,6 +339,7 @@ export const useAppConfig = () => {
     setBgPatternConfig(safeMerge({ intensity: 0.25, scale: 1.0 }, config.bgPatternConfig));
     
     setShowVisualizer(config.showVisualizer ?? true);
+    setShowVisualizer3D(config.showVisualizer3D ?? false); 
     setShowDvd(config.showDvd ?? true);
     setBgAutoplayInterval(config.bgAutoplayInterval ?? 5);
     
@@ -350,6 +351,9 @@ export const useAppConfig = () => {
 
   const deletePreset = (id: string) => {
     setSavedPresets(prev => prev.filter(p => p.id !== id));
+    if (activePresetId === id) {
+        setActivePresetId(null);
+    }
   };
 
   const renamePreset = (id: string, newName: string) => {
@@ -362,9 +366,8 @@ export const useAppConfig = () => {
 
   const exportConfig = (theme: ThemeType, controlStyle: ControlStyle) => {
     const config = {
-      visualizerConfig, dvdConfig, effectsConfig, bgColor, bgPattern, bgPatternConfig, showVisualizer, showDvd, marqueeConfig, watermarkConfig, bgAutoplayInterval, cursorStyle, theme, controlStyle, bgTransition, version: '1.2'
+      visualizerConfig, reactorConfig, dvdConfig, effectsConfig, bgColor, bgPattern, bgPatternConfig, showVisualizer, showVisualizer3D, showDvd, marqueeConfig, watermarkConfig, bgAutoplayInterval, cursorStyle, theme, controlStyle, bgTransition, version: '1.3'
     };
-    // Note: API Key is purposely excluded from export for security
     const blob = new Blob([JSON.stringify(config, null, 2)], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
     const date = new Date();
@@ -382,8 +385,9 @@ export const useAppConfig = () => {
       try {
         const rawContent = JSON.parse(event.target?.result as string);
         
-        // 1. Sanitize Data using Safe Merge
+        // 1. Sanitize Data
         const visualizerSafe = safeMerge(DEFAULT_VISUALIZER_CONFIG, rawContent.visualizerConfig);
+        const reactorSafe = safeMerge(DEFAULT_REACTOR_CONFIG, rawContent.reactorConfig || DEFAULT_REACTOR_CONFIG);
         const dvdSafe = safeMerge(DEFAULT_DVD_CONFIG, rawContent.dvdConfig);
         const effectsSafe = safeMerge(DEFAULT_EFFECTS_CONFIG, rawContent.effectsConfig);
         const marqueeSafe = safeMerge(DEFAULT_MARQUEE_CONFIG, rawContent.marqueeConfig);
@@ -392,6 +396,7 @@ export const useAppConfig = () => {
 
         // 2. Apply States
         setVisualizerConfig(visualizerSafe);
+        setReactorConfig(reactorSafe);
         setDvdConfig(dvdSafe);
         setEffectsConfig(effectsSafe);
         setMarqueeConfig(marqueeSafe);
@@ -402,24 +407,26 @@ export const useAppConfig = () => {
         setBgPatternConfig(patternConfigSafe);
         
         if (typeof rawContent.showVisualizer === 'boolean') setShowVisualizer(rawContent.showVisualizer);
+        if (typeof rawContent.showVisualizer3D === 'boolean') setShowVisualizer3D(rawContent.showVisualizer3D);
         if (typeof rawContent.showDvd === 'boolean') setShowDvd(rawContent.showDvd);
         if (typeof rawContent.bgAutoplayInterval === 'number') setBgAutoplayInterval(rawContent.bgAutoplayInterval);
         
         if (rawContent.cursorStyle) setCursorStyle(rawContent.cursorStyle);
         if (rawContent.bgTransition) setBgTransition(rawContent.bgTransition);
         
-        // Pass sanitized full object to callback (for Theme/ControlStyle handling in App.tsx)
+        setActivePresetId(null);
+
         if (onLoadCallback) {
             onLoadCallback({
                 ...rawContent,
                 visualizerConfig: visualizerSafe,
+                reactorConfig: reactorSafe,
                 effectsConfig: effectsSafe
             });
         }
 
       } catch (err) {
         console.error("Failed to parse NRP config file", err);
-        // Error handling could be added here (e.g. notify parent)
       }
     };
     reader.readAsText(file);
@@ -428,9 +435,11 @@ export const useAppConfig = () => {
   return {
     apiKey, setApiKey,
     showVisualizer, setShowVisualizer,
+    showVisualizer3D, setShowVisualizer3D,
     showDvd, setShowDvd,
     marqueeConfig, setMarqueeConfig,
     visualizerConfig, setVisualizerConfig,
+    reactorConfig, setReactorConfig, // Exposed
     dvdConfig, setDvdConfig,
     effectsConfig, setEffectsConfig,
     watermarkConfig, setWatermarkConfig,
@@ -447,7 +456,10 @@ export const useAppConfig = () => {
     bgCount: bgList.length,
     exportConfig, importConfig,
     savedPresets,
+    activePresetId,
     savePreset,
+    overwritePreset,
+    resetDefaultPreset, // Exposed
     loadPreset,
     deletePreset,
     renamePreset,

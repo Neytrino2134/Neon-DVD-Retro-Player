@@ -12,7 +12,8 @@ interface ThemeColors {
   muted: string;
   border: string;
   scrollThumb: string;
-  toggleKnob: string; // New property for toggle button knob
+  toggleKnob: string;
+  toggleBg: string; // New: Unified toggle background color
 }
 
 const THEMES: Record<ThemeType, ThemeColors> = {
@@ -27,6 +28,7 @@ const THEMES: Record<ThemeType, ThemeColors> = {
     border: '#374151',
     scrollThumb: '#374151',
     toggleKnob: '#ffffff',
+    toggleBg: '#bc13fe',
   },
   'neon-blue': {
     primary: '#3b82f6',
@@ -36,45 +38,49 @@ const THEMES: Record<ThemeType, ThemeColors> = {
     panel: '#0f172a',
     text: '#e0f2fe',
     muted: '#64748b',
-    border: '#60a5fa',
+    border: '#1e3a8a',
     scrollThumb: '#1e3a8a',
     toggleKnob: '#ffffff',
+    toggleBg: '#3b82f6',
   },
   'warm-cozy': {
-    primary: '#fbbf24',
-    secondary: '#d97706',
-    accent: '#fcd34d',
-    bg: '#1c1917',
-    panel: '#292524',
-    text: '#fef3c7',
-    muted: '#a8a29e',
-    border: '#78716c',
-    scrollThumb: '#57534e',
+    primary: '#fbbf24', // Amber-400
+    secondary: '#d97706', // Amber-600
+    accent: '#fcd34d', // Amber-300
+    bg: '#1a120b', // Deep warm brown (almost black)
+    panel: '#2e2012', // Dark golden-brown panel
+    text: '#fef3c7', // Amber-100
+    muted: '#a8a29e', // Warm gray
+    border: '#78350f', // Amber-900
+    scrollThumb: '#78350f',
     toggleKnob: '#ffffff',
+    toggleBg: '#ea580c',
   },
   'neutral-gray': {
-    primary: '#d4d4d4',
-    secondary: '#737373',
-    accent: '#ffffff',
-    bg: '#171717',
-    panel: '#262626',
-    text: '#ffffff',
-    muted: '#a3a3a3',
-    border: '#525252',
-    scrollThumb: '#404040',
-    toggleKnob: '#ffffff',
+    primary: '#9ca3af', // Gray-400 (Cool Gray) - Darker
+    secondary: '#4b5563', // Gray-600 - Darker
+    accent: '#e5e7eb', // Gray-200
+    bg: '#030303', // Almost black
+    panel: '#0f1115', // Dark Gray-Blue (Custom)
+    text: '#d1d5db', // Gray-300
+    muted: '#6b7280', // Gray-500 (Blue-gray)
+    border: '#1f2937', // Gray-800 (Cool/Blueish)
+    scrollThumb: '#374151', // Gray-700
+    toggleKnob: '#d1d5db',
+    toggleBg: '#4b5563',
   },
   'neutral-ocean': {
     primary: '#4B8CA8',
-    secondary: '#243B4A',
+    secondary: '#89C2D9',
     accent: '#70C6D6',
     bg: '#050A10',
     panel: '#0D1620',
     text: '#DDE6EB',
     muted: '#5A7585',
     border: '#1F3342',
-    scrollThumb: '#243B4A',
-    toggleKnob: '#A0B0C0', // Restrained light grey-blue
+    scrollThumb: '#4A6B82',
+    toggleKnob: '#0F172A',
+    toggleBg: '#00E5FF',
   }
 };
 
@@ -112,6 +118,7 @@ export const ThemeProvider: React.FC<{ children: ReactNode }> = ({ children }) =
     root.style.setProperty('--color-border', colors.border);
     root.style.setProperty('--color-scroll-thumb', colors.scrollThumb);
     root.style.setProperty('--color-toggle-knob', colors.toggleKnob);
+    root.style.setProperty('--color-toggle-bg', colors.toggleBg);
 
   }, [currentTheme]);
 

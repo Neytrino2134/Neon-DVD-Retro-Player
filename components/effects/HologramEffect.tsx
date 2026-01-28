@@ -332,10 +332,10 @@ const HologramEffect: React.FC<HologramEffectProps> = ({ effects }) => {
             ></div>
             
             {/* Decorative Corners - Colored */}
-            <div className="absolute top-0 left-0 w-3 h-3 border-t border-l opacity-50" style={{ borderColor: baseColor }}></div>
+            {/* Top Left removed */}
             <div className="absolute top-0 right-0 w-3 h-3 border-t border-r opacity-50" style={{ borderColor: baseColor }}></div>
             <div className="absolute bottom-0 left-0 w-3 h-3 border-b border-l opacity-50" style={{ borderColor: baseColor }}></div>
-            <div className="absolute bottom-0 right-0 w-3 h-3 border-b border-r opacity-50" style={{ borderColor: baseColor }}></div>
+            {/* Bottom Right removed */}
 
             {/* Header - Colored Background */}
             <div 

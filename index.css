@@ -15,6 +15,13 @@
   --color-border: #374151;
   --color-scroll-thumb: #374151; /* Default fallback */
   --color-toggle-knob: #ffffff; /* Default fallback */
+  --color-toggle-bg: #bc13fe; /* Default fallback (Retro Purple) */
+}
+
+/* Custom Selection Color */
+::selection {
+  background-color: var(--color-primary);
+  color: #000000;
 }
 
 /* ELECTRON DRAG REGIONS */
@@ -29,6 +36,18 @@
 /* FORCE SYSTEM CURSOR */
 .system-cursor {
   cursor: default !important;
+}
+
+/* 
+   SCROLLBAR INTERACTION STATE
+   Overrides the global cursor: none when interacting with scrollbars
+   OR when style is set to system
+*/
+body.show-system-cursor,
+body.show-system-cursor *,
+body.force-system-cursor,
+body.force-system-cursor * {
+  cursor: auto !important;
 }
 
 /* 
@@ -81,6 +100,15 @@ textarea {
   user-select: text;
 }
 
+/* Remove default focus outline to prevent white border on hotkey press */
+button:focus,
+input:focus,
+select:focus,
+textarea:focus,
+[role="button"]:focus {
+  outline: none;
+}
+
 body {
   background-color: var(--color-bg); 
   color: var(--color-text);
@@ -90,6 +118,15 @@ body {
 /* Reserve space for scrollbar to prevent jumping */
 .custom-scrollbar {
   scrollbar-gutter: stable;
+}
+
+/* NO SCROLLBAR UTILITY (For Touch-like panels) */
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  -ms-overflow-style: none;  /* IE and Edge */
+  scrollbar-width: none;  /* Firefox */
 }
 
 /* CRT Scanline Effect */
@@ -133,9 +170,15 @@ input[type=range] {
   appearance: none;
   background: transparent; 
   width: 100%;
-  cursor: pointer;
   margin: 0;
   vertical-align: middle;
+}
+
+/* Only force cursor: none if NOT in system cursor mode */
+body:not(.force-system-cursor) input[type=range],
+body:not(.force-system-cursor) input[type=range]::-webkit-slider-thumb,
+body:not(.force-system-cursor) input[type=range]::-webkit-slider-runnable-track {
+  cursor: none !important;
 }
 
 /* Chrome/Safari Track */
@@ -155,10 +198,10 @@ input[type=range]::-webkit-slider-thumb {
   height: 20px;
   width: 12px;
   border: 1px solid var(--color-muted); /* Restrained border color */
-  background: var(--color-secondary);
+  background: var(--color-primary); /* UPDATED: Primary color (Blue in default) */
   cursor: pointer;
   margin-top: -4px; /* Centers thumb on track (14px track - 20px thumb) / 2 = -3px */
-  box-shadow: 0 0 8px var(--color-secondary), inset 0 0 2px rgba(255,255,255,0.5);
+  box-shadow: 0 0 8px var(--color-primary), inset 0 0 2px rgba(255,255,255,0.5);
   transition: transform 0.1s;
   /* Dynamic Border Radius handled below via data-attribute */
 }
@@ -183,9 +226,9 @@ input[type=range]::-moz-range-thumb {
   height: 20px;
   width: 12px;
   border: 1px solid var(--color-muted); /* Restrained border color */
-  background: var(--color-secondary);
+  background: var(--color-primary); /* UPDATED: Primary color */
   cursor: pointer;
-  box-shadow: 0 0 8px var(--color-secondary);
+  box-shadow: 0 0 8px var(--color-primary);
 }
 
 input[type=range]:focus {
@@ -243,13 +286,6 @@ body, button, a, input, select, textarea, [role="button"], .cursor-pointer {
 @media (hover: none) and (pointer: coarse) {
     /* Optional: Show system cursor on touch devices if 'none' causes confusion, 
        though usually cursor:none is ignored on touch anyway */
-}
-
-/* Ensure range inputs obey */
-input[type=range],
-input[type=range]::-webkit-slider-thumb,
-input[type=range]::-webkit-slider-runnable-track {
-  cursor: none !important;
 }
 
 /* --- ANIMATIONS FOR REBOOT SEQUENCE --- */
@@ -323,4 +359,19 @@ input[type=range]::-webkit-slider-runnable-track {
 
 .animate-slide-out-up {
   animation: slide-out-up 0.5s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+}
+
+/* FIX: Prevent layout singularity during resize events */
+/* If the window shrinks below 500px while in full mode, keep content structure intact */
+/* This prevents canvas 0-width errors */
+#root {
+  min-width: 0; /* Default */
+}
+
+/* When not in mini-mode, enforce a minimum layout width to prevent crushing */
+/* Adjusted to allow 1700px width comfortably */
+@media (min-width: 800px) {
+    #root {
+        min-width: 800px;
+    }
 }

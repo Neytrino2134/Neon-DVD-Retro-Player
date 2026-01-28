@@ -18,6 +18,7 @@ const MarqueeSettings: React.FC<MarqueeSettingsProps> = ({ config, update }) => 
   const [expandTimeScale, setExpandTimeScale] = useState(true);
 
   const styleOptions = [
+    { value: 'theme-sync', label: t('style_theme_sync') }, // New Option
     { value: 'retro', label: t('style_retro') },
     { value: 'blue', label: t('style_blue') },
     { value: 'pink', label: t('style_pink') },
@@ -54,8 +55,8 @@ const MarqueeSettings: React.FC<MarqueeSettingsProps> = ({ config, update }) => 
         />
 
         {/* Custom Collapsible for Time Scale (Progress Bar) */}
-        <div className={`bg-theme-panel/40 border border-theme-border ${wrapperRadius} overflow-hidden mb-3 hover:border-theme-muted transition-colors`}>
-          <div className="flex items-center justify-between p-3">
+        <div className={`bg-theme-panel/40 ${wrapperRadius} overflow-hidden mb-3 transition-all duration-300 border border-theme-border hover:border-theme-primary hover:shadow-[0_0_5px_var(--color-primary)]`}>
+          <div className="flex items-center justify-between p-3 border-b border-theme-border">
             <div 
                className="flex items-center gap-3 cursor-pointer flex-1"
                onClick={() => setExpandTimeScale(!expandTimeScale)}
@@ -71,7 +72,8 @@ const MarqueeSettings: React.FC<MarqueeSettingsProps> = ({ config, update }) => 
             <button
                 onClick={() => update('showProgress', !config.showProgress)}
                 className={`relative w-10 h-5 ${containerRadius} transition-all duration-300 shadow-inner ml-2 border border-theme-border
-                ${config.showProgress ? 'bg-theme-secondary shadow-[0_0_8px_var(--color-secondary)]' : 'bg-gray-800'}
+                ${config.showProgress ? 'bg-[var(--color-toggle-bg)] shadow-[0_0_8px_var(--color-toggle-bg)]' : 'bg-gray-800'}
+                hover:border-theme-primary hover:shadow-[0_0_5px_var(--color-primary)]
                 `}
             >
                 <div className={`absolute top-0.5 left-0.5 w-3.5 h-3.5 bg-theme-toggleKnob ${knobRadius} shadow-md transition-transform duration-300
@@ -83,11 +85,11 @@ const MarqueeSettings: React.FC<MarqueeSettingsProps> = ({ config, update }) => 
           {/* Collapsible Progress Bar Settings */}
           <div 
             className={`grid transition-[grid-template-rows,padding,opacity] duration-300 ease-in-out
-                ${config.showProgress && expandTimeScale ? 'grid-rows-[1fr] opacity-100 p-3 pt-0' : 'grid-rows-[0fr] opacity-0 p-0'}
+                ${config.showProgress && expandTimeScale ? 'grid-rows-[1fr] opacity-100 p-3 pt-2' : 'grid-rows-[0fr] opacity-0 p-0'}
             `}
           >
             <div className="overflow-hidden">
-                <div className="pl-4 pt-2 space-y-3 border-l-2 border-theme-muted ml-2">
+                <div className="pl-4 space-y-3 border-l-2 border-theme-border ml-2">
                 <CustomSelect 
                     label={t('prog_mode')}
                     value={config.progressMode || 'continuous'}

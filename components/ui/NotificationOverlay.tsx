@@ -3,16 +3,29 @@ import React, { useEffect, useState } from 'react';
 import { Terminal } from 'lucide-react';
 import { useNotification, Notification } from '../../contexts/NotificationContext';
 
-const NotificationItem: React.FC<{ notification: Notification, onDismiss: (id: string) => void, color: string }> = ({ notification, onDismiss, color }) => {
-  // Phases: 'spawn' (line only) -> 'expand' (slide open) -> 'type' (text) -> 'wait' -> 'untype' -> 'collapse' -> 'done'
-  const [phase, setPhase] = useState<'spawn' | 'expand' | 'type' | 'wait' | 'untype' | 'collapse' | 'done'>('spawn');
+const NotificationItem: React.FC<{ notification: Notification, onDismiss: (id: string) => void, color: string, forceExpire: boolean }> = ({ notification, onDismiss, color, forceExpire }) => {
+  // Phases: 
+  // 'spawn' (line only) -> 'expand' (slide open) -> 'type' (text) -> 'wait' 
+  // -> 'untype' -> 'collapse' (width) -> 'exit' (height/slide up) -> 'done'
+  const [phase, setPhase] = useState<'spawn' | 'expand' | 'type' | 'wait' | 'untype' | 'collapse' | 'exit' | 'done'>('spawn');
   const [displayedText, setDisplayedText] = useState('');
   
   const EXPAND_DURATION = 500;
   const COLLAPSE_DURATION = 500;
+  const EXIT_DURATION = 500; // Time for slide up animation
   const TYPE_SPEED = 30; // ms per char
   const WAIT_DURATION = 3000;
   const UNTYPE_SPEED = 15;
+
+  // Create a semi-transparent version of the theme color (Hex + B3 = ~70% opacity)
+  const fadedColor = `${color}B3`; 
+
+  // Force expire logic: If list gets too long, trigger exit sequence immediately
+  useEffect(() => {
+      if (forceExpire && (phase === 'spawn' || phase === 'expand' || phase === 'type' || phase === 'wait')) {
+          setPhase('untype');
+      }
+  }, [forceExpire, phase]);
 
   useEffect(() => {
     // Start animation sequence after mount
@@ -25,7 +38,6 @@ const NotificationItem: React.FC<{ notification: Notification, onDismiss: (id: s
     let interval: number | undefined;
 
     if (phase === 'expand') {
-        // Wait for CSS slide transition to finish before typing
         t = window.setTimeout(() => setPhase('type'), EXPAND_DURATION);
     } else if (phase === 'type') {
         let cursor = 0;
@@ -51,7 +63,11 @@ const NotificationItem: React.FC<{ notification: Notification, onDismiss: (id: s
             }
         }, UNTYPE_SPEED);
     } else if (phase === 'collapse') {
-        t = window.setTimeout(() => onDismiss(notification.id), COLLAPSE_DURATION);
+        // After width collapse, start height collapse (exit)
+        t = window.setTimeout(() => setPhase('exit'), COLLAPSE_DURATION);
+    } else if (phase === 'exit') {
+        // After slide up animation, actually remove from DOM
+        t = window.setTimeout(() => onDismiss(notification.id), EXIT_DURATION);
     }
 
     return () => {
@@ -60,36 +76,43 @@ const NotificationItem: React.FC<{ notification: Notification, onDismiss: (id: s
     };
   }, [phase, notification.message, onDismiss]);
 
+  const isExiting = phase === 'exit';
+
   return (
     <div 
       className={`
-        relative mb-2 
-        bg-black/90 border-l-4 
-        shadow-[0_0_15px_rgba(0,0,0,0.5)]
+        relative 
+        bg-black/40 backdrop-blur-md border-l-4 
+        shadow-[0_0_15px_rgba(0,0,0,0.3)]
         overflow-hidden
         transition-all duration-500 ease-in-out
         flex items-center
+        ${isExiting ? 'border-l-0' : ''} 
       `}
       style={{
-        maxWidth: (phase === 'spawn' || phase === 'collapse') ? '4px' : '320px',
-        opacity: 1,
-        minHeight: '44px', // Fixed height ensures the "line" look works well
-        borderColor: color, // Dynamic border color
-        boxShadow: `0 0 15px ${color}33` // Dynamic shadow with opacity
+        maxWidth: (phase === 'spawn' || phase === 'collapse' || phase === 'exit') ? '4px' : '320px',
+        // Smoothly collapse height and margin to 0 during exit phase to let siblings slide up
+        minHeight: isExiting ? '0px' : '44px',
+        height: isExiting ? '0px' : 'auto',
+        marginBottom: isExiting ? '0px' : '8px',
+        opacity: isExiting ? 0 : 1,
+        
+        borderColor: fadedColor, 
+        boxShadow: isExiting ? 'none' : `0 0 10px ${color}1A`
       }}
     >
       {/* Content Container - Fixed width prevents text reflow during slide */}
       <div className="flex items-center pl-3 pr-4 py-2 min-w-[320px]">
-        <Terminal size={14} style={{ color }} className="mr-2 shrink-0" />
+        <Terminal size={14} style={{ color: fadedColor }} className="mr-2 shrink-0" />
         <span 
             className="font-mono text-xs font-bold tracking-wide"
-            style={{ color }}
+            style={{ color: fadedColor }}
         >
           {displayedText}
           {(phase === 'type' || phase === 'wait' || phase === 'untype') && (
              <span 
                 className="inline-block w-2 h-4 ml-1 align-middle animate-pulse"
-                style={{ backgroundColor: color }}
+                style={{ backgroundColor: fadedColor }}
              ></span>
           )}
         </span>
@@ -105,18 +128,29 @@ interface NotificationOverlayProps {
 const NotificationOverlay: React.FC<NotificationOverlayProps> = ({ color = '#00ff00' }) => {
   const { notifications, removeNotification } = useNotification();
 
-  if (notifications.length === 0) return null;
+  // We render all notifications, but if the list exceeds 2, 
+  // we trigger 'forceExpire' on the oldest ones.
+  // This causes them to animate out gracefully instead of vanishing instantly.
+  const MAX_VISIBLE = 2;
 
   return (
-    <div className="absolute top-6 left-6 flex flex-col items-start gap-2 pointer-events-none z-[99999] w-auto">
-      {notifications.map((n) => (
-        <NotificationItem 
-          key={n.id} 
-          notification={n} 
-          onDismiss={removeNotification}
-          color={color}
-        />
-      ))}
+    <div className="absolute top-6 left-6 flex flex-col items-start pointer-events-none z-[99999] w-auto">
+      {notifications.map((n, index) => {
+        // Calculate if this item should be pushed out
+        // The newest items are at the end of the array.
+        // We want to keep the last 2. So if index < (length - 2), it expires.
+        const shouldExpire = index < (notifications.length - MAX_VISIBLE);
+
+        return (
+          <NotificationItem 
+            key={n.id} 
+            notification={n} 
+            onDismiss={removeNotification}
+            color={color}
+            forceExpire={shouldExpire}
+          />
+        );
+      })}
     </div>
   );
 };

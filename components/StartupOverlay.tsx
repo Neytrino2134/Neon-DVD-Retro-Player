@@ -2,6 +2,7 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { Terminal, Cpu, Power, Key, ShieldCheck, Globe, X } from 'lucide-react';
 import { useLanguage } from '../contexts/LanguageContext';
+import { APP_VERSION } from '../lib/version';
 
 // Characters used for the glitch effect
 const GLITCH_CHARS = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789@#$%&*!??█▓▒░<>/[]{}-=_+";
@@ -66,13 +67,14 @@ interface StartupOverlayProps {
   onStopSfx?: () => void;
   apiKey: string;
   setApiKey: (key: string) => void;
+  forceSkip?: boolean; // New Prop
 }
 
 // Updated phases to include split_appear and split_expand
 type IntroPhase = 'black' | 'dot' | 'line' | 'split_appear' | 'split_expand' | 'text' | 'window_line' | 'window_expand' | 'content';
 type CollapsePhase = 'idle' | 'content_out' | 'line_merge' | 'height_collapse' | 'width_collapse' | 'done';
 
-const StartupOverlay: React.FC<StartupOverlayProps> = ({ onComplete, onFadeOut, onPlaySfx, onStopSfx, apiKey, setApiKey }) => {
+const StartupOverlay: React.FC<StartupOverlayProps> = ({ onComplete, onFadeOut, onPlaySfx, onStopSfx, apiKey, setApiKey, forceSkip }) => {
   const [isVisible, setIsVisible] = useState(true);
   const [hasStarted, setHasStarted] = useState(false); 
   const [windowState, setWindowState] = useState<'hidden' | 'spawn' | 'expand' | 'full' | 'collapse'>('hidden');
@@ -110,9 +112,18 @@ const StartupOverlay: React.FC<StartupOverlayProps> = ({ onComplete, onFadeOut, 
     }
   }, [lines, showLogin, showPass, showProgress]);
 
+  // --- FORCE SKIP HANDLER ---
+  useEffect(() => {
+      if (forceSkip) {
+          timeoutsRef.current.forEach(window.clearTimeout);
+          timeoutsRef.current = [];
+          setIsVisible(false);
+      }
+  }, [forceSkip]);
+
   // --- INTRO CINEMATIC SEQUENCE ---
   useEffect(() => {
-    if (hasStarted) return;
+    if (hasStarted || forceSkip) return;
 
     const sequence = async () => {
         const wait = (ms: number) => new Promise(r => setTimeout(r, ms));
@@ -156,7 +167,7 @@ const StartupOverlay: React.FC<StartupOverlayProps> = ({ onComplete, onFadeOut, 
     };
 
     sequence();
-  }, [hasStarted]);
+  }, [hasStarted, forceSkip]);
 
 
   // Skip Function (For Boot Sequence)
@@ -263,17 +274,17 @@ const StartupOverlay: React.FC<StartupOverlayProps> = ({ onComplete, onFadeOut, 
 
   // Keyboard listener for Enter
   useEffect(() => {
-    if (hasStarted || collapsePhase !== 'idle') return;
+    if (hasStarted || collapsePhase !== 'idle' || forceSkip) return;
     const handleKeyDown = (e: KeyboardEvent) => {
         if (e.key === 'Enter') handleStart();
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [hasStarted, collapsePhase, tempApiKey, introPhase]); 
+  }, [hasStarted, collapsePhase, tempApiKey, introPhase, forceSkip]); 
 
   useEffect(() => {
     // Only run if active and not already running
-    if (!hasStarted || sequenceRunningRef.current) return;
+    if (!hasStarted || sequenceRunningRef.current || forceSkip) return;
     sequenceRunningRef.current = true;
 
     let mounted = true;
@@ -311,7 +322,7 @@ const StartupOverlay: React.FC<StartupOverlayProps> = ({ onComplete, onFadeOut, 
       setWindowState('full');
       await wait(800);
 
-      addLine("NEON BIOS v1.0.4 - INITIALIZING...");
+      addLine(`NEON BIOS ${APP_VERSION} - INITIALIZING...`);
       await wait(800);
       addLine("CHECKING MEMORY INTEGRITY... OK");
       await wait(800);
@@ -321,7 +332,7 @@ const StartupOverlay: React.FC<StartupOverlayProps> = ({ onComplete, onFadeOut, 
       addLine("--------------------------------");
       addLine(isRu ? "ДОБРО ПОЖАЛОВАТЬ В СИСТЕМУ" : "WELCOME TO THE SYSTEM");
       await wait(800);
-      addLine("RETRO SONIC ULTRA v0.1.2");
+      addLine(`RETRO SONIC ULTRA ${APP_VERSION}`);
       await wait(800);
       addLine("--------------------------------");
       await wait(1000);
@@ -377,26 +388,23 @@ const StartupOverlay: React.FC<StartupOverlayProps> = ({ onComplete, onFadeOut, 
         mounted = false;
         timeoutsRef.current.forEach(window.clearTimeout);
     };
-  }, [hasStarted, language, onComplete, onFadeOut, onPlaySfx]);
+  }, [hasStarted, language, onComplete, onFadeOut, onPlaySfx, forceSkip]);
 
-  if (!isVisible) return null;
+  if (!isVisible || forceSkip) return null;
 
   // INITIAL INTERACTION SCREEN (CINEMATIC)
   if (!hasStarted) {
     
     // Side Lines Logic
-    // Show during 'split_appear' through to 'content_out' (merge)
     const showSideLines = ['split_appear', 'split_expand', 'text', 'window_line', 'window_expand', 'content'].includes(introPhase) && (collapsePhase === 'idle' || collapsePhase === 'content_out');
     
     // Expanded only during specific phases (Move Out)
     const sideLinesExpanded = ['split_expand', 'text', 'window_line', 'window_expand', 'content'].includes(introPhase) && collapsePhase === 'idle';
 
     // Center Line Logic
-    // Show initially ('line'), then HIDE INSTANTLY during split, then show again for height collapse (after merge)
-    // Using simple boolean here for Conditional Rendering
     const showCenterLine = (introPhase === 'line' || introPhase === 'dot') || (collapsePhase === 'line_merge') || (collapsePhase === 'height_collapse');
     
-    // Center Line Height: Tall during intro 'line' and merge 'line_merge'. Shrinks during 'height_collapse' or 'dot'.
+    // Center Line Height
     const centerLineHeight = (introPhase === 'line' || collapsePhase === 'line_merge') ? '60vh' : '4px';
 
     // Window Logic
@@ -406,7 +414,6 @@ const StartupOverlay: React.FC<StartupOverlayProps> = ({ onComplete, onFadeOut, 
     let windowWidth = '0px';
     if (isWindowVisible) {
         if (collapsePhase === 'content_out') {
-            // Snap horizontal: Shrink to center line width to simulate horizontal collapse
             windowWidth = '8px'; 
         } else {
             windowWidth = '660px';
@@ -420,39 +427,35 @@ const StartupOverlay: React.FC<StartupOverlayProps> = ({ onComplete, onFadeOut, 
 
     return (
         <div 
-            className="fixed inset-0 z-[10000] bg-black flex flex-col items-center justify-center cursor-none select-none overflow-hidden"
+            className="fixed inset-0 z-[10000] bg-[#030712] flex flex-col items-center justify-center cursor-none select-none overflow-hidden"
             style={{ 
                 opacity: standbyOpacity, 
                 transition: 'opacity 1s ease-in-out' 
             }}
         >
             <div className="absolute inset-0 bg-white/5 opacity-5 pointer-events-none scanlines z-20"></div>
-            <div className="absolute inset-0 pointer-events-none flicker bg-neon-blue/5 opacity-10 z-20"></div>
+            {/* REMOVED: Blue tint overlay to ensure pure color. Was: bg-neon-blue/5 */}
+            <div className="absolute inset-0 pointer-events-none flicker opacity-0 z-20"></div>
             
             {/* --- CINEMATIC LAYER (Lines) --- */}
-            {/* Z-Index raised to 30 to appear ABOVE the window (z-10) */}
             <div className="absolute inset-0 pointer-events-none z-30 flex items-center justify-center">
-                 {/* Center Line (Morphs from Dot -> Tall -> DISAPPEARS -> Tall -> Dot) */}
-                 {/* We use Conditional Rendering for the Exit to ensure NO FADE OUT animation (Instant Cut) */}
                  {showCenterLine && (
                      <div 
                         className={`bg-neon-green shadow-[0_0_15px_#00ff00] transition-all duration-700 ease-in-out absolute`}
                         style={{
-                            width: '8px', // Increased thickness to prevent visual "jump" from side lines
+                            width: '8px', 
                             height: centerLineHeight,
                             borderRadius: '0px',
-                            opacity: 1 // Always 1 when mounted
+                            opacity: 1 
                         }}
                     ></div>
                  )}
 
-                {/* Side Lines (Instant Appear, Then Move) */}
                 <div 
                     className={`hidden md:block absolute bg-neon-green/80 shadow-[0_0_15px_#00ff00] transition-transform duration-1000 ease-in-out w-1.5`}
                     style={{
                         height: '60vh',
                         left: '50%',
-                        // Opacity is handled instantly (no transition on opacity property)
                         opacity: showSideLines ? 1 : 0,
                         transform: sideLinesExpanded ? 'translateX(-45vw)' : 'translateX(-50%)'
                     }}
@@ -483,7 +486,7 @@ const StartupOverlay: React.FC<StartupOverlayProps> = ({ onComplete, onFadeOut, 
 
                 {/* --- MAIN WINDOW CONTAINER --- */}
                 <div 
-                    className="relative bg-black/90 border-2 border-neon-blue shadow-[0_0_40px_rgba(0,243,255,0.2)] flex flex-col items-center overflow-hidden transition-all duration-700 ease-in-out"
+                    className="relative bg-[#030712]/90 border-2 border-neon-blue shadow-[0_0_40px_rgba(0,243,255,0.2)] flex flex-col items-center overflow-hidden transition-all duration-700 ease-in-out"
                     style={{
                         width: windowWidth,
                         maxWidth: '100%',
@@ -600,15 +603,16 @@ const StartupOverlay: React.FC<StartupOverlayProps> = ({ onComplete, onFadeOut, 
 
   return (
     <div 
-      className={`fixed inset-0 z-[10000] bg-black flex items-center justify-center cursor-none transition-opacity duration-1000 ease-out select-none ${containerOpacity < 1 ? 'pointer-events-none' : ''}`}
+      className={`fixed inset-0 z-[10000] bg-[#030712] flex items-center justify-center cursor-none transition-opacity duration-1000 ease-out select-none ${containerOpacity < 1 ? 'pointer-events-none' : ''}`}
       style={{ opacity: containerOpacity }}
       onDoubleClick={handleSkip}
     >
       <div className="absolute inset-0 bg-white/5 opacity-5 pointer-events-none scanlines"></div>
-      <div className="absolute inset-0 pointer-events-none flicker bg-neon-blue/5 opacity-10"></div>
+      {/* REMOVED: Blue tint overlay */}
+      <div className="absolute inset-0 pointer-events-none flicker opacity-0"></div>
 
       <div 
-        className="relative bg-black border-2 border-neon-blue shadow-[0_0_30px_rgba(0,243,255,0.4)] overflow-hidden transition-all duration-700 ease-in-out flex flex-col"
+        className="relative bg-[#030712] border-2 border-neon-blue shadow-[0_0_30px_rgba(0,243,255,0.4)] overflow-hidden transition-all duration-700 ease-in-out flex flex-col"
         style={{ 
             width, 
             height,

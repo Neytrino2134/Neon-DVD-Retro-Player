@@ -28,6 +28,7 @@ export default {
           muted: 'var(--color-muted)',         // Muted Text
           border: 'var(--color-border)',       // Borders
           toggleKnob: 'var(--color-toggle-knob)', // Toggle Switch Knob Color
+          'toggle-bg': 'var(--color-toggle-bg)', // Unified Toggle Switch Active Background
         }
       },
       boxShadow: {

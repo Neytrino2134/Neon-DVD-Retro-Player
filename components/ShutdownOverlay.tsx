@@ -69,9 +69,9 @@ const ShutdownOverlay: React.FC<ShutdownOverlayProps> = ({ active, onCancel, onP
 
       // 2. Smooth Window Slide (Width then Height)
       setStep('window_slide');
-      setWindowSize({ w: 500, h: 2 }); // Expand Width
+      setWindowSize({ w: 600, h: 2 }); // Expand Width
       await wait(800);
-      setWindowSize({ w: 500, h: 420 }); // Expand Height (Increased slightly)
+      setWindowSize({ w: 600, h: 420 }); // Expand Height (Increased slightly)
       await wait(800);
 
       // 3. Type "CRITICAL ERROR DETECTED"
@@ -248,7 +248,7 @@ const ShutdownOverlay: React.FC<ShutdownOverlayProps> = ({ active, onCancel, onP
                     </div>
 
                     {/* Instructions Block - Wrapper to smooth out height changes if needed, but typing handles it well */}
-                    <div className="w-full max-w-[320px] min-h-[100px] mb-2">
+                    <div className="w-full max-w-[480px] min-h-[100px] mb-2">
                         {showInstructions && (
                             <div className="text-xs text-red-400 space-y-1 text-left border-l-2 border-red-900/50 pl-4 py-2 bg-red-950/10 transition-opacity duration-500">
                                 {typedLines.map((line, i) => (

@@ -392,31 +392,49 @@ const TutorialOverlay: React.FC<TutorialOverlayProps> = ({
   }, [currentStepIndex, trackCount, isPlaying, visualizerConfig, presetsCount]);
 
   const handleExitSequence = (isSkip: boolean, onCompleteCallback: () => void) => {
-      // Exit Animation: 
-      // 1. Hide Content (Fade out)
-      setModalPhase(2); 
+      // 1. ERASE TEXT ANIMATION
+      // Instead of immediate fade out, we erase text quickly
+      if (typeIntervalRef.current) clearInterval(typeIntervalRef.current);
+      if (titleIntervalRef.current) clearInterval(titleIntervalRef.current);
+
+      let textContent = displayedText;
       
-      // 2. Collapse Height (Slow)
-      setTimeout(() => {
-          setModalPhase(1); 
-          
-          // 3. Collapse Width (Slow)
-          setTimeout(() => {
-              setModalPhase(0); 
+      const eraseInterval = setInterval(() => {
+          // Erase 4 chars per tick for speed
+          textContent = textContent.slice(0, Math.max(0, textContent.length - 4));
+          setDisplayedText(textContent);
+
+          if (textContent.length === 0) {
+              clearInterval(eraseInterval);
+              setDisplayedTitle(""); // Clear title instantly after body
               
-              // 4. Fade BG (Only if skipping, otherwise let next step handle/override)
-              if (isSkip) {
-                  setBgOpacity(0);
+              // Proceed with collapse animation
+              // 2. Hide Content (Fade out remainder)
+              setModalPhase(2); 
+              
+              setTimeout(() => {
+                  // 3. Collapse Height (Slow)
+                  setModalPhase(1); 
+                  
                   setTimeout(() => {
-                      onCompleteCallback();
-                  }, 1000); // Wait for BG fade
-              } else {
-                  setTimeout(() => {
-                      onCompleteCallback();
-                  }, 500); // Wait for width collapse
-              }
-          }, 800); // Duration of Height Collapse
-      }, 500); // Duration of Content Fade
+                      // 4. Collapse Width (Slow)
+                      setModalPhase(0); 
+                      
+                      // 5. Fade BG (Only if skipping, otherwise let next step handle/override)
+                      if (isSkip) {
+                          setBgOpacity(0);
+                          setTimeout(() => {
+                              onCompleteCallback();
+                          }, 1000); // Wait for BG fade
+                      } else {
+                          setTimeout(() => {
+                              onCompleteCallback();
+                          }, 500); // Wait for width collapse
+                      }
+                  }, 800); // Duration of Height Collapse
+              }, 200); // Short pause after text gone
+          }
+      }, 10);
   };
 
   const handleNext = () => {
@@ -471,7 +489,7 @@ const TutorialOverlay: React.FC<TutorialOverlayProps> = ({
   if (currentStep.type === 'welcome' || currentStep.type === 'finish') {
     return (
       <div 
-        className="fixed inset-0 z-[10000] flex items-center justify-center p-4 bg-black/90 cursor-default select-none transition-opacity duration-1000 ease-in-out"
+        className="fixed inset-0 z-[10000] flex items-center justify-center p-4 bg-black/90 cursor-none select-none transition-opacity duration-1000 ease-in-out"
         style={{ opacity: bgOpacity }}
       >
         

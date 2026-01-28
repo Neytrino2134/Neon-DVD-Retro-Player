@@ -5,7 +5,7 @@ import CustomSelect from '../CustomSelect';
 import ToggleSwitch from '../ToggleSwitch';
 import { useLanguage } from '../../../contexts/LanguageContext';
 import { DvdConfig, EffectsConfig } from '../../../types';
-import { Volume2 } from 'lucide-react';
+import { Volume2, Power } from 'lucide-react';
 
 const FPS_OPTIONS = [
   { value: 60, label: '60 FPS (OFF)' },
@@ -71,6 +71,14 @@ export const DebugSettings: React.FC<{ config: EffectsConfig['debugConsole'], up
     const { t } = useLanguage();
     return (
         <div className="pt-2">
+           <div className="mb-4">
+             <ToggleSwitch 
+                label={t('debug_console')} 
+                icon={Power} 
+                value={config.enabled} 
+                onChange={(v) => update({ ...config, enabled: v })} 
+             />
+           </div>
            <RangeControl label={t('opacity')} value={config.opacity} min={0.1} max={1} step={0.1} onChange={v => update({ ...config, opacity: v })} />
            <RangeControl label={t('scale')} value={config.scale} min={0.5} max={1.5} step={0.1} onChange={v => update({ ...config, scale: v })} />
         </div>

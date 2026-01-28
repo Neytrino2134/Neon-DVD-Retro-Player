@@ -1,8 +1,7 @@
-
 {
   "name": "neon-dvd-player",
   "private": true,
-  "version": "0.1.2",
+  "version": "0.1.4",
   "main": "electron/main.js",
   "author": "MeowMasterArt",
   "description": "A retro-styled audio player featuring a bouncing DVD screensaver, audio visualization, and neon aesthetics.",
@@ -23,12 +22,16 @@
     "lucide-react": "^0.400.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
-    "@google/genai": "*"
+    "@google/genai": "*",
+    "three": "^0.160.0",
+    "@react-three/fiber": "^8.15.12",
+    "@react-three/drei": "^9.96.1"
   },
   "devDependencies": {
     "@types/jszip": "^3.4.1",
     "@types/react": "^18.3.3",
     "@types/react-dom": "^18.3.0",
+    "@types/three": "^0.160.0",
     "@vitejs/plugin-react": "^4.3.1",
     "autoprefixer": "^10.4.19",
     "concurrently": "^8.2.2",

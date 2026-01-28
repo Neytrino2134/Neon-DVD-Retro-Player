@@ -1,9 +1,10 @@
 
-import React, { useRef, useEffect, forwardRef, useMemo, useState } from 'react';
-import { Upload, Minimize, Maximize, Monitor, Power, List, Music } from 'lucide-react';
+import React, { useRef, useEffect, forwardRef, useMemo, useState, useCallback } from 'react';
+import { Upload, Minimize, Maximize, Monitor, Power, List, Music, HelpCircle } from 'lucide-react';
 import { AudioTrack, VisualizerConfig, EffectsConfig, DvdConfig, MarqueeConfig, PatternConfig, WatermarkConfig, BgTransitionType } from '../types';
 import DvdLogo from './DvdLogo';
 import Visualizer from './Visualizer';
+import Visualizer3D from './Visualizer3D'; 
 import MediaRenderer from './MediaRenderer';
 import NoiseOverlay from './NoiseOverlay';
 import PatternOverlay from './PatternOverlay';
@@ -19,10 +20,14 @@ import LightLeaksEffect from './effects/LightLeaksEffect';
 import Marquee from './Marquee';
 import ProgressBar from './ProgressBar';
 import NotificationOverlay from './ui/NotificationOverlay';
+import HologramPanel from './ui/HologramPanel';
+import HologramHelp from './ui/HologramHelp'; 
 import { useLanguage } from '../contexts/LanguageContext';
 import { useNotification } from '../contexts/NotificationContext';
 import { Tooltip } from './ui/Tooltip';
 import { useGestures } from '../hooks/useGestures';
+import { useTheme } from '../contexts/ThemeContext';
+import RangeControl from './settings/RangeControl';
 
 const formatTime = (seconds: number) => {
   if (!seconds || isNaN(seconds) || seconds < 0) return "00:00";
@@ -43,9 +48,16 @@ interface RetroScreenProps {
   bgPattern?: string;
   bgPatternConfig?: PatternConfig;
   
+  // Live Stream
+  videoStream?: MediaStream | null; // NEW
+
   // Configs
   visualizerConfig: VisualizerConfig;
+  setVisualizerConfig?: (c: VisualizerConfig) => void; 
+  reactorConfig?: VisualizerConfig; 
+  setReactorConfig?: (c: VisualizerConfig) => void; 
   showVisualizer: boolean;
+  showVisualizer3D?: boolean; 
   dvdConfig: DvdConfig;
   showDvd: boolean;
   effectsConfig: EffectsConfig;
@@ -74,15 +86,16 @@ interface RetroScreenProps {
 
   // SFX
   onPlaySfx?: (name: string) => void;
-  volume: number; // ADDED
+  volume: number; 
   
   // API
-  apiKey?: string; // New Prop
+  apiKey?: string; 
 }
 
 const RetroScreen = forwardRef<HTMLDivElement, RetroScreenProps>(({
   analyser, isPlaying, currentTrack, tracks, onTrackSelect, bgMedia, bgColor, bgPattern = 'none', bgPatternConfig,
-  visualizerConfig, showVisualizer, dvdConfig, showDvd, effectsConfig, marqueeConfig, watermarkConfig,
+  videoStream, // NEW
+  visualizerConfig, setVisualizerConfig, reactorConfig, showVisualizer, showVisualizer3D, dvdConfig, showDvd, effectsConfig, marqueeConfig, watermarkConfig,
   progress = 0, currentTime, duration,
   focusMode, setFocusMode, isDragging,
   onDragOver, onDragEnter, onDragLeave, onDrop,
@@ -91,10 +104,17 @@ const RetroScreen = forwardRef<HTMLDivElement, RetroScreenProps>(({
 }, externalRef) => {
   
   const { t } = useLanguage();
-  const { notifications } = useNotification();
+  const { notifications, addNotification } = useNotification();
+  const { colors } = useTheme();
   
   const [bgTransition, setBgTransition] = useState<BgTransitionType>('glitch');
   const [showPlaylist, setShowPlaylist] = useState(false);
+  const [showHelp, setShowHelp] = useState(false); 
+
+  // Holographic Panel State
+  const [activePanel, setActivePanel] = useState<'quantity' | 'power' | 'freq' | 'opacity' | null>(null);
+  const [panelPos, setPanelPos] = useState({ x: 0, y: 0 });
+  const mousePosRef = useRef({ x: 0, y: 0 });
 
   useEffect(() => {
       // Sync with storage on mount/update
@@ -105,8 +125,8 @@ const RetroScreen = forwardRef<HTMLDivElement, RetroScreenProps>(({
           }
       };
       load();
-      window.addEventListener('storage', load); // Listen for cross-tab or self-updates
-  }, [bgMedia]); // Re-check when BG changes
+      window.addEventListener('storage', load); 
+  }, [bgMedia]); 
 
   const internalRef = useRef<HTMLDivElement>(null);
   const containerRef = (externalRef as React.RefObject<HTMLDivElement>) || internalRef;
@@ -126,10 +146,13 @@ const RetroScreen = forwardRef<HTMLDivElement, RetroScreenProps>(({
   const [activeMedia, setActiveMedia] = useState(bgMedia);
   const [transitionPhase, setTransitionPhase] = useState<'idle' | 'out' | 'in'>('idle');
 
+  // Handle media switching
   useEffect(() => {
+    // If video stream is active, it overrides everything, no transition needed or simple cut
+    if (videoStream) return;
+
     if (activeMedia === bgMedia) return;
 
-    // Refresh config setting before transition starts
     const stored = localStorage.getItem('neon_bg_transition');
     const currentTransition = stored ? JSON.parse(stored) as BgTransitionType : 'glitch';
     setBgTransition(currentTransition);
@@ -153,7 +176,7 @@ const RetroScreen = forwardRef<HTMLDivElement, RetroScreenProps>(({
     }, 800);
 
     return () => clearTimeout(timeout1);
-  }, [bgMedia]); 
+  }, [bgMedia, videoStream]); 
 
   // Screen Shake Loop (Only for Glitch)
   useEffect(() => {
@@ -183,6 +206,84 @@ const RetroScreen = forwardRef<HTMLDivElement, RetroScreenProps>(({
     return () => cancelAnimationFrame(aid);
   }, [effectsConfig.vhsJitter, transitionPhase, bgTransition]);
 
+  // HOTKEY LISTENER
+  useEffect(() => {
+      const handleKeyDown = (e: KeyboardEvent) => {
+          const target = e.target as HTMLElement;
+          if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.tagName === 'SELECT') return;
+          if (e.repeat) return;
+
+          // CRITICAL FIX: Ignore these hotkeys if modifiers are pressed to prevent conflicts (e.g. Ctrl+R)
+          if (e.ctrlKey || e.altKey || e.metaKey) return;
+
+          if (setVisualizerConfig) {
+              if (e.code === 'KeyT') {
+                  setVisualizerConfig({ ...visualizerConfig, position: 'top' });
+                  addNotification("WAVEFORM: TOP", "info");
+              } else if (e.code === 'KeyB') {
+                  setVisualizerConfig({ ...visualizerConfig, position: 'bottom' });
+                  addNotification("WAVEFORM: BOTTOM", "info");
+              } else if (e.code === 'KeyC' && !e.shiftKey) { // Prevent conflict with Shift+C (Compact Mode)
+                  setVisualizerConfig({ ...visualizerConfig, position: 'center' });
+                  addNotification("WAVEFORM: CENTER", "info");
+              } else if (e.code === 'KeyN') {
+                  setVisualizerConfig({ ...visualizerConfig, normalize: !visualizerConfig.normalize });
+                  addNotification(`NORMALIZE: ${!visualizerConfig.normalize ? 'ON' : 'OFF'}`, "info");
+              } else if (e.code === 'KeyM') {
+                  setVisualizerConfig({ ...visualizerConfig, mirror: !visualizerConfig.mirror });
+                  addNotification(`MIRROR: ${!visualizerConfig.mirror ? 'ON' : 'OFF'}`, "info");
+              } else if (e.code === 'KeyR') {
+                  setVisualizerConfig({ ...visualizerConfig, preventVolumeScaling: !visualizerConfig.preventVolumeScaling });
+                  addNotification(`IGNORE VOLUME: ${!visualizerConfig.preventVolumeScaling ? 'ON' : 'OFF'}`, "info");
+              }
+          }
+
+          if (e.code === 'KeyQ') {
+              if (activePanel === 'quantity') setActivePanel(null);
+              else {
+                  setActivePanel('quantity');
+                  setPanelPos({ ...mousePosRef.current });
+              }
+          } else if (e.code === 'KeyW') { 
+              if (activePanel === 'power') setActivePanel(null);
+              else {
+                  setActivePanel('power');
+                  setPanelPos({ ...mousePosRef.current });
+              }
+          } else if (e.code === 'KeyE') { 
+              if (activePanel === 'freq') setActivePanel(null);
+              else {
+                  setActivePanel('freq');
+                  setPanelPos({ ...mousePosRef.current });
+              }
+          } else if (e.code === 'KeyY') { 
+              if (activePanel === 'opacity') setActivePanel(null);
+              else {
+                  setActivePanel('opacity');
+                  setPanelPos({ ...mousePosRef.current });
+              }
+          } else if (e.code === 'KeyH') {
+              setShowHelp(prev => !prev);
+          } else if (e.code === 'Escape') {
+              setActivePanel(null);
+              setShowHelp(false); 
+          }
+      };
+
+      window.addEventListener('keydown', handleKeyDown);
+      return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [visualizerConfig, setVisualizerConfig, activePanel]);
+
+  const handleMouseMove = useCallback((e: React.MouseEvent) => {
+      if (containerRef.current) {
+          const rect = containerRef.current.getBoundingClientRect();
+          mousePosRef.current = {
+              x: e.clientX - rect.left,
+              y: e.clientY - rect.top
+          };
+      }
+  }, [containerRef]);
+
   const aberrationValue = effectsConfig.chromaticAberration || 0;
 
   const marqueeText = useMemo(() => {
@@ -201,32 +302,29 @@ const RetroScreen = forwardRef<HTMLDivElement, RetroScreenProps>(({
     return `INSERT DISK  ${dots}  SYSTEM READY  ${dots}  ${brand}  ${dots}  WAITING FOR INPUT  ${dots} ${getRandomGlitch()} ${dots} `;
   }, [currentTrack]);
 
-  // Determine marquee color based on style
   const getMarqueeColor = (style: string) => {
       switch (style) {
           case 'blue': return '#00f3ff';
           case 'pink': return '#ff00ff';
           case 'inferno': return '#ff3333';
-          case 'retro': return '#f9f871'; // Yellow for Retro text
-          case 'theme-blue': return '#3b82f6'; // Royal Blue
-          case 'warm': return '#fbbf24';       // Amber
-          case 'gray': return '#d4d4d4';       // Gray
-          case 'ocean': return '#4B8CA8';      // Teal
+          case 'retro': return '#f9f871'; 
+          case 'theme-blue': return '#3b82f6'; 
+          case 'warm': return '#fbbf24';       
+          case 'gray': return '#d4d4d4';       
+          case 'ocean': return '#4B8CA8';      
+          case 'theme-sync': return colors.primary; 
           case 'matrix': default: return '#00ff00';
       }
   };
 
   const marqueeColor = getMarqueeColor(marqueeConfig.style || 'matrix');
 
-  // Watermark Animation Calc
   const watermarkAnimClass = (watermarkConfig?.flashIntensity || 0) > 0 ? "animate-text-flash" : "";
-  const watermarkAnimStyle: React.CSSProperties = {
-      // Map intensity 0.1-1.0 to speed (e.g., 20s to 1s)
+  // Fix: Using 'any' type to bypass strict CSSProperties check for animationDuration which might be missing in some type definitions
+  const watermarkAnimStyle: any = {
       animationDuration: watermarkConfig?.flashIntensity ? `${21 - (watermarkConfig.flashIntensity * 20)}s` : '0s'
   };
 
-  // --- Dynamic Effects Config Calculation ---
-  // If transition is 'leaks', we override light leaks settings during transition
   const activeLightLeaksConfig = useMemo(() => {
       if (transitionPhase !== 'idle' && bgTransition === 'leaks') {
           return {
@@ -239,9 +337,7 @@ const RetroScreen = forwardRef<HTMLDivElement, RetroScreenProps>(({
       return effectsConfig.lightLeaks;
   }, [effectsConfig.lightLeaks, transitionPhase, bgTransition]);
 
-  // Media Opacity for Leaks Transition
   const mediaOpacity = (transitionPhase === 'out' && bgTransition === 'leaks') ? 0 : 1;
-  // Use a CSS transition to smooth the opacity change
   const mediaStyle = {
       opacity: mediaOpacity,
       transition: bgTransition === 'leaks' ? 'opacity 0.8s ease-in-out' : 'none'
@@ -254,18 +350,17 @@ const RetroScreen = forwardRef<HTMLDivElement, RetroScreenProps>(({
       <div 
         ref={shakeRef}
         onDoubleClick={() => setFocusMode(!focusMode)} 
+        onMouseMove={handleMouseMove}
         {...gestureHandlers} 
-        className={`cursor-hide-center relative w-full h-full bg-gray-900 transition-all duration-700 ${focusMode ? 'rounded-none border-0' : 'rounded-2xl border-4'} ${isDragging ? 'border-neon-blue shadow-[0_0_30px_#00f3ff]' : 'border-gray-800'} overflow-hidden group touch-action-manipulation`}
+        className={`cursor-hide-center relative w-full h-full bg-gray-900 transition-all duration-700 ${focusMode ? 'rounded-none border-0' : 'rounded-xl border-2'} ${isDragging ? 'border-neon-blue shadow-[0_0_30px_#00f3ff]' : 'border-gray-800'} overflow-hidden group touch-action-manipulation`}
         onDragOver={onDragOver}
         onDragEnter={onDragEnter}
         onDragLeave={onDragLeave}
         onDrop={onDrop}
       >
          <div ref={containerRef} className="relative w-full h-full overflow-hidden bg-black">
-            {/* IN-SCREEN NOTIFICATION OVERLAY - Updated with Dynamic Color */}
             <NotificationOverlay color={marqueeColor} />
 
-            {/* Screen Controls - Left (Reboot) */}
             <div className="absolute top-4 left-4 z-50 flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
               <Tooltip content={t('reboot')} position="right">
                 <button 
@@ -277,7 +372,6 @@ const RetroScreen = forwardRef<HTMLDivElement, RetroScreenProps>(({
               </Tooltip>
             </div>
 
-            {/* Screen Controls - Right */}
             <div className="absolute top-4 right-4 z-50 flex items-center gap-4">
               
               {rebootPhase === 'waiting' && (
@@ -312,6 +406,16 @@ const RetroScreen = forwardRef<HTMLDivElement, RetroScreenProps>(({
               )}
 
               <div className="opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-center gap-2">
+                <Tooltip content="COMMANDS (H)" position="left">
+                  <button 
+                    onClick={() => setShowHelp(!showHelp)} 
+                    style={{ color: marqueeColor }}
+                    className="p-2 bg-transparent rounded-full transition-all border border-transparent hover:shadow-[0_0_15px_currentColor] active:scale-95"
+                  >
+                      <HelpCircle size={20} />
+                  </button>
+                </Tooltip>
+
                 <Tooltip content="PLAYLIST VIEW" position="left">
                   <button 
                     onClick={() => setShowPlaylist(!showPlaylist)} 
@@ -322,10 +426,9 @@ const RetroScreen = forwardRef<HTMLDivElement, RetroScreenProps>(({
                   </button>
                 </Tooltip>
 
-                <Tooltip content={focusMode ? "EXIT FULL SCREEN" : "FULL SCREEN"} position="left">
+                <Tooltip content={focusMode ? "EXIT CINEMA MODE (F)" : "CINEMA MODE (F)"} position="left">
                   <button 
                     onClick={() => setFocusMode(!focusMode)} 
-                    // Dynamic styling for Fullscreen button
                     style={{ color: marqueeColor }}
                     className="p-2 bg-transparent rounded-full transition-all border border-transparent hover:shadow-[0_0_15px_currentColor] active:scale-95"
                   >
@@ -342,18 +445,33 @@ const RetroScreen = forwardRef<HTMLDivElement, RetroScreenProps>(({
                 className="absolute inset-0 w-full h-full"
                 style={aberrationValue > 0 ? { filter: 'url(#chromatic-aberration-filter)' } : undefined}
             >
-                {/* Media Wrapper for Opacity Transition */}
                 <div className="absolute inset-0 w-full h-full" style={mediaStyle}>
-                    <MediaRenderer type={activeMedia ? activeMedia.type : 'color'} url={activeMedia?.url} bgColor={bgColor} effects={effectsConfig} />
+                    <MediaRenderer 
+                        type={activeMedia ? activeMedia.type : 'color'} 
+                        url={activeMedia?.url} 
+                        stream={videoStream} 
+                        bgColor={bgColor} 
+                        effects={effectsConfig} 
+                    />
                 </div>
                 
+                {/* Pattern Overlay only if not streaming video (optional, but looks cleaner) */}
                 <PatternOverlay pattern={bgPattern} config={bgPatternConfig} />
                 
                 <TransitionEffect phase={transitionPhase} mode={bgTransition} />
                 
                 <LightLeaksEffect config={activeLightLeaksConfig} />
 
-                {showVisualizer && <Visualizer analyser={analyser} isPlaying={isPlaying} config={visualizerConfig} fps={120} volume={volume} />}
+                {/* MAIN VISUALIZER LAYER (2D Canvas Only) */}
+                {showVisualizer && (
+                    <Visualizer analyser={analyser} isPlaying={isPlaying} config={visualizerConfig} fps={120} volume={volume} />
+                )}
+
+                {/* INDEPENDENT 3D REACTOR (Module #10) */}
+                {showVisualizer3D && reactorConfig && (
+                    <Visualizer3D analyser={analyser} isPlaying={isPlaying} config={reactorConfig} volume={volume} />
+                )}
+                
                 {showDvd && <DvdLogo containerRef={containerRef} fps={effectsConfig.fps} effectsConfig={effectsConfig} config={dvdConfig} onPlaySfx={onPlaySfx} />}
                 
                 <ProgressBar 
@@ -378,18 +496,14 @@ const RetroScreen = forwardRef<HTMLDivElement, RetroScreenProps>(({
                    </div>
                 )}
 
-                {/* PLAYLIST OVERLAY (Big Screen Mode) */}
                 {showPlaylist && (
                   <div className="absolute inset-0 z-[25] bg-black/90 backdrop-blur-md flex flex-col p-8 md:p-12 overflow-hidden animate-slide-in-right">
-                     {/* Header */}
                      <div className="flex items-center justify-between border-b-2 border-theme-primary/50 pb-4 mb-4 shrink-0" style={{ borderColor: `${marqueeColor}80` }}>
                         <h2 className="text-2xl font-mono font-bold tracking-widest flex items-center gap-3" style={{ color: marqueeColor }}>
                            <Music className="animate-pulse" /> TRACK REPOSITORY
                         </h2>
                         <span className="font-mono text-theme-muted text-sm">{tracks.length} FILES FOUND</span>
                      </div>
-                     
-                     {/* List */}
                      <div className="flex-1 overflow-y-auto custom-scrollbar pr-2 space-y-2">
                         {tracks.map((track, i) => (
                            <div 
@@ -420,6 +534,41 @@ const RetroScreen = forwardRef<HTMLDivElement, RetroScreenProps>(({
                   </div>
                 )}
 
+                {/* Panels... */}
+                {activePanel && setVisualizerConfig && (
+                    <>
+                        {activePanel === 'quantity' && (
+                            <HologramPanel title={t('group_qty_space')} x={panelPos.x} y={panelPos.y} onClose={() => setActivePanel(null)}>
+                                <RangeControl label={t('bar_count')} value={visualizerConfig.barCount} min={8} max={512} step={8} onChange={(v) => setVisualizerConfig({ ...visualizerConfig, barCount: v })} className="mb-0" />
+                                <RangeControl label={t('bar_gap')} value={visualizerConfig.barGap} min={0} max={20} step={0.5} onChange={(v) => setVisualizerConfig({ ...visualizerConfig, barGap: v })} className="mb-0" />
+                            </HologramPanel>
+                        )}
+                        
+                        {activePanel === 'power' && (
+                            <HologramPanel title={t('group_power_gravity')} x={panelPos.x} y={panelPos.y} onClose={() => setActivePanel(null)}>
+                                <RangeControl label={t('amplitude')} value={visualizerConfig.sensitivity} min={0.1} max={3.0} step={0.1} onChange={(v) => setVisualizerConfig({ ...visualizerConfig, sensitivity: v })} className="mb-0" />
+                                <RangeControl label={t('bar_gravity')} value={visualizerConfig.barGravity ?? 5} min={0} max={10} step={0.5} onChange={(v) => setVisualizerConfig({ ...visualizerConfig, barGravity: v })} className="mb-0" />
+                            </HologramPanel>
+                        )}
+
+                        {activePanel === 'freq' && (
+                            <HologramPanel title={t('group_cutoff')} x={panelPos.x} y={panelPos.y} onClose={() => setActivePanel(null)}>
+                                <RangeControl label={t('min_freq')} value={visualizerConfig.minFrequency} min={0} max={99} step={1} onChange={(v) => setVisualizerConfig({ ...visualizerConfig, minFrequency: v })} className="mb-0" />
+                                <RangeControl label={t('max_freq')} value={visualizerConfig.maxFrequency} min={1} max={100} step={1} onChange={(v) => setVisualizerConfig({ ...visualizerConfig, maxFrequency: v })} className="mb-0" />
+                            </HologramPanel>
+                        )}
+
+                        {activePanel === 'opacity' && (
+                            <HologramPanel title={t('group_opacity')} x={panelPos.x} y={panelPos.y} onClose={() => setActivePanel(null)}>
+                                <RangeControl label={t('fill_opacity')} value={visualizerConfig.fillOpacity} min={0} max={1} step={0.1} onChange={(v) => setVisualizerConfig({ ...visualizerConfig, fillOpacity: v })} className="mb-0" />
+                                {visualizerConfig.strokeEnabled && (
+                                    <RangeControl label={t('stroke_opacity')} value={visualizerConfig.strokeOpacity} min={0} max={1} step={0.1} onChange={(v) => setVisualizerConfig({ ...visualizerConfig, strokeOpacity: v })} className="mb-0" />
+                                )}
+                            </HologramPanel>
+                        )}
+                    </>
+                )}
+
                 <GlitchEffect effects={effectsConfig} />
                 <CyberHackEffect effects={effectsConfig} />
                 <HologramEffect effects={effectsConfig} />
@@ -430,8 +579,11 @@ const RetroScreen = forwardRef<HTMLDivElement, RetroScreenProps>(({
             <NoiseOverlay opacity={effectsConfig.noise} pixelation={effectsConfig.pixelation} />
             <ScanlineEffect config={effectsConfig} />
             
-            {/* Flicker Effect - Disabled when notifications are present to keep screen static */}
             <div className={`absolute inset-0 z-30 pointer-events-none ${hasNotifications ? '' : 'flicker'} bg-white/5`}></div>
+
+            {showHelp && (
+                <HologramHelp onClose={() => setShowHelp(false)} />
+            )}
 
             {isDragging && (
               <div className="absolute inset-0 z-50 flex items-center justify-center bg-neon-blue/20 backdrop-blur-sm pointer-events-none border-4 border-dashed border-neon-blue m-2 rounded-xl animate-pulse">
@@ -445,32 +597,30 @@ const RetroScreen = forwardRef<HTMLDivElement, RetroScreenProps>(({
 
             {!isPlaying && !currentTrack && !isDragging && (
                 <div className="absolute inset-0 flex items-center justify-center z-20 pointer-events-none">
-                    {/* Dynamic color for INSERT DISK */}
                     <div 
                         className="font-mono text-xl border px-8 py-4 rounded bg-black/20 backdrop-blur-[2px]"
                         style={{ 
                             color: marqueeColor, 
-                            borderColor: `${marqueeColor}80`, // 50% opacity border
-                            boxShadow: `0 0 20px ${marqueeColor}20` // 12% opacity shadow
+                            borderColor: `${marqueeColor}80`, 
+                            boxShadow: `0 0 20px ${marqueeColor}20` 
                         }}
                     >
-                        INSERT DISK
+                        {videoStream ? 'SYSTEM LINK ACTIVE' : 'INSERT DISK'}
                     </div>
                 </div>
             )}
          </div>
          
-         {/* Watermark Section - Updated with Dynamic Color */}
          <div 
-            className="absolute bottom-6 right-8 z-50 flex flex-col items-end pointer-events-none select-none mix-blend-screen"
+            className="absolute bottom-10 right-10 md:bottom-12 md:right-12 z-50 flex flex-col items-end pointer-events-none select-none mix-blend-screen whitespace-nowrap"
             style={{
                 opacity: watermarkConfig?.opacity ?? 1,
                 transform: `scale(${watermarkConfig?.scale ?? 1})`,
                 transformOrigin: 'bottom right',
-                color: marqueeColor // Apply color to container
+                color: marqueeColor 
             }}
          >
-            <div className="flex flex-col items-end text-xs font-mono font-bold tracking-wider mb-1 space-y-0.5 opacity-80">
+            <div className="flex flex-col items-end text-xs font-mono font-bold tracking-wider mb-1 space-y-0.5 opacity-80 whitespace-nowrap">
                <span 
                   className={watermarkAnimClass} 
                   style={{ animationDuration: watermarkAnimStyle.animationDuration, animationDelay: '2s', color: 'currentColor' }}
@@ -485,7 +635,7 @@ const RetroScreen = forwardRef<HTMLDivElement, RetroScreenProps>(({
                </span>
             </div>
             <div 
-                className={`flex items-center gap-2 font-black text-lg tracking-widest uppercase ${watermarkAnimClass}`}
+                className={`flex items-center gap-2 font-black text-lg tracking-widest uppercase whitespace-nowrap ${watermarkAnimClass}`}
                 style={{ animationDuration: watermarkAnimStyle.animationDuration, color: 'currentColor' }}
             >
                <Monitor size={20} /> RETRO-SONIC ULTRA

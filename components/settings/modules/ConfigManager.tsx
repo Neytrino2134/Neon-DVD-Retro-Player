@@ -1,19 +1,22 @@
 
 import React, { useState, useEffect } from 'react';
-import { Save, Trash2, Edit2, Check, X, Download } from 'lucide-react';
+import { Save, Trash2, Edit2, Check, X, Download, RotateCcw } from 'lucide-react';
 import { useLanguage } from '../../../contexts/LanguageContext';
 import { AppPreset } from '../../../types';
 import { Tooltip } from '../../ui/Tooltip';
 
 interface ConfigManagerProps {
   presets: AppPreset[];
+  activePresetId: string | null;
   onSave: (name: string) => void;
+  onOverwrite: (id: string) => void;
   onLoad: (id: string) => void;
   onDelete: (id: string) => void;
   onRename: (id: string, newName: string) => void;
+  onResetDefault?: () => void;
 }
 
-const ConfigManager: React.FC<ConfigManagerProps> = ({ presets, onSave, onLoad, onDelete, onRename }) => {
+const ConfigManager: React.FC<ConfigManagerProps> = ({ presets, activePresetId, onSave, onOverwrite, onLoad, onDelete, onRename, onResetDefault }) => {
   const { t } = useLanguage();
   
   // Logic to determine next default name
@@ -44,6 +47,16 @@ const ConfigManager: React.FC<ConfigManagerProps> = ({ presets, onSave, onLoad, 
     if (!newName.trim()) return;
     onSave(newName);
     // Name update is handled by useEffect
+  };
+
+  const handleOverwrite = (id: string, e: React.MouseEvent) => {
+      e.stopPropagation();
+      onOverwrite(id);
+  };
+
+  const handleReset = (e: React.MouseEvent) => {
+      e.stopPropagation();
+      if (onResetDefault) onResetDefault();
   };
 
   const startEditing = (preset: AppPreset, e: React.MouseEvent) => {
@@ -79,7 +92,7 @@ const ConfigManager: React.FC<ConfigManagerProps> = ({ presets, onSave, onLoad, 
       e.stopPropagation();
       const configToExport = {
           ...preset.config,
-          version: '1.1'
+          version: '1.2'
       };
       
       const blob = new Blob([JSON.stringify(configToExport, null, 2)], { type: 'application/json' });
@@ -107,7 +120,7 @@ const ConfigManager: React.FC<ConfigManagerProps> = ({ presets, onSave, onLoad, 
           value={newName}
           onChange={(e) => setNewName(e.target.value)}
           placeholder={t('preset_name')}
-          className="flex-1 bg-transparent border-b border-theme-muted/50 focus:border-theme-primary outline-none text-xs font-mono text-theme-text placeholder-theme-muted px-1 transition-colors"
+          className="flex-1 bg-transparent border-b border-theme-primary focus:border-theme-primary outline-none text-xs font-mono text-theme-text placeholder-theme-muted px-1 transition-colors"
           onKeyDown={(e) => e.key === 'Enter' && handleSave()}
         />
         <Tooltip content={t('save_preset')} position="top">
@@ -130,13 +143,22 @@ const ConfigManager: React.FC<ConfigManagerProps> = ({ presets, onSave, onLoad, 
           </div>
         )}
         
-        {presets.map((preset) => (
+        {presets.map((preset) => {
+          const isActive = preset.id === activePresetId;
+          const isDefault = preset.id === 'default_system';
+
+          return (
           <div 
             key={preset.id} 
             onClick={() => {
                 if (editingId !== preset.id) handleLoad(preset.id);
             }}
-            className="flex items-center justify-between p-2 bg-theme-panel/30 border border-theme-border rounded group hover:border-theme-muted transition-colors cursor-pointer hover:bg-theme-panel/60"
+            className={`flex items-center justify-between p-2 border rounded group transition-all cursor-pointer 
+                ${isActive 
+                    ? 'bg-theme-accent/10 border-theme-accent shadow-[inset_0_0_10px_rgba(var(--color-accent),0.2)]' 
+                    : 'bg-theme-panel/30 border-theme-border hover:bg-theme-panel/60 hover:border-theme-primary'
+                }
+            `}
           >
             {editingId === preset.id ? (
               <div className="flex flex-1 items-center gap-2 mr-2" onClick={(e) => e.stopPropagation()}>
@@ -159,18 +181,56 @@ const ConfigManager: React.FC<ConfigManagerProps> = ({ presets, onSave, onLoad, 
                 </button>
               </div>
             ) : (
-              <div className="flex-1 min-w-0 mr-2">
-                <div className="text-xs font-mono text-theme-muted truncate font-bold group-hover:text-theme-text transition-colors">
+              <div className="flex-1 min-w-0 mr-2 flex items-center gap-2">
+                <div className={`text-xs font-mono truncate transition-colors ${isActive ? 'text-theme-accent font-bold' : 'text-theme-muted group-hover:text-theme-text'}`}>
                   {preset.name}
                 </div>
-                <div className="text-[9px] text-theme-muted/70 font-mono">
-                  {new Date(preset.createdAt).toLocaleDateString()}
-                </div>
+                {isActive && (
+                    <span className="text-[8px] bg-theme-accent text-black px-1 rounded font-bold tracking-wider">ACTIVE</span>
+                )}
               </div>
             )}
 
             {editingId !== preset.id && (
               <div className="flex items-center gap-1 opacity-60 group-hover:opacity-100 transition-opacity">
+                 
+                 {/* Apply Button */}
+                 {!isActive && (
+                    <Tooltip content="APPLY" position="top">
+                        <button 
+                        onClick={(e) => handleLoad(preset.id, e)}
+                        className="p-1.5 hover:bg-theme-primary/20 hover:text-theme-primary rounded transition-colors text-theme-muted"
+                        >
+                        <Check size={12} />
+                        </button>
+                    </Tooltip>
+                 )}
+
+                 {/* Reset Default Button */}
+                 {isDefault && onResetDefault && (
+                     <Tooltip content="FACTORY RESET" position="top">
+                        <button 
+                        onClick={handleReset}
+                        className="p-1.5 hover:bg-amber-500/20 hover:text-amber-500 rounded transition-colors text-theme-muted"
+                        >
+                        <RotateCcw size={12} />
+                        </button>
+                    </Tooltip>
+                 )}
+
+                 {/* Save/Overwrite Button */}
+                 {!isDefault && (
+                     <Tooltip content="OVERWRITE" position="top">
+                        <button 
+                        onClick={(e) => handleOverwrite(preset.id, e)}
+                        className="p-1.5 hover:bg-theme-accent/20 hover:text-theme-accent rounded transition-colors text-theme-muted"
+                        >
+                        <Save size={12} />
+                        </button>
+                    </Tooltip>
+                 )}
+
+                 {/* Export Config */}
                  <Tooltip content={t('export_config')} position="top">
                     <button 
                     onClick={(e) => handleExport(preset, e)}
@@ -179,41 +239,37 @@ const ConfigManager: React.FC<ConfigManagerProps> = ({ presets, onSave, onLoad, 
                     <Download size={12} />
                     </button>
                 </Tooltip>
-
-                 <Tooltip content={t('load')} position="top">
-                    <button 
-                    onClick={(e) => handleLoad(preset.id, e)}
-                    className="p-1.5 hover:bg-theme-accent/20 hover:text-theme-accent rounded transition-colors"
-                    >
-                    <Check size={12} />
-                    </button>
-                </Tooltip>
                 
-                <Tooltip content={t('rename')} position="top">
-                    <button 
-                    onClick={(e) => startEditing(preset, e)}
-                    className="p-1.5 hover:bg-theme-secondary/20 hover:text-theme-secondary rounded transition-colors"
-                    >
-                    <Edit2 size={12} />
-                    </button>
-                </Tooltip>
+                {/* Rename */}
+                {!isDefault && (
+                    <Tooltip content={t('rename')} position="top">
+                        <button 
+                        onClick={(e) => startEditing(preset, e)}
+                        className="p-1.5 hover:bg-theme-secondary/20 hover:text-theme-secondary rounded transition-colors"
+                        >
+                        <Edit2 size={12} />
+                        </button>
+                    </Tooltip>
+                )}
 
-                <Tooltip content={t('delete')} position="top">
-                    <button 
-                    onClick={(e) => handleDelete(preset.id, e)}
-                    className="p-1.5 hover:bg-red-500/20 hover:text-red-500 rounded transition-colors"
-                    >
-                    <Trash2 size={12} />
-                    </button>
-                </Tooltip>
+                {/* Delete */}
+                {!isDefault && (
+                    <Tooltip content={t('delete')} position="top">
+                        <button 
+                        onClick={(e) => handleDelete(preset.id, e)}
+                        className="p-1.5 hover:bg-red-500/20 hover:text-red-500 rounded transition-colors"
+                        >
+                        <Trash2 size={12} />
+                        </button>
+                    </Tooltip>
+                )}
               </div>
             )}
           </div>
-        ))}
+        )})}
       </div>
     </div>
   );
 };
 
 export default ConfigManager;
-    

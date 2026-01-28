@@ -1,8 +1,95 @@
+
 import { useState, useRef, useEffect, useCallback, SyntheticEvent } from 'react';
 import { AudioTrack, Playlist } from '../types';
 import { getAllTracks, saveTrack, getAllPlaylists, savePlaylist, deletePlaylistAndTracks, clearTracksInPlaylist, deleteTracksBulk, saveTracksBulk } from '../lib/db';
 
 type Deck = 'A' | 'B';
+
+const RESUME_KEY = 'neon_player_resume_state';
+
+// Simple function to parse basic ID3v2 tags for APIC frame (Cover Art)
+// This is a simplified parser to avoid heavy external dependencies
+const extractCoverArt = async (file: File): Promise<string | undefined> => {
+    return new Promise((resolve) => {
+        // Only process MP3s for now
+        if (!file.type.includes('audio/mpeg') && !file.name.toLowerCase().endsWith('.mp3')) {
+            resolve(undefined);
+            return;
+        }
+
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            const buffer = e.target?.result as ArrayBuffer;
+            if (!buffer) { resolve(undefined); return; }
+            
+            const view = new DataView(buffer);
+            // Check for ID3 header
+            if (view.getUint8(0) !== 0x49 || view.getUint8(1) !== 0x44 || view.getUint8(2) !== 0x33) {
+                resolve(undefined);
+                return;
+            }
+
+            const version = view.getUint8(3);
+            const size = ((view.getUint8(6) & 0x7f) << 21) | ((view.getUint8(7) & 0x7f) << 14) | ((view.getUint8(8) & 0x7f) << 7) | (view.getUint8(9) & 0x7f);
+            
+            let offset = 10;
+            const limit = offset + size;
+
+            while (offset < limit) {
+                // Read frame header
+                let frameId = '';
+                let frameSize = 0;
+                
+                if (version === 2) {
+                    // ID3v2.2
+                    if (offset + 6 > limit) break;
+                    frameId = String.fromCharCode(view.getUint8(offset), view.getUint8(offset+1), view.getUint8(offset+2));
+                    frameSize = (view.getUint8(offset+3) << 16) | (view.getUint8(offset+4) << 8) | view.getUint8(offset+5);
+                    offset += 6;
+                } else if (version === 3 || version === 4) {
+                    // ID3v2.3 / ID3v2.4
+                    if (offset + 10 > limit) break;
+                    frameId = String.fromCharCode(view.getUint8(offset), view.getUint8(offset+1), view.getUint8(offset+2), view.getUint8(offset+3));
+                    frameSize = (view.getUint8(offset+4) << 24) | (view.getUint8(offset+5) << 16) | (view.getUint8(offset+6) << 8) | view.getUint8(offset+7);
+                    // Handle unsynchronization scheme in v2.4 size if necessary (omitted for simplicity in this basic parser)
+                    if (version === 4 && (frameSize & 0x80808080)) {
+                         // Basic synchsafe decode
+                         frameSize = ((view.getUint8(offset+4) & 0x7f) << 21) | ((view.getUint8(offset+5) & 0x7f) << 14) | ((view.getUint8(offset+6) & 0x7f) << 7) | (view.getUint8(offset+7) & 0x7f);
+                    }
+                    offset += 10;
+                } else {
+                    break;
+                }
+
+                if (frameId === 'APIC' || frameId === 'PIC') {
+                    const mimeStart = offset + 1; // Skip encoding byte
+                    let mimeEnd = mimeStart;
+                    while (view.getUint8(mimeEnd) !== 0 && mimeEnd < limit) mimeEnd++;
+                    const mimeType = new TextDecoder().decode(buffer.slice(mimeStart, mimeEnd)) || 'image/jpeg';
+                    
+                    let contentStart = mimeEnd + 1;
+                    // Skip picture type byte
+                    contentStart++; 
+                    // Skip description (search for null terminator)
+                    while (view.getUint8(contentStart) !== 0 && contentStart < limit) contentStart++;
+                    contentStart++; // Skip the null terminator
+
+                    const imageBuffer = buffer.slice(contentStart, offset + frameSize);
+                    const blob = new Blob([imageBuffer], { type: mimeType });
+                    resolve(URL.createObjectURL(blob));
+                    return;
+                }
+
+                offset += frameSize;
+            }
+            resolve(undefined);
+        };
+        
+        // Read first 500KB (usually enough for headers + art)
+        const slice = file.slice(0, 500 * 1024);
+        reader.readAsArrayBuffer(slice);
+    });
+};
 
 export const useAudioPlayer = () => {
   // Playlist State
@@ -48,6 +135,11 @@ export const useAudioPlayer = () => {
   const gainARef = useRef<GainNode | null>(null);
   const gainBRef = useRef<GainNode | null>(null);
   const masterGainRef = useRef<GainNode | null>(null); // New Master Gain
+  const analyserRef = useRef<AnalyserNode | null>(null); // Analyser Ref for immediate access
+  
+  // --- AUX INPUT (System Audio) ---
+  const auxSourceRef = useRef<MediaStreamAudioSourceNode | null>(null);
+  const auxGainRef = useRef<GainNode | null>(null);
 
   // Helper to get tracks of currently PLAYING playlist (for audio engine)
   const getPlayingTracks = useCallback(() => {
@@ -74,51 +166,104 @@ export const useAudioPlayer = () => {
      localStorage.setItem('neon_crossfade', crossfadeDuration.toString());
   }, [crossfadeDuration]);
 
-  // INITIAL LOAD
+  // --- PERSISTENCE: Save State on Change ---
+  useEffect(() => {
+      // Only save if we have loaded playlists
+      if (playlists.length > 0) {
+          const state = {
+              activePlaylistId,
+              playingPlaylistId,
+              currentTrackIndex,
+              currentTime
+          };
+          localStorage.setItem(RESUME_KEY, JSON.stringify(state));
+      }
+  }, [activePlaylistId, playingPlaylistId, currentTrackIndex, currentTime, playlists]);
+
+  // INITIAL LOAD (Existing logic preserved...)
   useEffect(() => {
     const loadData = async () => {
       try {
         const savedPlaylists = await getAllPlaylists();
         const savedTracks = await getAllTracks();
         
-        // If no playlists exist, create a default one
+        let hydratedPlaylists: Playlist[] = [];
+
         if (savedPlaylists.length === 0) {
             const defaultId = crypto.randomUUID();
             const defaultPl = { id: defaultId, name: 'MAIN DECK', order: 0 };
             await savePlaylist(defaultPl);
             
-            // If there are legacy tracks with no playlist ID or old format, migrate them
+            // Process saved tracks to get artwork if needed (lazy load or just map)
+            // For now, we don't re-extract on load to save time, we assume user adds files
+            // or we could store artwork in DB (not implemented to save space in this demo)
+            
             const migratedTracks: AudioTrack[] = [];
             for (const t of savedTracks) {
-                const updated = { ...t, playlistId: defaultId, url: URL.createObjectURL(t.file) };
+                // Attempt to re-extract cover art on load since we don't store blob URL permanently in DB text
+                const artUrl = await extractCoverArt(t.file);
+                
+                const updated = { 
+                    ...t, 
+                    playlistId: defaultId, 
+                    url: URL.createObjectURL(t.file),
+                    artworkUrl: artUrl
+                };
                 await saveTrack({ id: updated.id, playlistId: defaultId, name: updated.name, file: updated.file });
                 migratedTracks.push(updated);
             }
             
-            setPlaylists([{ ...defaultPl, tracks: migratedTracks }]);
-            setActivePlaylistId(defaultId);
-            setPlayingPlaylistId(defaultId);
-
-            if (migratedTracks.length > 0) {
-                 setCurrentTrackIndex(0);
-                 if (audioRefA.current) {
-                     audioRefA.current.src = migratedTracks[0].url;
-                     audioRefA.current.load();
-                 }
-            }
+            hydratedPlaylists = [{ ...defaultPl, tracks: migratedTracks }];
         } else {
-            // Map tracks to playlists
-            const hydratedPlaylists = savedPlaylists.map(pl => ({
+            // Re-hydrate playlists
+            // We need to re-extract art for saved files
+            const processedTracks = await Promise.all(savedTracks.map(async t => ({
+                ...t,
+                url: URL.createObjectURL(t.file),
+                artworkUrl: await extractCoverArt(t.file)
+            })));
+
+            hydratedPlaylists = savedPlaylists.map(pl => ({
                 ...pl,
-                tracks: savedTracks
-                    .filter(t => t.playlistId === pl.id)
-                    .map(t => ({ ...t, url: URL.createObjectURL(t.file) }))
+                tracks: processedTracks.filter(t => t.playlistId === pl.id)
             }));
-            
-            setPlaylists(hydratedPlaylists);
+        }
+        
+        setPlaylists(hydratedPlaylists);
+
+        const savedStateStr = localStorage.getItem(RESUME_KEY);
+        let restoreSuccess = false;
+
+        if (savedStateStr) {
+            try {
+                const savedState = JSON.parse(savedStateStr);
+                const { activePlaylistId: sActive, playingPlaylistId: sPlaying, currentTrackIndex: sIndex, currentTime: sTime } = savedState;
+
+                const activeExists = hydratedPlaylists.some(p => p.id === sActive);
+                const playingPl = hydratedPlaylists.find(p => p.id === sPlaying);
+                
+                if (activeExists && playingPl) {
+                    setActivePlaylistId(sActive);
+                    setPlayingPlaylistId(sPlaying);
+                    
+                    if (playingPl.tracks[sIndex]) {
+                        setCurrentTrackIndex(sIndex);
+                        if (audioRefA.current) {
+                            audioRefA.current.src = playingPl.tracks[sIndex].url;
+                            audioRefA.current.currentTime = sTime || 0;
+                            setCurrentTime(sTime || 0);
+                        }
+                        restoreSuccess = true;
+                    }
+                }
+            } catch (e) {
+                console.warn("Failed to restore player state", e);
+            }
+        }
+
+        if (!restoreSuccess) {
             setActivePlaylistId(hydratedPlaylists[0].id);
             setPlayingPlaylistId(hydratedPlaylists[0].id);
-
             const initialTracks = hydratedPlaylists[0].tracks;
             if (initialTracks.length > 0) {
                 setCurrentTrackIndex(0);
@@ -148,16 +293,26 @@ export const useAudioPlayer = () => {
       const analyserNode = context.createAnalyser();
       analyserNode.smoothingTimeConstant = 0.6; 
       setAnalyser(analyserNode);
+      analyserRef.current = analyserNode; // Sync ref
 
       const gainA = context.createGain();
       const gainB = context.createGain();
       const masterGain = context.createGain();
       
-      // Routing: Deck Gains -> Analyser -> Master Gain -> Output
+      // --- ROUTING FIX FOR SYSTEM AUDIO ---
+      // We split into two parallel paths:
+      
+      // 1. AUDIO OUTPUT PATH (To Speakers)
+      // Only the internal decks (A & B) go to the master gain and speakers.
+      gainA.connect(masterGain);
+      gainB.connect(masterGain);
+      masterGain.connect(context.destination);
+
+      // 2. VISUALIZATION PATH (To Analyser)
+      // Decks A & B also go to the analyser.
+      // Important: Analyser is NOT connected to destination anymore.
       gainA.connect(analyserNode);
       gainB.connect(analyserNode);
-      analyserNode.connect(masterGain);
-      masterGain.connect(context.destination);
 
       gainARef.current = gainA;
       gainBRef.current = gainB;
@@ -190,12 +345,62 @@ export const useAudioPlayer = () => {
     }
   }, [volume]);
 
-  // --- CROSSFADE LOGIC ---
+  // --- CONNECT SYSTEM AUDIO (AUX) ---
+  const connectAuxSource = useCallback((stream: MediaStream | null) => {
+      initAudio(); // Ensure context exists
+      const ctx = audioContextRef.current;
+      const analyserNode = analyserRef.current; // Get from ref for guaranteed access
+
+      if (!ctx) return;
+
+      // Disconnect previous
+      if (auxSourceRef.current) {
+          auxSourceRef.current.disconnect();
+          auxSourceRef.current = null;
+      }
+      if (auxGainRef.current) {
+          auxGainRef.current.disconnect();
+          auxGainRef.current = null;
+      }
+
+      if (stream) {
+          try {
+              const source = ctx.createMediaStreamSource(stream);
+              const gain = ctx.createGain();
+              
+              // FORCE 100% Volume for Analyser Input
+              gain.gain.value = 1.0;
+
+              // Connect Source -> Gain
+              source.connect(gain);
+
+              // 1. Connect Gain -> Analyser (For Visualization)
+              if (analyserNode) {
+                  gain.connect(analyserNode);
+              }
+
+              // 2. DO NOT Connect to Destination (Speakers)
+              // Since the routing logic in initAudio now decouples Analyser from Destination,
+              // simply connecting to Analyser here will visualize the sound without playing it back.
+              
+              auxSourceRef.current = source;
+              auxGainRef.current = gain;
+
+          } catch (e) {
+              console.error("Failed to connect AUX source", e);
+          }
+      }
+  }, [initAudio]);
+
+  // Empty placeholder to keep interface consistent
+  const updateAuxVolume = useCallback((_volume: number) => {}, []);
+  const updateAuxMonitor = useCallback((_monitor: boolean) => {}, []);
+
+
+  // --- CROSSFADE LOGIC (Existing...) ---
   const performCrossfade = useCallback((toTrackIndex: number, specificTracks?: AudioTrack[]) => {
       initAudio();
-      
       const tracksToUse = specificTracks || getPlayingTracks();
-      
       if (!tracksToUse[toTrackIndex] || !audioContextRef.current || !gainARef.current || !gainBRef.current) return;
 
       if (crossfadeTimeoutRef.current) {
@@ -384,7 +589,12 @@ export const useAudioPlayer = () => {
           }
       }
 
-      if (!tracksToPlay[index] || (index === currentTrackIndex && activePlaylistId === playingPlaylistId)) return;
+      if (!tracksToPlay[index]) return;
+
+      if (index === currentTrackIndex && activePlaylistId === playingPlaylistId) {
+          if (!isPlaying) togglePlay();
+          return;
+      }
       
       if (isPlaying) {
           performCrossfade(index, tracksToPlay);
@@ -397,11 +607,21 @@ export const useAudioPlayer = () => {
               initAudio();
               audio.play();
               setIsPlaying(true);
+              
+              if (gainARef.current && gainBRef.current) {
+                 const now = audioContextRef.current?.currentTime || 0;
+                 const activeGain = activeDeckRef.current === 'A' ? gainARef.current : gainBRef.current;
+                 const inactiveGain = activeDeckRef.current === 'A' ? gainBRef.current : gainARef.current;
+                 activeGain.gain.cancelScheduledValues(now);
+                 inactiveGain.gain.cancelScheduledValues(now);
+                 activeGain.gain.setValueAtTime(1, now);
+                 inactiveGain.gain.setValueAtTime(0, now);
+              }
           }
           setCurrentTrackIndex(index);
           hasTriggeredAutoMixRef.current = false;
       }
-  }, [currentTrackIndex, isPlaying, performCrossfade, getPlayingTracks, activePlaylistId, playingPlaylistId, playlists, initAudio]);
+  }, [currentTrackIndex, isPlaying, performCrossfade, getPlayingTracks, activePlaylistId, playingPlaylistId, playlists, initAudio, togglePlay]);
 
   const seek = useCallback((time: number) => {
     const audio = activeDeckRef.current === 'A' ? audioRefA.current : audioRefB.current;
@@ -439,13 +659,18 @@ export const useAudioPlayer = () => {
         targetPlaylistId = plId;
     }
 
-    const newTracks = files.map(file => ({ 
-        id: crypto.randomUUID(), 
-        playlistId: targetPlaylistId,
-        name: file.name, 
-        url: URL.createObjectURL(file), 
-        file 
-    }));
+    const newTracks: AudioTrack[] = [];
+    for (const file of files) {
+        const artUrl = await extractCoverArt(file);
+        newTracks.push({ 
+            id: crypto.randomUUID(), 
+            playlistId: targetPlaylistId,
+            name: file.name, 
+            url: URL.createObjectURL(file), 
+            file,
+            artworkUrl: artUrl
+        });
+    }
 
     for (const t of newTracks) {
         await saveTrack({ id: t.id, playlistId: t.playlistId, name: t.name, file: t.file });
@@ -468,6 +693,54 @@ export const useAudioPlayer = () => {
     }));
   };
 
+  const insertAudioFiles = async (files: File[], insertIndex: number) => {
+      if (!activePlaylistId) {
+          // If no playlist exists, fall back to simple append which creates one
+          processAudioFiles(files);
+          return;
+      }
+
+      const newTracks: AudioTrack[] = [];
+      for (const file of files) {
+          const artUrl = await extractCoverArt(file);
+          newTracks.push({
+              id: crypto.randomUUID(),
+              playlistId: activePlaylistId,
+              name: file.name,
+              url: URL.createObjectURL(file),
+              file,
+              artworkUrl: artUrl
+          });
+      }
+
+      await saveTracksBulk(newTracks.map(t => ({ id: t.id, playlistId: t.playlistId, name: t.name, file: t.file })));
+
+      setPlaylists(prev => prev.map(pl => {
+          if (pl.id === activePlaylistId) {
+              const updatedTracks = [...pl.tracks];
+              // Insert new tracks at specific index
+              updatedTracks.splice(insertIndex, 0, ...newTracks);
+              
+              // Handle first track logic if playlist was empty
+              if (pl.id === playingPlaylistId && pl.tracks.length === 0 && updatedTracks.length > 0) {
+                  setCurrentTrackIndex(0);
+                  if (audioRefA.current) {
+                      audioRefA.current.src = updatedTracks[0].url;
+                      audioRefA.current.load();
+                  }
+                  initAudio();
+              }
+              // Adjust current index if we inserted ABOVE the current playing track
+              else if (pl.id === playingPlaylistId && currentTrackIndex >= insertIndex) {
+                  setCurrentTrackIndex(prevIndex => prevIndex + newTracks.length);
+              }
+
+              return { ...pl, tracks: updatedTracks };
+          }
+          return pl;
+      }));
+  };
+
   const createPlaylistFromFiles = async (files: File[]) => {
       const plId = crypto.randomUUID();
       const plName = `DECK ${playlists.length + 1}`;
@@ -475,13 +748,18 @@ export const useAudioPlayer = () => {
       
       await savePlaylist(newPlaylist);
       
-      const newTracks = files.map(file => ({ 
-          id: crypto.randomUUID(), 
-          playlistId: plId,
-          name: file.name, 
-          url: URL.createObjectURL(file), 
-          file 
-      }));
+      const newTracks: AudioTrack[] = [];
+      for (const file of files) {
+          const artUrl = await extractCoverArt(file);
+          newTracks.push({ 
+              id: crypto.randomUUID(), 
+              playlistId: plId,
+              name: file.name, 
+              url: URL.createObjectURL(file), 
+              file,
+              artworkUrl: artUrl
+          });
+      }
 
       await saveTracksBulk(newTracks.map(t => ({ id: t.id, playlistId: t.playlistId, name: t.name, file: t.file })));
 
@@ -549,31 +827,21 @@ export const useAudioPlayer = () => {
     }));
   }, [activePlaylistId, playingPlaylistId, currentTrackIndex]);
 
-  // --- NEW TRACK MANAGEMENT FUNCTIONS ---
-
   const removeTracks = useCallback(async (playlistId: string, trackIds: string[]) => {
-      // If we are deleting the CURRENTLY PLAYING track, handle logic
       if (playlistId === playingPlaylistId) {
           const currentTrack = playlists.find(p => p.id === playlistId)?.tracks[currentTrackIndex];
           if (currentTrack && trackIds.includes(currentTrack.id)) {
-              stop(); // Stop for safety if current is deleted
+              stop();
               setCurrentTrackIndex(-1);
           }
       }
-
       await deleteTracksBulk(trackIds);
-
       setPlaylists(prev => prev.map(pl => {
           if (pl.id === playlistId) {
               const remaining = pl.tracks.filter(t => {
-                  if (trackIds.includes(t.id)) {
-                      URL.revokeObjectURL(t.url);
-                      return false;
-                  }
+                  if (trackIds.includes(t.id)) { URL.revokeObjectURL(t.url); return false; }
                   return true;
               });
-              
-              // Recalculate index if items removed above current
               if (pl.id === playingPlaylistId && currentTrackIndex > -1) {
                   const currentId = pl.tracks[currentTrackIndex]?.id;
                   if (currentId && !trackIds.includes(currentId)) {
@@ -581,7 +849,6 @@ export const useAudioPlayer = () => {
                       setCurrentTrackIndex(newIndex);
                   }
               }
-              
               return { ...pl, tracks: remaining };
           }
           return pl;
@@ -593,21 +860,11 @@ export const useAudioPlayer = () => {
           if (pl.id === playlistId) {
               const tracks = [...pl.tracks];
               const movedItems = sourceIndices.sort((a, b) => a - b).map(i => tracks[i]);
-              
-              // Remove items from old positions (iterate backwards to avoid shifting issues)
-              for (let i = sourceIndices.length - 1; i >= 0; i--) {
-                  tracks.splice(sourceIndices[i], 1);
-              }
-              
-              // Calculate insert position
-              // Adjust target index because removing items might shift it
+              for (let i = sourceIndices.length - 1; i >= 0; i--) { tracks.splice(sourceIndices[i], 1); }
               let insertAt = targetIndex;
               const itemsBeforeTarget = sourceIndices.filter(i => i < targetIndex).length;
               insertAt -= itemsBeforeTarget;
-              
               tracks.splice(insertAt, 0, ...movedItems);
-
-              // Update Playing Index if needed
               if (pl.id === playingPlaylistId) {
                   const currentId = pl.tracks[currentTrackIndex]?.id;
                   if (currentId) {
@@ -615,7 +872,6 @@ export const useAudioPlayer = () => {
                       setCurrentTrackIndex(newIndex);
                   }
               }
-
               return { ...pl, tracks };
           }
           return pl;
@@ -625,39 +881,24 @@ export const useAudioPlayer = () => {
   const moveTracksToPlaylist = useCallback(async (sourcePlaylistId: string, trackIds: string[], targetPlaylistId: string) => {
       const sourcePl = playlists.find(p => p.id === sourcePlaylistId);
       const targetPl = playlists.find(p => p.id === targetPlaylistId);
-      
       if (!sourcePl || !targetPl) return;
-
       const movingTracks = sourcePl.tracks.filter(t => trackIds.includes(t.id));
-      
-      // Update DB for moving tracks
-      const tracksToSave = movingTracks.map(t => ({ 
-          id: t.id, 
-          playlistId: targetPlaylistId, 
-          name: t.name, 
-          file: t.file 
-      }));
+      const tracksToSave = movingTracks.map(t => ({ id: t.id, playlistId: targetPlaylistId, name: t.name, file: t.file }));
       await saveTracksBulk(tracksToSave);
-
       setPlaylists(prev => prev.map(pl => {
           if (pl.id === sourcePlaylistId) {
               const remaining = pl.tracks.filter(t => !trackIds.includes(t.id));
-              // Handle Playing Index if moved from active
               if (pl.id === playingPlaylistId && currentTrackIndex > -1) {
                   const currentId = pl.tracks[currentTrackIndex]?.id;
-                  if (currentId && trackIds.includes(currentId)) {
-                      stop(); // Moved playing track away
-                      setCurrentTrackIndex(-1);
-                  } else if (currentId) {
+                  if (currentId && trackIds.includes(currentId)) { stop(); setCurrentTrackIndex(-1); } 
+                  else if (currentId) {
                       const newIndex = remaining.findIndex(t => t.id === currentId);
                       setCurrentTrackIndex(newIndex);
                   }
               }
               return { ...pl, tracks: remaining };
           }
-          if (pl.id === targetPlaylistId) {
-              return { ...pl, tracks: [...pl.tracks, ...movingTracks] };
-          }
+          if (pl.id === targetPlaylistId) { return { ...pl, tracks: [...pl.tracks, ...movingTracks] }; }
           return pl;
       }));
   }, [playlists, playingPlaylistId, currentTrackIndex, stop]);
@@ -665,26 +906,15 @@ export const useAudioPlayer = () => {
   const createPlaylistFromMove = useCallback(async (trackIds: string[], sourcePlaylistId: string) => {
       const sourcePl = playlists.find(p => p.id === sourcePlaylistId);
       if (!sourcePl) return;
-
       const plId = crypto.randomUUID();
       const plName = `DECK ${playlists.length + 1}`;
       const newPlaylist: Playlist = { id: plId, name: plName, order: playlists.length, tracks: [] };
       await savePlaylist(newPlaylist);
-
       const movingTracks = sourcePl.tracks.filter(t => trackIds.includes(t.id));
-      
-      // Update DB
-      const tracksToSave = movingTracks.map(t => ({ 
-          id: t.id, 
-          playlistId: plId, 
-          name: t.name, 
-          file: t.file 
-      }));
+      const tracksToSave = movingTracks.map(t => ({ id: t.id, playlistId: plId, name: t.name, file: t.file }));
       await saveTracksBulk(tracksToSave);
-
       setPlaylists(prev => {
           const newPlState = { ...newPlaylist, tracks: movingTracks };
-          // Remove from old playlist
           return prev.map(pl => {
               if (pl.id === sourcePlaylistId) {
                   const remaining = pl.tracks.filter(t => !trackIds.includes(t.id));
@@ -693,11 +923,8 @@ export const useAudioPlayer = () => {
               return pl;
           }).concat(newPlState);
       });
-      
       setActivePlaylistId(plId);
   }, [playlists]);
-
-  // --- PLAYLIST MANAGEMENT ---
 
   const addPlaylist = async () => {
       const id = crypto.randomUUID();
@@ -705,24 +932,18 @@ export const useAudioPlayer = () => {
       const newPl: Playlist = { id, name, order: playlists.length, tracks: [] };
       await savePlaylist(newPl);
       setPlaylists(prev => [...prev, newPl]);
+      // Immediately switch to the new playlist
+      setActivePlaylistId(id);
   };
 
   const removePlaylist = async (id: string) => {
       if (playlists.length <= 1) return; 
-      
       const plToDelete = playlists.find(p => p.id === id);
-      if (plToDelete) {
-          plToDelete.tracks.forEach(t => URL.revokeObjectURL(t.url));
-      }
-
+      if (plToDelete) { plToDelete.tracks.forEach(t => URL.revokeObjectURL(t.url)); }
       await deletePlaylistAndTracks(id);
-      
       setPlaylists(prev => {
           const filtered = prev.filter(p => p.id !== id);
-          if (id === activePlaylistId) {
-             const nextActive = filtered[0];
-             setActivePlaylistId(nextActive.id);
-          }
+          if (id === activePlaylistId) { const nextActive = filtered[0]; setActivePlaylistId(nextActive.id); }
           if (id === playingPlaylistId) {
              stop();
              const nextPlaying = filtered[0];
@@ -752,19 +973,14 @@ export const useAudioPlayer = () => {
       const cloned = [...playlists];
       const [removed] = cloned.splice(dragIndex, 1);
       cloned.splice(hoverIndex, 0, removed);
-      
       const updated = cloned.map((p, idx) => ({ ...p, order: idx }));
       setPlaylists(updated);
-      
-      for (const p of updated) {
-          await savePlaylist({ id: p.id, name: p.name, order: p.order });
-      }
+      for (const p of updated) { await savePlaylist({ id: p.id, name: p.name, order: p.order }); }
   };
 
   const switchPlaylist = (id: string) => {
       if (id === activePlaylistId) return;
       setActivePlaylistId(id);
-      
       if (!isPlaying) {
           setPlayingPlaylistId(id);
           const targetPl = playlists.find(p => p.id === id);
@@ -772,14 +988,8 @@ export const useAudioPlayer = () => {
               setCurrentTrackIndex(0);
               const nextDeck = activeDeckRef.current;
               const audio = nextDeck === 'A' ? audioRefA.current : audioRefB.current;
-              if (audio) {
-                  audio.src = targetPl.tracks[0].url;
-                  audio.currentTime = 0;
-                  audio.load();
-              }
-          } else {
-              setCurrentTrackIndex(-1);
-          }
+              if (audio) { audio.src = targetPl.tracks[0].url; audio.currentTime = 0; audio.load(); }
+          } else { setCurrentTrackIndex(-1); }
       }
   };
 
@@ -789,14 +999,10 @@ export const useAudioPlayer = () => {
       if (active) {
           const ct = active.currentTime;
           const dur = active.duration;
-          
           setCurrentTime(ct);
           if (dur) setDuration(dur);
-
           if (!preventAutoMix && isPlaying && dur > 0 && crossfadeDuration > 0) {
-              if (ct >= dur - crossfadeDuration && !hasTriggeredAutoMixRef.current && !isCrossfadingRef.current) {
-                   nextTrack();
-              }
+              if (ct >= dur - crossfadeDuration && !hasTriggeredAutoMixRef.current && !isCrossfadingRef.current) { nextTrack(); }
           }
       }
   };
@@ -808,15 +1014,12 @@ export const useAudioPlayer = () => {
 
   const onAudioPause = useCallback((e: SyntheticEvent<HTMLAudioElement>) => {
       const activeElement = activeDeckRef.current === 'A' ? audioRefA.current : audioRefB.current;
-      if (activeElement && e.target !== activeElement) {
-         return;
-      }
+      if (activeElement && e.target !== activeElement) { return; }
       if (isPlaying && !isCrossfadingRef.current) setIsPlaying(false);
   }, [isPlaying]);
 
   const visibleTracks = getVisibleTracks();
-  const playingTracks = getPlayingTracks();
-  const currentTrack = playingTracks[currentTrackIndex];
+  const currentTrack = getPlayingTracks()[currentTrackIndex];
 
   return {
     audioRefA,
@@ -839,6 +1042,7 @@ export const useAudioPlayer = () => {
     setCurrentTime,
     setDuration,
     processAudioFiles,
+    insertAudioFiles, // Exposed new function
     createPlaylistFromFiles,
     createPlaylistFromMove,
     clearPlaylist,
@@ -862,6 +1066,9 @@ export const useAudioPlayer = () => {
     onAudioPause,
     removeTracks,
     reorderTracks,
-    moveTracksToPlaylist
+    moveTracksToPlaylist,
+    connectAuxSource,
+    updateAuxVolume,
+    updateAuxMonitor
   };
 };

@@ -1,6 +1,7 @@
 
 import React, { useEffect, useRef } from 'react';
 import { NEON_COLORS, VisualizerConfig } from '../types';
+import { useTheme } from '../contexts/ThemeContext';
 
 interface VisualizerProps {
   analyser: AnalyserNode | null;
@@ -14,11 +15,18 @@ const Visualizer: React.FC<VisualizerProps> = ({ analyser, isPlaying, config, fp
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const animationRef = useRef<number>(0);
   const lastDrawTimeRef = useRef<number>(0);
+  const { colors } = useTheme();
   
   // Храним предыдущие значения высоты столбцов для реализации плавного падения ("гравитации")
   const prevBarsRef = useRef<Float32Array | null>(null);
   // Храним высоту "верхушек" (tips)
   const tipBarsRef = useRef<Float32Array | null>(null);
+
+  // Store theme colors in ref to access in animate loop
+  const themeColorsRef = useRef(colors);
+  useEffect(() => {
+      themeColorsRef.current = colors;
+  }, [colors]);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -249,6 +257,7 @@ const Visualizer: React.FC<VisualizerProps> = ({ analyser, isPlaying, config, fp
               case 'gray': color = '#d4d4d4'; break; // Neutral Gray
               case 'ocean': color = '#4B8CA8'; break; // Ocean Teal
               case 'theme-blue': color = '#3b82f6'; break; // Royal Blue
+              case 'theme-sync': color = themeColorsRef.current.primary; break; // NEW: Theme Sync
               case 'matrix':
                  // Dynamic green brightness
                  const intensity = Math.min(255, (barHeight / HEIGHT) * 255 + 50);
@@ -474,7 +483,7 @@ const Visualizer: React.FC<VisualizerProps> = ({ analyser, isPlaying, config, fp
         cancelAnimationFrame(animationRef.current);
       }
     };
-  }, [analyser, isPlaying, config, fps, volume]);
+  }, [analyser, isPlaying, config, fps, volume, colors]);
 
   return (
     <canvas 

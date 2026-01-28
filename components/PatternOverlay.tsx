@@ -13,7 +13,9 @@ const PatternOverlay: React.FC<PatternOverlayProps> = ({ pattern, config }) => {
   const scale = config?.scale ?? 1.0;
   const intensity = config?.intensity ?? 0.25;
 
-  let style: React.CSSProperties = {
+  // Use 'any' to bypass strict CSSProperties checking for background shorthand properties
+  // which might be missing in some TypeScript environment definitions
+  let style: any = {
     position: 'absolute',
     inset: 0,
     pointerEvents: 'none',

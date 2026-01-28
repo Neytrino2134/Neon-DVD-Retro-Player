@@ -11,13 +11,15 @@ export const ru = {
   cursor_warm: "CLASSIC WARM",
   cursor_white: "CLASSIC WHITE",
   cursor_ocean: "CLASSIC OCEAN",
+  cursor_dos: "DOS ТЕРМИНАЛ",
+  cursor_system: "СИСТЕМНЫЙ", // NEW
   control_style: "СТИЛЬ ЭЛЕМЕНТОВ",
   style_default: "КВАДРАТНЫЕ (DEFAULT)",
   style_round: "СКРУГЛЕННЫЕ",
   style_circle: "КРУГЛЫЕ",
   waveform: "ОСЦИЛЛОГРАФ",
   dvd_saver: "DVD ЗАСТАВКА",
-  top_marquee: "БЕГУЩАЯ СТРОКА",
+  top_marquee: "ТЕКСТОВАЯ СТРОКА", // Renamed
   watermark_settings: "НАСТРОЙКИ ВОДЯНОГО ЗНАКА",
   scanlines: "СКАНЛАЙНЫ",
   cyber_hack: "КИБЕР ВЗЛОМ",
@@ -35,8 +37,8 @@ export const ru = {
   leaks_config: "НАСТРОЙКИ БЛИКОВ",
   signal_processor: "ОБРАБОТКА СИГНАЛА",
   background: "ФОНОВЫЙ РЕЖИМ",
-  cat_backgrounds: "ФОНЫ", // NEW
-  cat_sound_effects: "ЗВУКОВЫЕ ЭФФЕКТЫ", // NEW
+  cat_backgrounds: "ФОНЫ", 
+  cat_sound_effects: "ЗВУКОВЫЕ ЭФФЕКТЫ", 
   load_img: "ЗАГРУЗИТЬ ФОН",
   load_sfx_zip: "SFX АРХИВ (ZIP)",
   export_config: "ЭКСПОРТ КОНФИГА",
@@ -46,6 +48,20 @@ export const ru = {
   config_manager: "СОХРАНЕННЫЕ ПРЕСЕТЫ",
   file_management: "УПРАВЛЕНИЕ ФАЙЛАМИ",
   
+  // Ambience
+  ambience: "АТМОСФЕРА (ФОН. ЗВУК)",
+  error_no_ambience: "НЕТ ФАЙЛОВ АТМОСФЕРЫ",
+  no_ambience_files: "ЗАГРУЗИТЕ ЗВУКИ (MP3/WAV)",
+  enable_ambience: "АКТИВНОСТЬ", 
+
+  // Screen Capture
+  sys_audio_input: "СИСТЕМНЫЙ ЗВУК (AUX)",
+  capture_audio: "ЗАХВАТ ЗВУКА",
+  capture_video: "ЭКРАННОЕ ВИДЕО",
+  start_screen: "НАЧАТЬ ТРАНСЛЯЦИЮ",
+  stop_screen: "ОСТАНОВИТЬ",
+  volume: "ГРОМКОСТЬ",
+
   // Controls
   size: "РАЗМЕР",
   speed: "СКОРОСТЬ",
@@ -142,6 +158,7 @@ export const ru = {
   style_gray: "НЕЙТРАЛЬНЫЙ (GRAY)",
   style_ocean: "ОКЕАН (TEAL)",
   style_theme_blue: "КОРОЛЕВСКИЙ СИНИЙ",
+  style_theme_sync: "СИНХР. С ТЕМОЙ",
 
   pos_top: "СВЕРХУ",
   pos_center: "ПО ЦЕНТРУ",

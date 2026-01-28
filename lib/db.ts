@@ -1,13 +1,15 @@
+
 /**
  * Simple IndexedDB wrapper for storing File/Blob objects
  */
 const DB_NAME = 'NeonPlayerDB';
-const DB_VERSION = 3; // Updated for Playlist support
+const DB_VERSION = 4; // Incremented for Ambience
 const STORES = {
   TRACKS: 'tracks',
   PLAYLISTS: 'playlists',
   BACKGROUND: 'background',
-  SFX: 'sfx'
+  SFX: 'sfx',
+  AMBIENCE: 'ambience' // New store
 };
 
 export const initDB = (): Promise<IDBDatabase> => {
@@ -38,6 +40,9 @@ export const initDB = (): Promise<IDBDatabase> => {
       }
       if (!db.objectStoreNames.contains(STORES.SFX)) {
         db.createObjectStore(STORES.SFX, { keyPath: 'id' });
+      }
+      if (!db.objectStoreNames.contains(STORES.AMBIENCE)) {
+        db.createObjectStore(STORES.AMBIENCE, { keyPath: 'id' });
       }
     };
 
@@ -256,6 +261,41 @@ export const getAllSFX = async (): Promise<{ id: string; blob: Blob }[]> => {
     const store = transaction.objectStore(STORES.SFX);
     const request = store.getAll();
     request.onsuccess = () => resolve(request.result || []);
+    request.onerror = () => reject(request.error);
+  });
+};
+
+// --- AMBIENCE FUNCTIONS (NEW) ---
+
+export const saveAmbience = async (item: { id: string; name: string; file: File }) => {
+  const db = await initDB();
+  return new Promise<void>((resolve, reject) => {
+    const transaction = db.transaction(STORES.AMBIENCE, 'readwrite');
+    const store = transaction.objectStore(STORES.AMBIENCE);
+    const request = store.put(item);
+    request.onsuccess = () => resolve();
+    request.onerror = () => reject(request.error);
+  });
+};
+
+export const getAllAmbience = async (): Promise<{ id: string; name: string; file: File }[]> => {
+  const db = await initDB();
+  return new Promise((resolve, reject) => {
+    const transaction = db.transaction(STORES.AMBIENCE, 'readonly');
+    const store = transaction.objectStore(STORES.AMBIENCE);
+    const request = store.getAll();
+    request.onsuccess = () => resolve(request.result || []);
+    request.onerror = () => reject(request.error);
+  });
+};
+
+export const deleteAmbience = async (id: string) => {
+  const db = await initDB();
+  return new Promise<void>((resolve, reject) => {
+    const transaction = db.transaction(STORES.AMBIENCE, 'readwrite');
+    const store = transaction.objectStore(STORES.AMBIENCE);
+    const request = store.delete(id);
+    request.onsuccess = () => resolve();
     request.onerror = () => reject(request.error);
   });
 };

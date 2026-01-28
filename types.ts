@@ -5,6 +5,7 @@ export interface AudioTrack {
   name: string;
   url: string;
   file: File;
+  artworkUrl?: string; // NEW: Album art blob URL
 }
 
 export interface Playlist {
@@ -21,12 +22,55 @@ export interface BackgroundMedia {
   file: File;
 }
 
+// NEW: Ambience File Type
+export interface AmbienceFile {
+  id: string;
+  name: string;
+  url: string;
+  file: File;
+}
+
+// NEW: Ambience Configuration
+export interface AmbienceConfig {
+  activeId: string | null;
+  isPlaying: boolean;
+  volume: number;
+}
+
+// NEW: System Audio Configuration
+export interface SystemAudioConfig {
+  enabled: boolean;
+  volume: number;
+  monitor: boolean; // Playback to speakers? (Avoid feedback loop)
+}
+
 export interface PlayerState {
   isPlaying: boolean;
   currentTrackIndex: number;
   playlists: Playlist[];
   activePlaylistId: string;
 }
+
+// --- MUSIC EDITOR TYPES ---
+export type InstrumentType = 'kick' | 'snare' | 'hihat' | 'clap' | 'bass' | 'lead';
+
+export interface EditorInstrument {
+  id: string;
+  name: string;
+  type: InstrumentType;
+  color: string;
+  volume: number; // 0 to 1
+  steps: boolean[]; // Array of 16 steps
+  pitch?: number; // Optional pitch tweak
+}
+
+export interface EditorState {
+  bpm: number;
+  isPlaying: boolean;
+  currentStep: number;
+  instruments: EditorInstrument[];
+}
+// --------------------------
 
 export const NEON_COLORS = [
   '#00f3ff', // Blue
@@ -37,14 +81,17 @@ export const NEON_COLORS = [
   '#ff3333', // Red
 ];
 
-export type VisualizerStyle = 'retro' | 'blue' | 'pink' | 'matrix' | 'inferno' | 'warm' | 'gray' | 'ocean' | 'theme-blue';
+export type VisualizerStyle = 'retro' | 'blue' | 'pink' | 'matrix' | 'inferno' | 'warm' | 'gray' | 'ocean' | 'theme-blue' | 'theme-sync';
 export type VisualizerPosition = 'center' | 'top' | 'bottom';
 export type TipColor = 'white' | 'blue' | 'pink' | 'green' | 'purple' | 'yellow' | 'red';
-export type CursorStyle = 'default' | 'classic-blue' | 'classic-warm' | 'classic-white' | 'classic-ocean';
+export type CursorStyle = 'default' | 'classic-blue' | 'classic-warm' | 'classic-white' | 'classic-ocean' | 'theme-sync' | 'dos-terminal' | 'system';
 
 export type ThemeType = 'neon-retro' | 'neon-blue' | 'warm-cozy' | 'neutral-gray' | 'neutral-ocean';
 export type ControlStyle = 'default' | 'round' | 'circle';
 export type BgTransitionType = 'glitch' | 'leaks' | 'none'; // NEW
+
+// NEW: View Mode for Application Layout
+export type ViewMode = 'default' | 'cinema' | 'mini';
 
 export interface VisualizerConfig {
   style: VisualizerStyle;
@@ -174,6 +221,7 @@ export interface AppPreset {
   createdAt: number;
   config: {
     visualizerConfig: VisualizerConfig;
+    reactorConfig?: VisualizerConfig; // NEW: Independent 3D Reactor config
     dvdConfig: DvdConfig;
     effectsConfig: EffectsConfig;
     marqueeConfig: MarqueeConfig;
@@ -182,11 +230,13 @@ export interface AppPreset {
     bgPattern: string;
     bgPatternConfig: PatternConfig;
     showVisualizer: boolean;
+    showVisualizer3D?: boolean; // NEW: Independent toggle
     showDvd: boolean;
     bgAutoplayInterval: number;
     cursorStyle?: CursorStyle;
     theme?: ThemeType;
     controlStyle?: ControlStyle;
     bgTransition?: BgTransitionType; // New
+    ambienceConfig?: AmbienceConfig; // NEW
   }
 }

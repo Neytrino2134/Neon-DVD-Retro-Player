@@ -5,19 +5,23 @@ import { EffectsConfig } from '../types';
 interface MediaRendererProps {
   type: 'image' | 'video' | 'color';
   url?: string;
+  stream?: MediaStream | null; // NEW: Live Stream
   bgColor: string;
   effects: EffectsConfig;
 }
 
-const MediaRenderer: React.FC<MediaRendererProps> = ({ type, url, bgColor, effects }) => {
+const MediaRenderer: React.FC<MediaRendererProps> = ({ type, url, stream, bgColor, effects }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   
   // Ref for Image
   const imageRef = useRef<HTMLImageElement | null>(null);
   
-  // Refs for Seamless Video Looping (Double Buffering)
+  // Refs for Seamless Video Looping (Double Buffering) for FILES
   const videoRefs = useRef<[HTMLVideoElement, HTMLVideoElement] | null>(null);
   const activeVideoIndex = useRef<number>(0);
+
+  // Ref for Live Stream
+  const streamVideoRef = useRef<HTMLVideoElement | null>(null);
 
   const animationRef = useRef<number>(0);
   const lastDrawTimeRef = useRef<number>(0);
@@ -33,10 +37,26 @@ const MediaRenderer: React.FC<MediaRendererProps> = ({ type, url, bgColor, effec
         });
         videoRefs.current = null;
     }
+    if (streamVideoRef.current) {
+        streamVideoRef.current.pause();
+        streamVideoRef.current.srcObject = null;
+        streamVideoRef.current = null;
+    }
     imageRef.current = null;
 
-    if (type === 'video' && url) {
-      // Create TWO video elements for Ping-Pong looping
+    if (stream) {
+        // --- LIVE STREAM MODE ---
+        const v = document.createElement('video');
+        v.srcObject = stream;
+        v.muted = true;
+        v.playsInline = true;
+        v.onloadedmetadata = () => {
+            v.play().catch(e => console.warn("Stream play failed", e));
+        };
+        streamVideoRef.current = v;
+
+    } else if (type === 'video' && url) {
+      // --- FILE VIDEO MODE (SEAMLESS LOOP) ---
       const v1 = document.createElement('video');
       const v2 = document.createElement('video');
       
@@ -59,6 +79,7 @@ const MediaRenderer: React.FC<MediaRendererProps> = ({ type, url, bgColor, effec
       activeVideoIndex.current = 0;
 
     } else if (type === 'image' && url) {
+      // --- IMAGE MODE ---
       const img = new Image();
       img.src = url;
       imageRef.current = img;
@@ -74,8 +95,13 @@ const MediaRenderer: React.FC<MediaRendererProps> = ({ type, url, bgColor, effec
         });
         videoRefs.current = null;
       }
+      if (streamVideoRef.current) {
+          streamVideoRef.current.pause();
+          streamVideoRef.current.srcObject = null;
+          streamVideoRef.current = null;
+      }
     };
-  }, [type, url]);
+  }, [type, url, stream]);
 
   // --- 2. RENDER LOOP ---
   useEffect(() => {
@@ -109,7 +135,7 @@ const MediaRenderer: React.FC<MediaRendererProps> = ({ type, url, bgColor, effec
       ctx.save();
       const scaleEffect = Math.max(1, effects.pixelation);
       
-      if (type !== 'color') {
+      if (type !== 'color' || stream) {
           const drawW = Math.ceil(w / scaleEffect);
           const drawH = Math.ceil(h / scaleEffect);
           ctx.imageSmoothingEnabled = false;
@@ -118,8 +144,17 @@ const MediaRenderer: React.FC<MediaRendererProps> = ({ type, url, bgColor, effec
           let srcW = 0;
           let srcH = 0;
 
-          // --- VIDEO LOGIC (SEAMLESS LOOP) ---
-          if (type === 'video' && videoRefs.current) {
+          // --- LIVE STREAM LOGIC ---
+          if (stream && streamVideoRef.current) {
+              const v = streamVideoRef.current;
+              if (v.readyState >= 2) {
+                  source = v;
+                  srcW = v.videoWidth;
+                  srcH = v.videoHeight;
+              }
+          }
+          // --- FILE VIDEO LOGIC ---
+          else if (type === 'video' && videoRefs.current) {
               const videos = videoRefs.current;
               const currentIndex = activeVideoIndex.current;
               const nextIndex = (currentIndex + 1) % 2;
@@ -127,19 +162,13 @@ const MediaRenderer: React.FC<MediaRendererProps> = ({ type, url, bgColor, effec
               const activeVid = videos[currentIndex];
               const nextVid = videos[nextIndex];
 
-              // Check if we need to swap (0.2s before end)
-              // We use a threshold to ensure the next video starts BEFORE the current one goes black
               if (activeVid.duration > 0 && activeVid.currentTime >= activeVid.duration - 0.25) {
-                  // Only swap if next video is ready
                   if (nextVid.readyState >= 2) {
                       nextVid.play().catch(e => console.warn("Seamless swap failed", e));
                       activeVideoIndex.current = nextIndex;
-                      
-                      // Reset the old video (now inactive) to 0 so it's ready for next time
                       activeVid.pause();
                       activeVid.currentTime = 0;
                   } else {
-                      // If next isn't ready, loop current normally as fallback (might blink, but better than freezing)
                       if (activeVid.currentTime >= activeVid.duration - 0.05) {
                           activeVid.currentTime = 0;
                           activeVid.play();
@@ -147,7 +176,6 @@ const MediaRenderer: React.FC<MediaRendererProps> = ({ type, url, bgColor, effec
                   }
               }
 
-              // Use whichever is currently marked active for drawing
               const drawSource = videos[activeVideoIndex.current];
               if (drawSource.readyState >= 2) {
                   source = drawSource;
@@ -171,12 +199,10 @@ const MediaRenderer: React.FC<MediaRendererProps> = ({ type, url, bgColor, effec
               let renderX = 0, renderY = 0, renderW = drawW, renderH = drawH;
 
               if (dstRatio > srcRatio) {
-                  // Screen is wider than video -> Fit Width, Crop Height
                   renderW = drawW;
                   renderH = drawW / srcRatio;
                   renderY = (drawH - renderH) / 2; 
               } else {
-                  // Screen is taller than video -> Fit Height, Crop Width
                   renderH = drawH;
                   renderW = drawH * srcRatio;
                   renderX = (drawW - renderW) / 2;
@@ -185,7 +211,6 @@ const MediaRenderer: React.FC<MediaRendererProps> = ({ type, url, bgColor, effec
               ctx.drawImage(source, renderX, renderY, renderW, renderH);
 
               if (scaleEffect > 1) {
-                  // Scale up the pixelated buffer
                   ctx.drawImage(canvas, 0, 0, drawW, drawH, 0, 0, w, h);
               }
           }
@@ -195,7 +220,7 @@ const MediaRenderer: React.FC<MediaRendererProps> = ({ type, url, bgColor, effec
 
     animationRef.current = requestAnimationFrame(render);
     return () => cancelAnimationFrame(animationRef.current);
-  }, [type, url, bgColor, effects]);
+  }, [type, url, stream, bgColor, effects]);
 
   return <canvas ref={canvasRef} className="absolute inset-0 w-full h-full object-cover z-0" />;
 };
