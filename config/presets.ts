@@ -22,14 +22,15 @@ export const DEFAULT_SYSTEM_PRESET: AppPreset = {
     effectsConfig: DEFAULT_EFFECTS_CONFIG,
     marqueeConfig: DEFAULT_MARQUEE_CONFIG,
     watermarkConfig: DEFAULT_WATERMARK_CONFIG,
-    bgColor: '#0f172a',
+    bgColor: 'theme-sync',
     bgPattern: 'none',
     bgPatternConfig: { intensity: 0.25, scale: 1.0 },
     showVisualizer: true,
     showVisualizer3D: false, // Default OFF
     showDvd: true,
     bgAutoplayInterval: 5,
-    cursorStyle: 'theme-sync', // Updated to theme-sync
+    cursorStyle: 'theme-sync',
+    retroScreenCursorStyle: 'dos-terminal',
     theme: 'neon-retro',
     controlStyle: 'default',
     bgTransition: 'glitch'

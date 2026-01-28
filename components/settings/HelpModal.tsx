@@ -1,15 +1,19 @@
 
 import React, { useEffect, useState, useRef } from 'react';
-import { HelpCircle, X, Keyboard, User, Mail, Github, Terminal } from 'lucide-react';
+import { HelpCircle, X, Keyboard, User, Mail, Github, Terminal, Lock, Unlock } from 'lucide-react';
 import { useLanguage } from '../../contexts/LanguageContext';
 
 interface HelpModalProps {
   onClose: () => void;
   onRestartTutorial: () => void;
+  onUnlockAdvanced?: (pass: string) => boolean;
+  isAdvanced?: boolean;
 }
 
-const HelpModal: React.FC<HelpModalProps> = ({ onClose, onRestartTutorial }) => {
+const HelpModal: React.FC<HelpModalProps> = ({ onClose, onRestartTutorial, onUnlockAdvanced, isAdvanced }) => {
   const { t, language } = useLanguage();
+  const [passInput, setPassInput] = useState('');
+  const [unlockStatus, setUnlockStatus] = useState<'idle' | 'success' | 'error'>('idle');
   
   const isRu = language === 'ru';
 
@@ -59,12 +63,24 @@ const HelpModal: React.FC<HelpModalProps> = ({ onClose, onRestartTutorial }) => 
       handleClose();
   };
 
+  const handleUnlock = () => {
+      if (!onUnlockAdvanced) return;
+      
+      const success = onUnlockAdvanced(passInput);
+      if (success) {
+          setUnlockStatus('success');
+      } else {
+          setUnlockStatus('error');
+          setTimeout(() => setUnlockStatus('idle'), 1000);
+      }
+  };
+
   // Styles calculation based on phase
   const overlayClass = `fixed inset-0 z-[100] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 transition-opacity duration-500 ${animPhase >= 1 ? 'opacity-100' : 'opacity-0'}`;
   
   const windowStyle: React.CSSProperties = {
     width: animPhase >= 2 ? '100%' : '0px',
-    height: animPhase >= 3 ? '640px' : '2px', // Adjusted height slightly for extra rows
+    height: animPhase >= 3 ? '680px' : '2px', // Adjusted height for unlock section
     opacity: animPhase >= 2 ? 1 : 0,
     transition: 'width 0.5s cubic-bezier(0.23, 1, 0.32, 1), height 0.5s cubic-bezier(0.23, 1, 0.32, 1), opacity 0.2s',
   };
@@ -108,6 +124,40 @@ const HelpModal: React.FC<HelpModalProps> = ({ onClose, onRestartTutorial }) => 
                         <div className="text-theme-muted font-bold text-right">Pause/Break</div><div className="text-theme-text">{isRu ? "Перезагрузка" : "Reboot"}</div>
                     </div>
                 </div>
+
+                <div className="h-px bg-theme-border"></div>
+
+                {/* Advanced Unlock */}
+                {onUnlockAdvanced && !isAdvanced && (
+                    <div className="bg-black/20 p-3 rounded border border-theme-border">
+                        <h4 className="text-theme-text font-mono text-[10px] uppercase opacity-70 mb-2 flex items-center gap-2">
+                            <Lock size={12} /> {isRu ? "РАСШИРЕННЫЙ ФУНКЦИОНАЛ" : "ADVANCED FEATURES"}
+                        </h4>
+                        <div className="flex gap-2">
+                            <input 
+                                type="password" 
+                                value={passInput}
+                                onChange={(e) => setPassInput(e.target.value)}
+                                placeholder="Enter Access Code"
+                                className={`flex-1 bg-black border rounded px-2 py-1 text-xs font-mono outline-none transition-colors ${unlockStatus === 'error' ? 'border-red-500 text-red-500' : 'border-theme-muted/50 focus:border-theme-primary text-theme-text'}`}
+                                onKeyDown={(e) => e.key === 'Enter' && handleUnlock()}
+                            />
+                            <button 
+                                onClick={handleUnlock}
+                                className="px-3 py-1 bg-theme-primary/10 border border-theme-primary text-theme-primary rounded text-xs hover:bg-theme-primary hover:text-black transition-all"
+                            >
+                                UNLOCK
+                            </button>
+                        </div>
+                    </div>
+                )}
+                
+                {isAdvanced && (
+                    <div className="bg-green-500/10 p-3 rounded border border-green-500/50 flex items-center gap-2">
+                        <Unlock size={14} className="text-green-500" />
+                        <span className="text-green-500 text-xs font-mono font-bold tracking-wider">ADVANCED MODE ACTIVE</span>
+                    </div>
+                )}
 
                 <div className="h-px bg-theme-border"></div>
 

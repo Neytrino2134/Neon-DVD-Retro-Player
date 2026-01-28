@@ -84,7 +84,7 @@ export const NEON_COLORS = [
 export type VisualizerStyle = 'retro' | 'blue' | 'pink' | 'matrix' | 'inferno' | 'warm' | 'gray' | 'ocean' | 'theme-blue' | 'theme-sync';
 export type VisualizerPosition = 'center' | 'top' | 'bottom';
 export type TipColor = 'white' | 'blue' | 'pink' | 'green' | 'purple' | 'yellow' | 'red';
-export type CursorStyle = 'default' | 'classic-blue' | 'classic-warm' | 'classic-white' | 'classic-ocean' | 'theme-sync' | 'dos-terminal' | 'system';
+export type CursorStyle = 'default' | 'classic-blue' | 'classic-warm' | 'classic-white' | 'classic-ocean' | 'theme-sync' | 'dos-terminal' | 'system' | 'crosshair' | 'rounded';
 
 export type ThemeType = 'neon-retro' | 'neon-blue' | 'warm-cozy' | 'neutral-gray' | 'neutral-ocean';
 export type ControlStyle = 'default' | 'round' | 'circle';
@@ -234,6 +234,7 @@ export interface AppPreset {
     showDvd: boolean;
     bgAutoplayInterval: number;
     cursorStyle?: CursorStyle;
+    retroScreenCursorStyle?: CursorStyle; // NEW
     theme?: ThemeType;
     controlStyle?: ControlStyle;
     bgTransition?: BgTransitionType; // New

@@ -15,11 +15,18 @@ const FPS_OPTIONS = [
   { value: 12, label: '12 FPS (RETRO)' },
 ];
 
-export const MixerSettings: React.FC<{ crossfadeDuration: number, setCrossfadeDuration: (v: number) => void }> = ({ crossfadeDuration, setCrossfadeDuration }) => {
+interface MixerSettingsProps {
+    crossfadeDuration: number;
+    setCrossfadeDuration: (v: number) => void;
+    sfxVolume: number;
+    setSfxVolume: (v: number) => void;
+}
+
+export const MixerSettings: React.FC<MixerSettingsProps> = ({ crossfadeDuration, setCrossfadeDuration, sfxVolume, setSfxVolume }) => {
     const { t } = useLanguage();
     return (
-        <div className="pt-2">
-            <div className="p-3 bg-theme-panel/50 border border-theme-border rounded mb-2">
+        <div className="pt-2 space-y-3">
+            <div className="p-3 bg-theme-panel/50 border border-theme-border rounded">
                 <RangeControl 
                     label={t('crossfade_duration')} 
                     value={crossfadeDuration} 
@@ -31,6 +38,16 @@ export const MixerSettings: React.FC<{ crossfadeDuration: number, setCrossfadeDu
                     <div className="text-neon-blue">*</div>
                     <span>{t('constant_power_hint')}</span>
                 </div>
+            </div>
+
+            <div className="p-3 bg-theme-panel/50 border border-theme-border rounded">
+                <RangeControl 
+                    label={t('sfx_volume')} 
+                    value={sfxVolume} 
+                    min={0} max={1} step={0.05} 
+                    onChange={setSfxVolume} 
+                    className="mb-0"
+                />
             </div>
         </div>
     );

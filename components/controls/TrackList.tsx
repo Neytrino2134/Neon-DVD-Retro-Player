@@ -2,7 +2,7 @@
 import React, { useRef, useState, useEffect } from 'react';
 import { FolderOpen, Lock, Unlock, ArrowDownAZ, Shuffle, Trash2, Upload, Music, Activity } from 'lucide-react';
 import { Tooltip } from '../ui/Tooltip';
-import { TranslatedText } from '../ui/TranslatedText';
+import { useLanguage } from '../../contexts/LanguageContext';
 import { AudioTrack, VisualizerConfig } from '../../types';
 import ConfirmModal from '../ConfirmModal';
 import Visualizer from '../Visualizer';
@@ -45,6 +45,7 @@ export const TrackList: React.FC<TrackListProps> = ({
   setDraggedTrackIds, setDragSourcePlaylistId, draggedTrackIds, dragSourcePlaylistId
 }) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const { t } = useLanguage();
   
   const [isLocked, setIsLocked] = useState(false);
   const [showBgVisualizer, setShowBgVisualizer] = useState(false);
@@ -368,7 +369,7 @@ export const TrackList: React.FC<TrackListProps> = ({
                 {tracks.length > 0 && !isLocked && (
                     <>
                         <div className="w-px h-3 bg-white/10 mx-1"></div>
-                        <Tooltip content={<TranslatedText k="sort_az" />} position="top">
+                        <Tooltip content={t('sort_az')} position="top">
                             <button 
                                 onClick={onSort} 
                                 className="text-theme-muted hover:text-theme-primary transition-colors p-1.5 hover:bg-white/5 rounded"
@@ -376,7 +377,7 @@ export const TrackList: React.FC<TrackListProps> = ({
                                 <ArrowDownAZ size={14} />
                             </button>
                         </Tooltip>
-                        <Tooltip content={<TranslatedText k="shuffle" />} position="top">
+                        <Tooltip content={t('shuffle')} position="top">
                             <button 
                                 onClick={onShuffle} 
                                 className="text-theme-muted hover:text-theme-secondary transition-colors p-1.5 hover:bg-white/5 rounded"
@@ -384,7 +385,7 @@ export const TrackList: React.FC<TrackListProps> = ({
                                 <Shuffle size={14} />
                             </button>
                         </Tooltip>
-                        <Tooltip content={<TranslatedText k="clear_playlist" />} position="top">
+                        <Tooltip content={t('clear_playlist')} position="top">
                             <button 
                                 type="button"
                                 onClick={(e) => {
@@ -405,7 +406,8 @@ export const TrackList: React.FC<TrackListProps> = ({
         </div>
         
         {/* Track List Items Container */}
-        <div className="flex-1 overflow-y-auto pr-1 space-y-0.5 p-1 flex flex-col min-h-0 custom-scrollbar relative">
+        {/* Removed custom-scrollbar class to fix clipping in mini mode, added w-full */}
+        <div className="flex-1 overflow-y-auto pr-1 space-y-0.5 p-1 flex flex-col min-h-0 relative z-10 transition-colors duration-300 w-full relative">
             
             {/* Background Visualizer Layer */}
             {showBgVisualizer && analyser && visualizerConfig && (

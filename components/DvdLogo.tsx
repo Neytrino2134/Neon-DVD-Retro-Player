@@ -10,6 +10,8 @@ interface DvdLogoProps {
   onPlaySfx?: (name: string) => void;
 }
 
+const TRIGGER_ZONE_PX = 30; // Pixel distance to trigger sound before impact
+
 const DvdLogo: React.FC<DvdLogoProps> = ({ containerRef, fps, effectsConfig, config, onPlaySfx }) => {
   const [position, setPosition] = useState({ x: 50, y: 50 });
   const [color, setColor] = useState(NEON_COLORS[0]);
@@ -17,6 +19,10 @@ const DvdLogo: React.FC<DvdLogoProps> = ({ containerRef, fps, effectsConfig, con
   
   // Store direction separately from speed so we can change speed dynamically
   const directionRef = useRef({ x: 1, y: 1 });
+  
+  // Track if sound was already triggered for the current wall approach to prevent spamming
+  const soundStateRef = useRef({ xTriggered: false, yTriggered: false });
+
   const logoRef = useRef<HTMLDivElement>(null);
   const requestRef = useRef<number>(0);
   const lastDrawTimeRef = useRef<number>(0);
@@ -67,6 +73,45 @@ const DvdLogo: React.FC<DvdLogoProps> = ({ containerRef, fps, effectsConfig, con
         let newX = prev.x + moveX;
         let newY = prev.y + moveY;
 
+        // Current dimensions
+        const currentW = logoRect.width;
+        const currentH = logoRect.height;
+        const contW = containerRect.width;
+        const contH = containerRect.height;
+
+        // --- AUDIO PRE-TRIGGER LOGIC ---
+        // We check if we are approaching a wall and are within the trigger zone.
+        // If so, play sound immediately to compensate for latency.
+        if (config.enableSfx && onPlaySfx) {
+            // Check X Axis Approach
+            if (directionRef.current.x > 0) { // Moving Right
+                const distToRight = contW - (newX + currentW);
+                if (distToRight <= TRIGGER_ZONE_PX && !soundStateRef.current.xTriggered) {
+                    onPlaySfx('UI_BEEP.mp3');
+                    soundStateRef.current.xTriggered = true;
+                }
+            } else { // Moving Left
+                if (newX <= TRIGGER_ZONE_PX && !soundStateRef.current.xTriggered) {
+                    onPlaySfx('UI_BEEP.mp3');
+                    soundStateRef.current.xTriggered = true;
+                }
+            }
+
+            // Check Y Axis Approach
+            if (directionRef.current.y > 0) { // Moving Bottom
+                const distToBottom = contH - (newY + currentH);
+                if (distToBottom <= TRIGGER_ZONE_PX && !soundStateRef.current.yTriggered) {
+                    onPlaySfx('UI_BEEP.mp3');
+                    soundStateRef.current.yTriggered = true;
+                }
+            } else { // Moving Top
+                if (newY <= TRIGGER_ZONE_PX && !soundStateRef.current.yTriggered) {
+                    onPlaySfx('UI_BEEP.mp3');
+                    soundStateRef.current.yTriggered = true;
+                }
+            }
+        }
+
         // Glitch Jerk Logic
         if (isGlitching && Math.random() > 0.92 - (glitchIntensity * 0.1)) {
             newX += (Math.random() - 0.5) * 100 * glitchIntensity;
@@ -74,29 +119,29 @@ const DvdLogo: React.FC<DvdLogoProps> = ({ containerRef, fps, effectsConfig, con
         }
 
         let hit = false;
-        
-        // Current width/height based on scaling
-        // Since we are applying width via style, logoRect.width is accurate
-        const currentW = logoRect.width;
-        const currentH = logoRect.height;
 
-        if (newX + currentW >= containerRect.width) {
-          newX = containerRect.width - currentW;
+        // --- PHYSICAL COLLISION LOGIC ---
+        if (newX + currentW >= contW) {
+          newX = contW - currentW;
           directionRef.current.x = -1;
+          soundStateRef.current.xTriggered = false; // Reset trigger on bounce
           hit = true;
         } else if (newX <= 0) {
           newX = 0;
           directionRef.current.x = 1;
+          soundStateRef.current.xTriggered = false; // Reset trigger on bounce
           hit = true;
         }
 
-        if (newY + currentH >= containerRect.height) {
-          newY = containerRect.height - currentH;
+        if (newY + currentH >= contH) {
+          newY = contH - currentH;
           directionRef.current.y = -1;
+          soundStateRef.current.yTriggered = false; // Reset trigger on bounce
           hit = true;
         } else if (newY <= 0) {
           newY = 0;
           directionRef.current.y = 1;
+          soundStateRef.current.yTriggered = false; // Reset trigger on bounce
           hit = true;
         }
 
@@ -104,11 +149,10 @@ const DvdLogo: React.FC<DvdLogoProps> = ({ containerRef, fps, effectsConfig, con
             const nextColor = NEON_COLORS[Math.floor(Math.random() * NEON_COLORS.length)];
             setColor(nextColor);
             
-            // Play SFX if enabled
-            if (config.enableSfx && onPlaySfx) {
-                const randomIdx = Math.floor(Math.random() * 3); // 0, 1, 2
-                onPlaySfx(`Boing_${randomIdx}.mp3`);
-            }
+            // NOTE: Sound is now handled in the Pre-Trigger block above for lower latency.
+            // If the speed is extremely high (higher than TRIGGER_ZONE_PX per frame), 
+            // the pre-trigger might miss. In that edge case, we could fallback here, 
+            // but for normal DVD speeds, pre-trigger is smoother.
         }
 
         return { x: newX, y: newY };

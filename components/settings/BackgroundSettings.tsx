@@ -1,10 +1,12 @@
 
 import React, { useState } from 'react';
-import { List, ChevronDown, ChevronUp, Timer, Trash2 } from 'lucide-react';
+import { List, ChevronDown, ChevronUp, Timer, Trash2, RefreshCw } from 'lucide-react';
 import { BackgroundMedia, PatternConfig, BgTransitionType } from '../../types';
 import RangeControl from './RangeControl';
 import CustomSelect from './CustomSelect';
 import { useLanguage } from '../../contexts/LanguageContext';
+import { Tooltip } from '../ui/Tooltip';
+import { useTheme } from '../../contexts/ThemeContext';
 
 interface BackgroundSettingsProps {
   bgColor: string;
@@ -27,10 +29,25 @@ interface BackgroundSettingsProps {
   setBgTransition: (t: BgTransitionType) => void; 
 }
 
-const BG_PALETTE = [
-  '#0f172a', '#000000', '#030712', '#020617', '#1c1917', '#050A10',
-  '#1a0505', '#051a05', '#05051a', '#1a051a', '#2d1b2e', '#001a1a',
-  '#171717', '#2e2e2e', '#11001c', '#001510', '#1a1005', '#202020'
+const PALETTE_OPTIONS = [
+  { value: 'theme-sync', label: 'THEME SYNC' },
+  { value: '#0f172a', label: 'SLATE' },
+  { value: '#000000', label: 'PURE BLACK' },
+  { value: '#030712', label: 'MIDNIGHT' },
+  { value: '#020617', label: 'DEEP SPACE' },
+  { value: '#1c1917', label: 'STONE' },
+  { value: '#050A10', label: 'OCEANIC' },
+  { value: '#1a0505', label: 'BLOOD' },
+  { value: '#051a05', label: 'FOREST' },
+  { value: '#05051a', label: 'ABYSS' },
+  { value: '#1a051a', label: 'VOID' },
+  { value: '#2d1b2e', label: 'NEBULA' },
+  { value: '#001a1a', label: 'CYBER' },
+  { value: '#171717', label: 'CARBON' },
+  { value: '#2e2e2e', label: 'ASH' },
+  { value: '#11001c', label: 'ROYAL' },
+  { value: '#001510', label: 'MATRIX' },
+  { value: '#1a1005', label: 'AMBER' },
 ];
 
 const PATTERNS = [
@@ -52,6 +69,7 @@ const BackgroundSettings: React.FC<BackgroundSettingsProps> = ({
   bgTransition, setBgTransition
 }) => {
   const { t } = useLanguage();
+  const { colors } = useTheme();
   
   // State for internal collapsible list
   const [showBgList, setShowBgList] = useState(false);
@@ -77,17 +95,36 @@ const BackgroundSettings: React.FC<BackgroundSettingsProps> = ({
       <div>
           <label className="text-theme-text font-mono text-[10px] block mb-2 tracking-widest uppercase opacity-70">PALETTE</label>
           <div className="grid grid-cols-6 gap-1.5 mb-3">
-              {BG_PALETTE.map(c => (
-              <button 
-                  key={c} 
-                  onClick={() => { 
-                  setBgColor(c); 
-                  if (onDeselectBg) onDeselectBg(); 
-                  }} 
-                  className={`h-6 rounded-sm border ${bgColor === c && !bgMedia ? 'border-theme-secondary shadow-[0_0_10px_var(--color-secondary)] scale-105' : 'border-gray-600 hover:border-theme-primary'}`} 
-                  style={{ backgroundColor: c }} 
-              />
-              ))}
+              {PALETTE_OPTIONS.map((opt) => {
+                const isThemeSync = opt.value === 'theme-sync';
+                // Resolve display color: if theme-sync, use current theme bg, else use the value
+                const displayColor = isThemeSync ? colors.bg : opt.value;
+                const isActive = bgColor === opt.value;
+
+                return (
+                  <Tooltip key={opt.value} content={opt.label} position="top">
+                    <button 
+                        onClick={() => { 
+                          setBgColor(opt.value); 
+                          if (onDeselectBg) onDeselectBg(); 
+                        }} 
+                        className={`
+                          h-6 w-full rounded-sm border relative overflow-hidden group
+                          ${isActive && !bgMedia 
+                              ? 'border-theme-secondary shadow-[0_0_10px_var(--color-secondary)] scale-105 z-10' 
+                              : 'border-gray-700 hover:border-theme-primary'}
+                        `}
+                        style={{ backgroundColor: displayColor }} 
+                    >
+                        {isThemeSync && (
+                           <div className="absolute inset-0 flex items-center justify-center bg-black/20 group-hover:bg-transparent transition-colors">
+                              <RefreshCw size={10} className={`text-theme-primary ${isActive ? 'animate-spin-slow' : ''}`} />
+                           </div>
+                        )}
+                    </button>
+                  </Tooltip>
+                );
+              })}
           </div>
       </div>
       

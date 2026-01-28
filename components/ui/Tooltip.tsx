@@ -5,11 +5,12 @@ import { createPortal } from 'react-dom';
 interface TooltipProps {
   content: React.ReactNode;
   children: React.ReactNode;
-  position?: 'top' | 'bottom' | 'left' | 'right';
+  position?: 'top' | 'bottom' | 'left' | 'right' | 'bottom-right';
   delay?: number;
+  className?: string;
 }
 
-export const Tooltip: React.FC<TooltipProps> = ({ content, children, position = 'top', delay = 200 }) => {
+export const Tooltip: React.FC<TooltipProps> = ({ content, children, position = 'top', delay = 200, className = "" }) => {
   const [isVisible, setIsVisible] = useState(false);
   const [coords, setCoords] = useState({ top: 0, left: 0 });
   
@@ -42,6 +43,10 @@ export const Tooltip: React.FC<TooltipProps> = ({ content, children, position = 
           case 'bottom':
             top = rect.bottom + gap;
             left = rect.left + rect.width / 2;
+            break;
+          case 'bottom-right':
+            top = rect.bottom + gap;
+            left = rect.right; // Anchor to right edge
             break;
           case 'left':
             top = rect.top + rect.height / 2;
@@ -134,7 +139,7 @@ export const Tooltip: React.FC<TooltipProps> = ({ content, children, position = 
         ref={triggerRef} 
         onMouseEnter={handleMouseEnter} 
         onMouseLeave={handleMouseLeave}
-        className="inline-flex" 
+        className={`inline-flex ${className}`} 
       >
         {children}
       </div>
@@ -146,8 +151,10 @@ export const Tooltip: React.FC<TooltipProps> = ({ content, children, position = 
              left: coords.left,
              transform: position === 'top' ? 'translate(-50%, -100%)' : 
                         position === 'bottom' ? 'translate(-50%, 0)' :
+                        position === 'bottom-right' ? 'translate(-100%, 0)' :
                         position === 'left' ? 'translate(-100%, -50%)' :
-                        'translate(0, -50%)' 
+                        'translate(0, -50%)',
+             alignItems: position === 'bottom-right' ? 'flex-end' : 'center'
           }}
         >
             {/* 

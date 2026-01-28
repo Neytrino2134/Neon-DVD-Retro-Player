@@ -78,7 +78,11 @@ const StartupOverlay: React.FC<StartupOverlayProps> = ({ onComplete, onFadeOut, 
   const [isVisible, setIsVisible] = useState(true);
   const [hasStarted, setHasStarted] = useState(false); 
   const [windowState, setWindowState] = useState<'hidden' | 'spawn' | 'expand' | 'full' | 'collapse'>('hidden');
+  
+  // Split logs into pre-login and post-login to maintain visual order
   const [lines, setLines] = useState<string[]>([]);
+  const [postLoginLines, setPostLoginLines] = useState<string[]>([]);
+
   const [loginText, setLoginText] = useState('');
   const [passText, setPassText] = useState('');
   const [showLogin, setShowLogin] = useState(false);
@@ -106,11 +110,15 @@ const StartupOverlay: React.FC<StartupOverlayProps> = ({ onComplete, onFadeOut, 
     setLines(prev => [...prev, text]);
   };
 
+  const addPostLine = (text: string) => {
+    setPostLoginLines(prev => [...prev, text]);
+  };
+
   useEffect(() => {
     if (linesEndRef.current) {
       linesEndRef.current.scrollIntoView({ behavior: 'smooth' });
     }
-  }, [lines, showLogin, showPass, showProgress]);
+  }, [lines, postLoginLines, showLogin, showPass, showProgress]);
 
   // --- FORCE SKIP HANDLER ---
   useEffect(() => {
@@ -147,7 +155,7 @@ const StartupOverlay: React.FC<StartupOverlayProps> = ({ onComplete, onFadeOut, 
         // 5. Type Header "SYSTEM STANDBY"
         await wait(1000);
         setIntroPhase('text');
-        const text = "NEON BIOS // SECURITY GATE";
+        const text = `NEON BIOS // SECURITY GATE // ${APP_VERSION}`;
         for (let i = 0; i <= text.length; i++) {
             setHeaderTyped(text.slice(0, i));
             await wait(30);
@@ -170,9 +178,9 @@ const StartupOverlay: React.FC<StartupOverlayProps> = ({ onComplete, onFadeOut, 
   }, [hasStarted, forceSkip]);
 
 
-  // Skip Function (For Boot Sequence)
+  // Skip Function (For Boot Sequence and Access Screen)
   const handleSkip = () => {
-    if (skippedRef.current || !isVisible || !hasStarted) return;
+    if (skippedRef.current || !isVisible) return;
     skippedRef.current = true;
 
     // Call stop SFX from parent
@@ -187,53 +195,13 @@ const StartupOverlay: React.FC<StartupOverlayProps> = ({ onComplete, onFadeOut, 
 
     // Fade out immediately
     setContainerOpacity(0);
+    setStandbyOpacity(0);
 
     // Short delay to allow fade out to render, then finish
     setTimeout(() => {
         onComplete?.();
         setIsVisible(false);
     }, 500);
-  };
-
-  // Close Function (For Start Screen)
-  const handleClose = async (e?: React.MouseEvent) => {
-      e?.stopPropagation();
-      
-      if (collapsePhase !== 'idle' || introPhase !== 'content') return;
-      
-      skippedRef.current = true;
-
-      if (tempApiKey !== apiKey) {
-          setApiKey(tempApiKey);
-      }
-
-      // --- COLLAPSE ANIMATION SEQUENCE ---
-      // 1. Fade out content, Collapse Width, Move Side Lines to Center
-      setCollapsePhase('content_out');
-      await new Promise(r => setTimeout(r, 1050)); // Wait for move to complete (1000ms CSS duration + buffer)
-
-      // 2. Switch to Center Line (Tall)
-      setCollapsePhase('line_merge');
-      await new Promise(r => setTimeout(r, 50)); // Short frame for switch
-
-      // 3. Collapse Height (Line -> Dot)
-      setCollapsePhase('height_collapse');
-      await new Promise(r => setTimeout(r, 600));
-
-      // 4. Collapse Width (Dot -> Gone)
-      setCollapsePhase('width_collapse');
-      await new Promise(r => setTimeout(r, 500));
-      
-      setCollapsePhase('done');
-      
-      if (onStopSfx) onStopSfx();
-      if (onFadeOut) onFadeOut();
-      setStandbyOpacity(0);
-
-      setTimeout(() => {
-          onComplete?.();
-          setIsVisible(false);
-      }, 1000);
   };
 
   const handleStart = async () => {
@@ -314,7 +282,7 @@ const StartupOverlay: React.FC<StartupOverlayProps> = ({ onComplete, onFadeOut, 
     const runSequence = async () => {
       await wait(500);
       // Play SFX exactly when the first beginnings of the window appear
-      onPlaySfx?.('Binary_Code_Sound_Effects_Start.mp3');
+      onPlaySfx?.('SFX_START.mp3');
       setWindowState('spawn');
       await wait(600);
       setWindowState('expand');
@@ -352,9 +320,11 @@ const StartupOverlay: React.FC<StartupOverlayProps> = ({ onComplete, onFadeOut, 
       await typePass("********");
       await wait(1000);
 
-      addLine(isRu ? "ПРОВЕРКА ДАННЫХ..." : "VERIFYING CREDENTIALS...");
+      // --- SWITCH TO POST LOGIN LINES ---
+      // This ensures messages appear BELOW the password input
+      addPostLine(isRu ? "ПРОВЕРКА ДАННЫХ..." : "VERIFYING CREDENTIALS...");
       await wait(1500);
-      addLine(isRu ? "ДОСТУП РАЗРЕШЕН." : "ACCESS GRANTED.");
+      addPostLine(isRu ? "ДОСТУП РАЗРЕШЕН." : "ACCESS GRANTED.");
       await wait(500);
 
       setShowProgress(true);
@@ -365,7 +335,7 @@ const StartupOverlay: React.FC<StartupOverlayProps> = ({ onComplete, onFadeOut, 
           await wait(30 + Math.random() * 50);
       }
       await wait(500);
-      addLine(isRu ? "ЗАГРУЗКА ИНТЕРФЕЙСА..." : "LOADING INTERFACE...");
+      addPostLine(isRu ? "ЗАГРУЗКА ИНТЕРФЕЙСА..." : "LOADING INTERFACE...");
       await wait(1000);
 
       setWindowState('collapse');
@@ -411,18 +381,22 @@ const StartupOverlay: React.FC<StartupOverlayProps> = ({ onComplete, onFadeOut, 
     const isWindowVisible = ['window_line', 'window_expand', 'content'].includes(introPhase) && collapsePhase !== 'done' && collapsePhase !== 'width_collapse' && collapsePhase !== 'height_collapse' && collapsePhase !== 'line_merge';
     const isWindowExpanded = ['window_expand', 'content'].includes(introPhase);
     
+    // Explicit fixed dimensions as requested
+    const targetWidth = '660px';
+    const targetHeight = '480px';
+
     let windowWidth = '0px';
     if (isWindowVisible) {
         if (collapsePhase === 'content_out') {
             windowWidth = '8px'; 
         } else {
-            windowWidth = '660px';
+            windowWidth = targetWidth;
         }
     }
 
     let windowMaxHeight = '2px'; 
     if (isWindowExpanded && (collapsePhase === 'idle' || collapsePhase === 'content_out')) {
-        windowMaxHeight = '800px';
+        windowMaxHeight = targetHeight;
     }
 
     return (
@@ -434,7 +408,6 @@ const StartupOverlay: React.FC<StartupOverlayProps> = ({ onComplete, onFadeOut, 
             }}
         >
             <div className="absolute inset-0 bg-white/5 opacity-5 pointer-events-none scanlines z-20"></div>
-            {/* REMOVED: Blue tint overlay to ensure pure color. Was: bg-neon-blue/5 */}
             <div className="absolute inset-0 pointer-events-none flicker opacity-0 z-20"></div>
             
             {/* --- CINEMATIC LAYER (Lines) --- */}
@@ -491,7 +464,8 @@ const StartupOverlay: React.FC<StartupOverlayProps> = ({ onComplete, onFadeOut, 
                         width: windowWidth,
                         maxWidth: '100%',
                         maxHeight: windowMaxHeight,
-                        height: 'auto', 
+                        // Ensure explicit height matches requested 480px when fully open to force layout distribution
+                        height: isWindowExpanded && collapsePhase === 'idle' ? targetHeight : 'auto', 
                         opacity: (isWindowVisible) ? 1 : 0
                     }}
                 >
@@ -507,7 +481,7 @@ const StartupOverlay: React.FC<StartupOverlayProps> = ({ onComplete, onFadeOut, 
                                 <div className="w-1.5 h-1.5 bg-neon-blue/50 rounded-full"></div>
                             </div>
                             <button 
-                                onClick={handleClose}
+                                onClick={(e) => { e.stopPropagation(); handleSkip(); }}
                                 className="text-neon-blue/50 hover:text-white transition-colors p-0.5 hover:bg-neon-blue/20 rounded"
                                 title="SKIP LOGIN"
                             >
@@ -518,22 +492,24 @@ const StartupOverlay: React.FC<StartupOverlayProps> = ({ onComplete, onFadeOut, 
 
                      {/* Inner Content - Fades out instantly on start */}
                      <div 
-                        className="flex flex-col items-center gap-6 w-full p-8 transition-opacity duration-300"
+                        className="flex flex-col items-center w-full h-full p-8 transition-opacity duration-300 relative"
                         style={{ opacity: collapsePhase === 'idle' ? 1 : 0 }}
                      >
                         <div className="absolute inset-0 bg-[linear-gradient(rgba(0,243,255,0.03)_1px,transparent_1px),linear-gradient(90deg,rgba(0,243,255,0.03)_1px,transparent_1px)] bg-[length:20px_20px] pointer-events-none z-0"></div>
 
-                        <div className="relative z-10">
+                        {/* CENTER AREA: POWER BUTTON */}
+                        <div className="flex-1 flex items-center justify-center w-full z-10">
                             <div 
                                 onClick={handleStart}
-                                className="w-24 h-24 rounded-full border-2 border-neon-blue flex items-center justify-center bg-neon-blue/5 shadow-[0_0_20px_rgba(0,243,255,0.3)] transition-all hover:scale-105 hover:shadow-[0_0_50px_#00f3ff] hover:bg-neon-blue/20 cursor-pointer group"
+                                className="w-32 h-32 rounded-full border-2 border-neon-blue flex items-center justify-center bg-neon-blue/5 shadow-[0_0_20px_rgba(0,243,255,0.3)] transition-all hover:scale-105 hover:shadow-[0_0_50px_#00f3ff] hover:bg-neon-blue/20 cursor-pointer group"
                             >
-                                <Power size={40} className="text-neon-blue group-hover:animate-pulse" />
+                                <Power size={64} className="text-neon-blue group-hover:animate-pulse" />
                                 <div className="absolute inset-0 rounded-full border border-dashed border-neon-blue/30 animate-spin-slow pointer-events-none"></div>
                             </div>
                         </div>
 
-                        <div className="w-full space-y-4 z-10 relative">
+                        {/* BOTTOM AREA: CONTROLS */}
+                        <div className="w-full z-10 flex flex-col gap-4 mt-4">
                             <div className="flex justify-center gap-4 text-xs font-mono">
                                 <button 
                                     onClick={(e) => { e.stopPropagation(); setLanguage('en'); }}
@@ -564,15 +540,15 @@ const StartupOverlay: React.FC<StartupOverlayProps> = ({ onComplete, onFadeOut, 
                                     className="w-full bg-black/40 border border-neon-blue/30 rounded py-2 pl-9 pr-3 text-xs font-mono text-white caret-white focus:outline-none focus:border-neon-blue focus:shadow-[0_0_15px_rgba(0,243,255,0.2)] transition-all placeholder-neon-blue/20 text-center"
                                 />
                             </div>
-                        </div>
 
-                        <div 
-                            onClick={handleStart}
-                            className="text-center cursor-pointer opacity-80 hover:opacity-100 transition-opacity"
-                        >
-                            <p className="text-neon-blue font-mono text-xs tracking-[0.2em] font-bold animate-pulse">
-                                <MatrixText text={language === 'ru' ? 'НАЖМИТЕ ENTER ДЛЯ СТАРТА' : 'PRESS ENTER TO INITIALIZE'} />
-                            </p>
+                            <div 
+                                onClick={handleStart}
+                                className="text-center cursor-pointer opacity-80 hover:opacity-100 transition-opacity"
+                            >
+                                <p className="text-neon-blue font-mono text-xs tracking-[0.2em] font-bold animate-pulse">
+                                    <MatrixText text={language === 'ru' ? 'НАЖМИТЕ ENTER ДЛЯ СТАРТА' : 'PRESS ENTER TO INITIALIZE'} />
+                                </p>
+                            </div>
                         </div>
                      </div>
                 </div>
@@ -608,7 +584,6 @@ const StartupOverlay: React.FC<StartupOverlayProps> = ({ onComplete, onFadeOut, 
       onDoubleClick={handleSkip}
     >
       <div className="absolute inset-0 bg-white/5 opacity-5 pointer-events-none scanlines"></div>
-      {/* REMOVED: Blue tint overlay */}
       <div className="absolute inset-0 pointer-events-none flicker opacity-0"></div>
 
       <div 
@@ -636,10 +611,12 @@ const StartupOverlay: React.FC<StartupOverlayProps> = ({ onComplete, onFadeOut, 
             style={{ opacity: contentOpacity, transition: 'opacity 0.3s' }}
         >
              <div className="flex-1 space-y-1 overflow-y-auto custom-scrollbar pb-2">
+                 {/* 1. Pre-Login Lines */}
                  {lines.map((line, i) => (
                      <div key={i} className="leading-tight">{line}</div>
                  ))}
                  
+                 {/* 2. Login Fields */}
                  {showLogin && (
                      <div className="flex items-center gap-2 mt-4">
                         <span className="text-white">LOGIN{'>'}</span>
@@ -652,12 +629,19 @@ const StartupOverlay: React.FC<StartupOverlayProps> = ({ onComplete, onFadeOut, 
                      <div className="flex items-center gap-2">
                         <span className="text-white">PASSWORD{'>'}</span>
                         <span>{passText}</span>
-                        {!showProgress && <span className="w-2 h-4 bg-neon-blue animate-pulse"></span>}
+                        {!showProgress && postLoginLines.length === 0 && <span className="w-2 h-4 bg-neon-blue animate-pulse"></span>}
                      </div>
                  )}
+
+                 {/* 3. Post-Login Lines (Appears BELOW input) */}
+                 {postLoginLines.map((line, i) => (
+                     <div key={`post-${i}`} className="leading-tight mt-2">{line}</div>
+                 ))}
+
                  <div ref={linesEndRef}></div>
              </div>
 
+             {/* 4. Progress Bar */}
              {showProgress && (
                  <div className="mt-4 pt-4 border-t-2 border-neon-blue/30 space-y-2">
                      <div className="flex justify-between text-xs uppercase tracking-wider text-neon-blue/70">

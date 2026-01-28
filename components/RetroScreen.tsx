@@ -49,7 +49,7 @@ interface RetroScreenProps {
   bgPatternConfig?: PatternConfig;
   
   // Live Stream
-  videoStream?: MediaStream | null; // NEW
+  videoStream?: MediaStream | null; 
 
   // Configs
   visualizerConfig: VisualizerConfig;
@@ -94,7 +94,7 @@ interface RetroScreenProps {
 
 const RetroScreen = forwardRef<HTMLDivElement, RetroScreenProps>(({
   analyser, isPlaying, currentTrack, tracks, onTrackSelect, bgMedia, bgColor, bgPattern = 'none', bgPatternConfig,
-  videoStream, // NEW
+  videoStream, 
   visualizerConfig, setVisualizerConfig, reactorConfig, showVisualizer, showVisualizer3D, dvdConfig, showDvd, effectsConfig, marqueeConfig, watermarkConfig,
   progress = 0, currentTime, duration,
   focusMode, setFocusMode, isDragging,
@@ -110,6 +110,9 @@ const RetroScreen = forwardRef<HTMLDivElement, RetroScreenProps>(({
   const [bgTransition, setBgTransition] = useState<BgTransitionType>('glitch');
   const [showPlaylist, setShowPlaylist] = useState(false);
   const [showHelp, setShowHelp] = useState(false); 
+
+  // Resolve Theme Sync Color
+  const resolvedBgColor = bgColor === 'theme-sync' ? colors.bg : bgColor;
 
   // Holographic Panel State
   const [activePanel, setActivePanel] = useState<'quantity' | 'power' | 'freq' | 'opacity' | null>(null);
@@ -343,6 +346,11 @@ const RetroScreen = forwardRef<HTMLDivElement, RetroScreenProps>(({
       transition: bgTransition === 'leaks' ? 'opacity 0.8s ease-in-out' : 'none'
   };
 
+  // Check if we actually need to render the media canvas
+  // If no stream and no media file (Color mode), we skip MediaRenderer entirely
+  // to allow the background color div to be fully visible and performant.
+  const hasMediaContent = !!(videoStream || activeMedia);
+
   return (
     <div 
       className={`flex-grow flex items-center justify-center relative bg-gray-950 transition-all duration-500 ${focusMode ? 'p-0' : 'p-1 md:p-3'}`}
@@ -352,7 +360,7 @@ const RetroScreen = forwardRef<HTMLDivElement, RetroScreenProps>(({
         onDoubleClick={() => setFocusMode(!focusMode)} 
         onMouseMove={handleMouseMove}
         {...gestureHandlers} 
-        className={`cursor-hide-center relative w-full h-full bg-gray-900 transition-all duration-700 ${focusMode ? 'rounded-none border-0' : 'rounded-xl border-2'} ${isDragging ? 'border-neon-blue shadow-[0_0_30px_#00f3ff]' : 'border-gray-800'} overflow-hidden group touch-action-manipulation`}
+        className={`cursor-hide-center cursor-target-screen relative w-full h-full bg-gray-900 transition-all duration-700 ${focusMode ? 'rounded-none border-0' : 'rounded-xl border-2'} ${isDragging ? 'border-neon-blue shadow-[0_0_30px_#00f3ff]' : 'border-theme-border shadow-md'} overflow-hidden group touch-action-manipulation`}
         onDragOver={onDragOver}
         onDragEnter={onDragEnter}
         onDragLeave={onDragLeave}
@@ -361,7 +369,8 @@ const RetroScreen = forwardRef<HTMLDivElement, RetroScreenProps>(({
          <div ref={containerRef} className="relative w-full h-full overflow-hidden bg-black">
             <NotificationOverlay color={marqueeColor} />
 
-            <div className="absolute top-4 left-4 z-50 flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+            {/* TOP LEFT CONTROLS - Now only appear on direct hover */}
+            <div className="absolute top-4 left-4 z-50 flex gap-2 opacity-0 hover:opacity-100 transition-opacity duration-300 p-2">
               <Tooltip content={t('reboot')} position="right">
                 <button 
                   onClick={onScheduleReload} 
@@ -405,7 +414,8 @@ const RetroScreen = forwardRef<HTMLDivElement, RetroScreenProps>(({
                 </div>
               )}
 
-              <div className="opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-center gap-2">
+              {/* TOP RIGHT CONTROLS - Now only appear on direct hover */}
+              <div className="opacity-0 hover:opacity-100 transition-opacity duration-300 flex items-center gap-2 p-2">
                 <Tooltip content="COMMANDS (H)" position="left">
                   <button 
                     onClick={() => setShowHelp(!showHelp)} 
@@ -445,14 +455,27 @@ const RetroScreen = forwardRef<HTMLDivElement, RetroScreenProps>(({
                 className="absolute inset-0 w-full h-full"
                 style={aberrationValue > 0 ? { filter: 'url(#chromatic-aberration-filter)' } : undefined}
             >
+                {/* 
+                    COLOR TRANSITION LAYER 
+                    This div handles the smooth transition of background colors using CSS transition.
+                    It sits behind the MediaRenderer. 
+                */}
+                <div 
+                    className="absolute inset-0 w-full h-full transition-colors duration-700 ease-in-out"
+                    style={{ backgroundColor: resolvedBgColor }}
+                ></div>
+
                 <div className="absolute inset-0 w-full h-full" style={mediaStyle}>
-                    <MediaRenderer 
-                        type={activeMedia ? activeMedia.type : 'color'} 
-                        url={activeMedia?.url} 
-                        stream={videoStream} 
-                        bgColor={bgColor} 
-                        effects={effectsConfig} 
-                    />
+                    {hasMediaContent && (
+                        <MediaRenderer 
+                            type={activeMedia ? activeMedia.type : 'video'} 
+                            url={activeMedia?.url} 
+                            stream={videoStream} 
+                            // Pass transparent so underlying div shows through if media has transparency
+                            bgColor={'transparent'} 
+                            effects={effectsConfig} 
+                        />
+                    )}
                 </div>
                 
                 {/* Pattern Overlay only if not streaming video (optional, but looks cleaner) */}

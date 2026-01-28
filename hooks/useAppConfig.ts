@@ -1,6 +1,6 @@
 
 import { useState, useEffect, useCallback } from 'react';
-import { VisualizerConfig, DvdConfig, EffectsConfig, MarqueeConfig, BackgroundMedia, PatternConfig, AppPreset, CursorStyle, WatermarkConfig, ThemeType, ControlStyle, BgTransitionType } from '../types';
+import { VisualizerConfig, DvdConfig, EffectsConfig, MarqueeConfig, PatternConfig, BackgroundMedia, AppPreset, CursorStyle, WatermarkConfig, ThemeType, ControlStyle, BgTransitionType } from '../types';
 import { getAllBackgrounds, saveBackground, clearBackgrounds, deleteBackground } from '../lib/db';
 import { 
   DEFAULT_VISUALIZER_CONFIG, 
@@ -29,8 +29,10 @@ const STORAGE_KEYS = {
   PRESETS: 'neon_config_presets',
   ACTIVE_PRESET: 'neon_active_preset_id', 
   CURSOR: 'neon_cursor_style',
+  RETRO_CURSOR: 'neon_retro_cursor_style', // NEW
   API_KEY: 'neon_gemini_api_key',
-  BG_TRANSITION: 'neon_bg_transition'
+  BG_TRANSITION: 'neon_bg_transition',
+  ADVANCED_MODE: 'neon_advanced_mode' // NEW
 };
 
 // --- HELPER: SAFE MERGE ---
@@ -70,7 +72,9 @@ export const useAppConfig = () => {
   const [showVisualizer3D, setShowVisualizer3D] = useState(() => getInitial(STORAGE_KEYS.SHOW_VISUALIZER_3D, false)); 
   const [showDvd, setShowDvd] = useState(() => getInitial(STORAGE_KEYS.SHOW_DVD, true));
   const [cursorStyle, setCursorStyle] = useState<CursorStyle>(() => getInitial(STORAGE_KEYS.CURSOR, 'theme-sync'));
+  const [retroScreenCursorStyle, setRetroScreenCursorStyle] = useState<CursorStyle>(() => getInitial(STORAGE_KEYS.RETRO_CURSOR, 'dos-terminal')); // NEW
   const [bgTransition, setBgTransition] = useState<BgTransitionType>(() => getInitial(STORAGE_KEYS.BG_TRANSITION, 'glitch'));
+  const [isAdvancedMode, setAdvancedMode] = useState(() => getInitial(STORAGE_KEYS.ADVANCED_MODE, false));
   
   const [marqueeConfig, setMarqueeConfig] = useState<MarqueeConfig>(() => getInitial(STORAGE_KEYS.MARQUEE, DEFAULT_MARQUEE_CONFIG));
   const [watermarkConfig, setWatermarkConfig] = useState<WatermarkConfig>(() => getInitial(STORAGE_KEYS.WATERMARK, DEFAULT_WATERMARK_CONFIG));
@@ -82,7 +86,7 @@ export const useAppConfig = () => {
   const [dvdConfig, setDvdConfig] = useState<DvdConfig>(() => getInitial(STORAGE_KEYS.DVD, DEFAULT_DVD_CONFIG));
   const [effectsConfig, setEffectsConfig] = useState<EffectsConfig>(() => getInitial(STORAGE_KEYS.EFFECTS, DEFAULT_EFFECTS_CONFIG));
   
-  const [bgColor, setBgColor] = useState(() => localStorage.getItem(STORAGE_KEYS.BG_COLOR) || '#0f172a');
+  const [bgColor, setBgColor] = useState(() => localStorage.getItem(STORAGE_KEYS.BG_COLOR) || 'theme-sync');
   const [bgPattern, setBgPattern] = useState(() => localStorage.getItem(STORAGE_KEYS.BG_PATTERN) || 'none');
   const [bgPatternConfig, setBgPatternConfig] = useState<PatternConfig>(() => getInitial(STORAGE_KEYS.BG_PATTERN_CONFIG, { intensity: 0.25, scale: 1.0 }));
   
@@ -130,8 +134,10 @@ export const useAppConfig = () => {
     localStorage.setItem(STORAGE_KEYS.WATERMARK, JSON.stringify(watermarkConfig));
     localStorage.setItem(STORAGE_KEYS.BG_AUTOPLAY, JSON.stringify(bgAutoplayInterval));
     localStorage.setItem(STORAGE_KEYS.CURSOR, JSON.stringify(cursorStyle));
+    localStorage.setItem(STORAGE_KEYS.RETRO_CURSOR, JSON.stringify(retroScreenCursorStyle));
     localStorage.setItem(STORAGE_KEYS.BG_TRANSITION, JSON.stringify(bgTransition));
-  }, [visualizerConfig, reactorConfig, dvdConfig, effectsConfig, bgColor, bgPattern, bgPatternConfig, showVisualizer, showVisualizer3D, showDvd, marqueeConfig, watermarkConfig, bgAutoplayInterval, cursorStyle, bgTransition]);
+    localStorage.setItem(STORAGE_KEYS.ADVANCED_MODE, JSON.stringify(isAdvancedMode));
+  }, [visualizerConfig, reactorConfig, dvdConfig, effectsConfig, bgColor, bgPattern, bgPatternConfig, showVisualizer, showVisualizer3D, showDvd, marqueeConfig, watermarkConfig, bgAutoplayInterval, cursorStyle, retroScreenCursorStyle, bgTransition, isAdvancedMode]);
 
   useEffect(() => {
     localStorage.setItem(STORAGE_KEYS.PRESETS, JSON.stringify(savedPresets));
@@ -270,6 +276,7 @@ export const useAppConfig = () => {
         showDvd,
         bgAutoplayInterval,
         cursorStyle,
+        retroScreenCursorStyle, // NEW
         theme,
         controlStyle,
         bgTransition
@@ -299,6 +306,7 @@ export const useAppConfig = () => {
                     showDvd,
                     bgAutoplayInterval,
                     cursorStyle,
+                    retroScreenCursorStyle,
                     theme: currentTheme,
                     controlStyle: currentControlStyle,
                     bgTransition
@@ -344,6 +352,7 @@ export const useAppConfig = () => {
     setBgAutoplayInterval(config.bgAutoplayInterval ?? 5);
     
     if (config.cursorStyle) setCursorStyle(config.cursorStyle);
+    if (config.retroScreenCursorStyle) setRetroScreenCursorStyle(config.retroScreenCursorStyle);
     if (config.bgTransition) setBgTransition(config.bgTransition);
     
     return config;
@@ -366,7 +375,7 @@ export const useAppConfig = () => {
 
   const exportConfig = (theme: ThemeType, controlStyle: ControlStyle) => {
     const config = {
-      visualizerConfig, reactorConfig, dvdConfig, effectsConfig, bgColor, bgPattern, bgPatternConfig, showVisualizer, showVisualizer3D, showDvd, marqueeConfig, watermarkConfig, bgAutoplayInterval, cursorStyle, theme, controlStyle, bgTransition, version: '1.3'
+      visualizerConfig, reactorConfig, dvdConfig, effectsConfig, bgColor, bgPattern, bgPatternConfig, showVisualizer, showVisualizer3D, showDvd, marqueeConfig, watermarkConfig, bgAutoplayInterval, cursorStyle, retroScreenCursorStyle, theme, controlStyle, bgTransition, version: '1.4'
     };
     const blob = new Blob([JSON.stringify(config, null, 2)], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
@@ -412,6 +421,7 @@ export const useAppConfig = () => {
         if (typeof rawContent.bgAutoplayInterval === 'number') setBgAutoplayInterval(rawContent.bgAutoplayInterval);
         
         if (rawContent.cursorStyle) setCursorStyle(rawContent.cursorStyle);
+        if (rawContent.retroScreenCursorStyle) setRetroScreenCursorStyle(rawContent.retroScreenCursorStyle);
         if (rawContent.bgTransition) setBgTransition(rawContent.bgTransition);
         
         setActivePresetId(null);
@@ -464,6 +474,8 @@ export const useAppConfig = () => {
     deletePreset,
     renamePreset,
     cursorStyle, setCursorStyle,
-    bgTransition, setBgTransition
+    retroScreenCursorStyle, setRetroScreenCursorStyle,
+    bgTransition, setBgTransition,
+    isAdvancedMode, setAdvancedMode // Exposed
   };
 };

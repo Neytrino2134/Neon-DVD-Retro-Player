@@ -18,6 +18,7 @@ interface UseAppHotkeysProps {
   toggleRightPanel: () => void;
   viewMode: ViewMode;
   setViewMode: (mode: ViewMode) => void;
+  onGoHome: () => void;
 }
 
 export const useAppHotkeys = ({
@@ -33,7 +34,8 @@ export const useAppHotkeys = ({
   toggleLeftPanel,
   toggleRightPanel,
   viewMode,
-  setViewMode
+  setViewMode,
+  onGoHome
 }: UseAppHotkeysProps) => {
   const { addNotification } = useNotification();
   const { setTheme, setControlStyle } = useTheme();
@@ -54,12 +56,17 @@ export const useAppHotkeys = ({
           return;
       }
 
-      if (e.code === 'Backslash') {
+      if (e.code === 'Backslash' || e.code === 'Insert') {
           setDevSkip(true);
           setIntroState(2);
           setShowTutorial(false);
           stopAllSFX();
           addNotification("DEV SKIP ACTIVATED", "warning");
+          return;
+      }
+
+      if (e.code === 'Home') {
+          onGoHome();
           return;
       }
 
@@ -165,5 +172,5 @@ export const useAppHotkeys = ({
 
     window.addEventListener('keydown', handleKeyDown, { capture: true });
     return () => window.removeEventListener('keydown', handleKeyDown, { capture: true });
-  }, [player, config, focusMode, handleScheduleReload, toggleFocusMode, addNotification, stopAllSFX, setTheme, setControlStyle, toggleLeftPanel, toggleRightPanel, viewMode, setViewMode]);
+  }, [player, config, focusMode, handleScheduleReload, toggleFocusMode, addNotification, stopAllSFX, setTheme, setControlStyle, toggleLeftPanel, toggleRightPanel, viewMode, setViewMode, onGoHome]);
 };

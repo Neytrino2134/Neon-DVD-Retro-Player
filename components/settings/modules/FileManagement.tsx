@@ -1,5 +1,5 @@
 
-import React, { useRef } from 'react';
+import React, { useRef, useState, useEffect } from 'react';
 import { Image as ImageIcon, Music, FileArchive, Download, Check, X } from 'lucide-react';
 import { Tooltip } from '../../ui/Tooltip';
 import { useLanguage } from '../../../contexts/LanguageContext';
@@ -12,6 +12,66 @@ interface FileManagementProps {
   onExportConfig: () => void;
   sfxMap?: Record<string, string>;
 }
+
+// Helper component for sequential typing animation
+const TypingSpan = ({ 
+    text, 
+    className = "", 
+    color = "", 
+    delay = 0,
+    speed = 30 // ms per char
+}: { 
+    text: string; 
+    className?: string; 
+    color?: string; 
+    delay?: number;
+    speed?: number;
+}) => {
+  const [display, setDisplay] = useState("");
+  const [showCursor, setShowCursor] = useState(false);
+  const [hasStarted, setHasStarted] = useState(false);
+
+  useEffect(() => {
+    let interval: number;
+    
+    // Reset state if text changes
+    setDisplay("");
+    setShowCursor(false);
+    setHasStarted(false);
+
+    const startTimeout = setTimeout(() => {
+      setHasStarted(true);
+      setShowCursor(true);
+      
+      let i = 0;
+      if (text.length === 0) {
+          setShowCursor(false);
+          return;
+      }
+
+      interval = window.setInterval(() => {
+        setDisplay(text.slice(0, i + 1));
+        i++;
+        if (i >= text.length) {
+          clearInterval(interval);
+          setShowCursor(false);
+        }
+      }, speed);
+    }, delay);
+
+    return () => {
+      clearTimeout(startTimeout);
+      if (interval) clearInterval(interval);
+    };
+  }, [text, delay, speed]);
+
+  return (
+    <span className={`${className} ${color} inline-flex items-center`}>
+      {hasStarted ? display : ""}
+      {showCursor && <span className="inline-block w-1.5 h-3 bg-current ml-0.5 animate-pulse opacity-70"></span>}
+    </span>
+  );
+};
 
 const FileManagement: React.FC<FileManagementProps> = ({
   onBgMediaUpload,
@@ -36,22 +96,56 @@ const FileManagement: React.FC<FileManagementProps> = ({
     const isComplete = missingFiles.length === 0 && Object.keys(sfxMap).length > 0;
     const isEmpty = Object.keys(sfxMap).length === 0;
 
+    // ANIMATION TIMING CALCULATOR
+    let cumulativeDelay = 300; // Base wait for tooltip open
+    const CHAR_SPEED = 20;     // Fast typing
+    const LINE_PAUSE = 100;    // Pause between lines
+
+    const getDelayAndAdvance = (txt: string) => {
+        const current = cumulativeDelay;
+        cumulativeDelay += (txt.length * CHAR_SPEED) + LINE_PAUSE;
+        return current;
+    };
+
+    const statusLabel = "STATUS:";
+    const statusValue = isComplete ? 'ACTIVE' : isEmpty ? 'EMPTY' : 'PARTIAL';
+    
+    const delayStatusLabel = getDelayAndAdvance(statusLabel);
+    const delayStatusValue = getDelayAndAdvance(statusValue);
+
     return (
       <div className="flex flex-col gap-2 min-w-[200px]">
          <div className="flex items-center justify-between border-b border-theme-border pb-1 mb-1">
-             <span className="text-theme-muted">STATUS:</span>
-             <span className={`font-bold ${isComplete ? 'text-theme-accent' : isEmpty ? 'text-theme-muted' : 'text-yellow-500'}`}>
-                {isComplete ? 'ACTIVE' : isEmpty ? 'EMPTY' : 'PARTIAL'}
-             </span>
+             <TypingSpan 
+                text={statusLabel} 
+                className="text-theme-muted" 
+                delay={delayStatusLabel} 
+                speed={CHAR_SPEED}
+             />
+             <TypingSpan 
+                text={statusValue} 
+                className="font-bold"
+                color={isComplete ? 'text-theme-accent' : isEmpty ? 'text-theme-muted' : 'text-yellow-500'}
+                delay={delayStatusValue}
+                speed={CHAR_SPEED}
+             />
          </div>
          
          <div className="space-y-1">
-            {REQUIRED_SFX_FILES.map(baseName => {
+            {REQUIRED_SFX_FILES.map((baseName) => {
                 const isFound = Object.keys(sfxMap).some(k => k.startsWith(baseName));
+                const delay = getDelayAndAdvance(baseName);
+                
                 return (
-                    <div key={baseName} className="flex items-center gap-2 text-[9px]">
-                        {isFound ? <Check size={10} className="text-theme-accent" /> : <X size={10} className="text-red-500" />}
-                        <span className={isFound ? 'text-theme-text' : 'text-theme-muted line-through'}>{baseName}</span>
+                    <div key={baseName} className="flex items-center gap-2 text-[9px] h-3">
+                        {/* Only show icon when text starts typing to keep layout stable but clean */}
+                        <FadeInIcon isFound={isFound} delay={delay} />
+                        <TypingSpan 
+                            text={baseName} 
+                            color={isFound ? 'text-theme-text' : 'text-theme-muted line-through'} 
+                            delay={delay}
+                            speed={CHAR_SPEED}
+                        />
                     </div>
                 );
             })}
@@ -59,7 +153,11 @@ const FileManagement: React.FC<FileManagementProps> = ({
 
          {!isComplete && (
              <div className="text-[9px] text-theme-muted mt-1 italic border-t border-theme-border pt-1">
-                 Required: wav/mp3/m4a with these names
+                 <TypingSpan 
+                    text="Required: wav/mp3/m4a" 
+                    delay={getDelayAndAdvance("Required: wav/mp3/m4a")}
+                    speed={CHAR_SPEED}
+                 />
              </div>
          )}
       </div>
@@ -140,6 +238,21 @@ const FileManagement: React.FC<FileManagementProps> = ({
       />
     </div>
   );
+};
+
+// Helper for icon appearing
+const FadeInIcon = ({ isFound, delay }: { isFound: boolean; delay: number }) => {
+    const [visible, setVisible] = useState(false);
+    useEffect(() => {
+        const t = setTimeout(() => setVisible(true), delay);
+        return () => clearTimeout(t);
+    }, [delay]);
+
+    if (!visible) return <span className="w-[10px] inline-block"></span>; // Placeholder
+
+    return isFound 
+        ? <Check size={10} className="text-theme-accent animate-in fade-in duration-300" /> 
+        : <X size={10} className="text-red-500 animate-in fade-in duration-300" />;
 };
 
 export default FileManagement;

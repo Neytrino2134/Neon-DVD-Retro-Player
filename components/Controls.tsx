@@ -115,6 +115,9 @@ const Controls: React.FC<ControlsProps> = ({
   const [isHeaderHovered, setIsHeaderHovered] = useState(false);
   const isHeaderHoveredRef = useRef(false); // Ref for animation loop to avoid dependency staleness
 
+  // Hover state for the entire player (Backlight effect)
+  const [isPlayerHovered, setIsPlayerHovered] = useState(false);
+
   // Check if running in Electron.
   const isElectron = typeof navigator !== 'undefined' && /Electron/.test(navigator.userAgent);
   const isMini = viewMode === 'mini';
@@ -140,7 +143,7 @@ const Controls: React.FC<ControlsProps> = ({
       const width = 300; // SVG ViewBox Width
       const step = 5;
       
-      // WAVE 1 (Front - Blue): Fast Speed, High Frequency
+      // WAVE 1 (Front - Primary): Fast Speed, High Frequency
       const amp1 = 15 + 5 * Math.sin(time * 0.8); 
       // Calculate start point explicitly to avoid vertical line artifact
       const startY1 = 40 + amp1 * Math.sin(0 * 0.05 - time * 9);
@@ -150,7 +153,7 @@ const Controls: React.FC<ControlsProps> = ({
         points1 += ` L${x},${y}`;
       }
 
-      // WAVE 2 (Middle - Purple): Medium Speed
+      // WAVE 2 (Middle - Secondary): Medium Speed
       const amp2 = 12 + 4 * Math.sin(time * 0.5 + 2);
       const startY2 = 50 + amp2 * Math.sin(0 * 0.03 - time * 4 + 1);
       let points2 = `M0,${startY2}`;
@@ -159,7 +162,7 @@ const Controls: React.FC<ControlsProps> = ({
         points2 += ` L${x},${y}`;
       }
 
-      // WAVE 3 (Back - Pink): Slow Speed, Low Frequency (Deep Breathing)
+      // WAVE 3 (Back - Accent): Slow Speed, Low Frequency (Deep Breathing)
       const amp3 = 15 + 10 * Math.sin(time * 0.2 + 4);
       const startY3 = 45 + amp3 * Math.sin(0 * 0.015 - time * 1.5 + 3);
       let points3 = `M0,${startY3}`;
@@ -220,13 +223,25 @@ const Controls: React.FC<ControlsProps> = ({
   };
 
   // UPDATED STYLES FOR VISUAL HIERARCHY:
+  // Using inline styles for border color to handle opacity with CSS variables correctly
   const outerContainerClass = isMini 
     ? "relative w-full h-full flex flex-col bg-theme-bg overflow-hidden" 
     : "relative w-full h-full flex flex-col bg-theme-bg border-l-4 border-theme-panel shadow-inner p-4"; 
 
   const innerContainerClass = isMini
     ? "relative w-full h-full flex flex-col bg-theme-panel overflow-hidden" 
-    : "relative w-full h-full flex flex-col bg-theme-panel rounded-xl overflow-hidden shadow-2xl border border-theme-border"; 
+    : `relative w-full h-full flex flex-col bg-theme-panel rounded-xl overflow-hidden border transition-all duration-500 ${isPlayerHovered ? 'animate-player-breathe' : ''}`; 
+
+  // Dynamic Style: Uses color-mix to handle opacity for Hex variables without breaking them
+  // If hovered, we remove specific styles so the class animation takes over
+  const containerStyle: React.CSSProperties = isMini ? {} : {
+      borderColor: isPlayerHovered 
+          ? undefined 
+          : 'color-mix(in srgb, var(--color-primary), transparent 50%)',
+      boxShadow: isPlayerHovered 
+          ? undefined 
+          : '0 25px 50px -12px rgba(0, 0, 0, 0.25)'
+  };
 
   return (
     // OUTER PANEL CONTAINER
@@ -235,10 +250,18 @@ const Controls: React.FC<ControlsProps> = ({
         className={outerContainerClass}
         onDragOver={(e) => { e.preventDefault(); e.stopPropagation(); }} 
         onDrop={(e) => { e.preventDefault(); e.stopPropagation(); }} 
+        onMouseEnter={() => setIsPlayerHovered(true)}
+        onMouseLeave={() => setIsPlayerHovered(false)}
     >
       
+      {/* 
+          REMOVED BREATHING NEON BACKLIGHT 
+          Per user request: No glow on the outer canvas/panel. 
+          Glow is now exclusively on the inner player container via boxShadow in containerStyle.
+      */}
+
       {/* INNER PLAYER DEVICE CONTAINER */}
-      <div className={innerContainerClass}>
+      <div className={innerContainerClass} style={containerStyle}>
 
         {/* 
             INTERACTIVE ZONE: Header + Waves + TrackInfo
@@ -252,12 +275,12 @@ const Controls: React.FC<ControlsProps> = ({
             {/* Background Graphic for Header - MATHEMATICAL WAVES */}
             <div className="absolute top-0 left-0 w-full h-48 overflow-hidden z-0 pointer-events-none">
                 <svg viewBox="0 0 300 80" preserveAspectRatio="none" className="w-full h-full">
-                    {/* Background Wave - Pink */}
+                    {/* Background Wave - Pink (Replaced Green) */}
                     <path 
                         ref={wavePath3Ref}
                         className="transition-all duration-500 ease-out"
                         style={{
-                            stroke: '#ff00ff', // Pink
+                            stroke: '#ff00ff', 
                             opacity: isHeaderHovered ? 1 : 0.1,
                             strokeWidth: isHeaderHovered ? 2.5 : 1.5,
                             filter: isHeaderHovered ? 'drop-shadow(0 0 8px #ff00ff)' : 'none'
@@ -265,12 +288,12 @@ const Controls: React.FC<ControlsProps> = ({
                         fill="none" 
                         vectorEffect="non-scaling-stroke"
                     />
-                    {/* Mid Wave - Purple */}
+                    {/* Mid Wave - Purple (Explicit) */}
                     <path 
                         ref={wavePath2Ref}
                         className="transition-all duration-500 ease-out"
                         style={{
-                            stroke: '#bc13fe', // Purple
+                            stroke: '#bc13fe',
                             opacity: isHeaderHovered ? 1 : 0.15,
                             strokeWidth: isHeaderHovered ? 2 : 1.2,
                             filter: isHeaderHovered ? 'drop-shadow(0 0 8px #bc13fe)' : 'none'
@@ -278,15 +301,15 @@ const Controls: React.FC<ControlsProps> = ({
                         fill="none" 
                         vectorEffect="non-scaling-stroke"
                     />
-                    {/* Front Wave - Blue */}
+                    {/* Front Wave - Primary (Cyan/Theme) */}
                     <path 
                         ref={wavePath1Ref}
                         className="transition-all duration-500 ease-out"
                         style={{
-                            stroke: '#00f3ff', // Blue
+                            stroke: 'var(--color-primary)', 
                             opacity: isHeaderHovered ? 1 : 0.2,
                             strokeWidth: isHeaderHovered ? 1.5 : 1,
-                            filter: isHeaderHovered ? 'drop-shadow(0 0 5px #00f3ff)' : 'none'
+                            filter: isHeaderHovered ? 'drop-shadow(0 0 5px var(--color-primary))' : 'none'
                         }}
                         fill="none" 
                         vectorEffect="non-scaling-stroke"
@@ -298,7 +321,12 @@ const Controls: React.FC<ControlsProps> = ({
             {!isMini && (
                 <div className="flex items-center justify-between p-4 pb-2 shrink-0 relative z-10">
                     <div className="flex items-center gap-2">
-                        <div className={`p-1.5 rounded-full transition-all duration-500 ${isHeaderHovered ? 'bg-theme-primary/20 shadow-[0_0_10px_var(--color-primary)]' : 'bg-theme-primary/10'}`}>
+                        <div className={`
+                            p-1.5 rounded-full transition-all duration-500 border
+                            ${isHeaderHovered 
+                                ? 'bg-theme-primary/20 shadow-[0_0_10px_var(--color-primary)] border-theme-primary' 
+                                : 'bg-theme-primary/10 border-transparent'}
+                        `}>
                             <Radio className={`text-theme-primary transition-opacity ${isHeaderHovered ? 'opacity-100' : 'opacity-90'}`} size={16} />
                         </div>
                         <h2 className={`text-lg font-mono tracking-[0.2em] font-bold transition-all duration-500 ${isHeaderHovered ? 'text-white drop-shadow-[0_0_5px_rgba(255,255,255,0.5)]' : 'text-theme-text opacity-80'}`}>

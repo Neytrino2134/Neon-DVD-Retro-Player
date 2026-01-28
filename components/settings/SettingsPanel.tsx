@@ -1,6 +1,6 @@
 
 import React, { useState, useRef, useEffect } from 'react';
-import { Settings, Disc, Activity, Zap, Terminal, AlertTriangle, Tv, Type, Bug, Power, MessageSquare, AudioWaveform, HelpCircle, Save, ChevronDown, Home, Sun, Palette, MousePointer2, Sliders, Stamp, Bot, Image as ImageIcon, Files, CloudRain, Box, RadioReceiver } from 'lucide-react';
+import { Settings, Disc, Activity, Zap, Terminal, AlertTriangle, Tv, Type, Bug, Power, MessageSquare, AudioWaveform, HelpCircle, Save, ChevronDown, Home, Sun, Palette, MousePointer2, Sliders, Stamp, Bot, Image as ImageIcon, Files, CloudRain, Box, RadioReceiver, Lock, ChevronRight } from 'lucide-react';
 import { VisualizerConfig, EffectsConfig, DvdConfig, MarqueeConfig, PatternConfig, BackgroundMedia, AppPreset, CursorStyle, WatermarkConfig, ThemeType, ControlStyle, BgTransitionType, AmbienceFile, AmbienceConfig } from '../../types';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { useTheme } from '../../contexts/ThemeContext';
@@ -24,6 +24,65 @@ import { SystemAudioModule, ScreenVideoModule } from './modules/ScreenSettings';
 import { MixerSettings, DvdSettings, DebugSettings, ScanlineSettings, CyberSettings, GlitchSettings, SignalSettings, LightLeaksSettings } from './modules/EffectModules';
 import CustomSelect from './CustomSelect';
 import RangeControl from './RangeControl';
+
+// --- INTERNAL COMPONENT: SETTINGS SECTION ---
+interface SettingsSectionProps {
+  id: string;
+  title: React.ReactNode;
+  isOpen: boolean;
+  onToggle: () => void;
+  stickyTop: string; // The pixel value for top (e.g. "0px", "36px")
+  sectionContent: React.ReactNode; // The content of THIS section
+  children?: React.ReactNode; // Nested next sections
+}
+
+const SettingsSection: React.FC<SettingsSectionProps> = ({ id, title, isOpen, onToggle, stickyTop, sectionContent, children }) => {
+  return (
+    <div className="relative">
+      {/* Sticky Header */}
+      <div 
+        id={`section-header-${id}`}
+        onClick={onToggle}
+        className="sticky z-30 bg-theme-bg border-b border-theme-border text-theme-text cursor-pointer flex items-center justify-between px-2 py-2 hover:bg-theme-panel/50 transition-colors shadow-lg"
+        style={{ top: stickyTop, height: '36px' }}
+      >
+        <h3 className="text-xs font-mono font-bold tracking-widest opacity-90 uppercase flex items-center gap-2">
+           {title}
+        </h3>
+        <div className={`text-theme-primary transition-transform duration-500 ease-[cubic-bezier(0.34,1.56,0.64,1)] ${isOpen ? 'rotate-90' : 'rotate-0'}`}>
+           <ChevronRight size={14} />
+        </div>
+      </div>
+      
+      {/* Collapsible Content - SMOOTH GRID ANIMATION */}
+      <div 
+        className={`
+          grid transition-[grid-template-rows] duration-500 ease-[cubic-bezier(0.4,0,0.2,1)]
+          ${isOpen ? 'grid-rows-[1fr]' : 'grid-rows-[0fr]'}
+        `}
+      >
+         <div className="overflow-hidden">
+            {/* Inner Content - SLIDE & FADE ANIMATION */}
+            <div 
+              className={`
+                transition-all duration-500 ease-[cubic-bezier(0.4,0,0.2,1)] px-1
+                ${isOpen 
+                  ? 'opacity-100 translate-x-0 py-3' 
+                  : 'opacity-0 -translate-x-4 py-0 pointer-events-none'}
+              `}
+            >
+                <div className="space-y-3">
+                    {sectionContent}
+                </div>
+            </div>
+         </div>
+      </div>
+
+      {/* Nested Sections */}
+      {children}
+    </div>
+  );
+};
 
 interface SettingsPanelProps {
   showVisualizer: boolean;
@@ -84,10 +143,14 @@ interface SettingsPanelProps {
 
   // SFX Data
   sfxMap: Record<string, string>;
+  sfxVolume: number;
+  setSfxVolume: (v: number) => void;
 
   // Cursor
   cursorStyle: CursorStyle;
   setCursorStyle: (s: CursorStyle) => void;
+  retroScreenCursorStyle: CursorStyle; // NEW
+  setRetroScreenCursorStyle: (s: CursorStyle) => void; // NEW
 
   // API
   apiKey: string;
@@ -118,6 +181,10 @@ interface SettingsPanelProps {
   setAudioVolume: (v: number) => void;
   isMonitoring: boolean;
   setMonitoring: (v: boolean) => void;
+
+  // Advanced Mode
+  isAdvancedMode?: boolean;
+  setAdvancedMode?: (v: boolean) => void;
 }
 
 const SettingsPanel: React.FC<SettingsPanelProps> = ({
@@ -128,14 +195,25 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
   bgAutoplayInterval, setBgAutoplayInterval, onScheduleReload, onGoHome,
   crossfadeDuration, setCrossfadeDuration,
   savedPresets, activePresetId, savePreset, overwritePreset, loadPreset, deletePreset, renamePreset, onResetDefault,
-  sfxMap,
-  cursorStyle, setCursorStyle, apiKey, setApiKey,
+  sfxMap, sfxVolume, setSfxVolume,
+  cursorStyle, setCursorStyle, retroScreenCursorStyle, setRetroScreenCursorStyle, apiKey, setApiKey,
   bgTransition, setBgTransition,
   onRestartTutorial,
   ambienceFiles, ambienceConfig, onAmbienceUpload, onAmbienceDelete, onAmbienceSetActive, onAmbienceTogglePlay, onAmbienceVolume,
-  isVideoActive, toggleVideo, isAudioActive, toggleAudio
+  isVideoActive, toggleVideo, isAudioActive, toggleAudio,
+  isAdvancedMode, setAdvancedMode
 }) => {
+  // Module Expansion State
   const [expandedState, setExpandedState] = useState<Record<string, boolean>>({});
+  
+  // Section Expansion State (Collapsible Headers)
+  const [openSections, setOpenSections] = useState<Record<string, boolean>>({
+      sys: true,
+      bg: true,
+      sfx: true,
+      mod: true
+  });
+
   const [expandWatermark, setExpandWatermark] = useState(false);
   const [showHelp, setShowHelp] = useState(false);
   const { language, setLanguage, t } = useLanguage();
@@ -177,6 +255,38 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
   const handleOverwrite = (id: string) => {
       overwritePreset(id, currentTheme, controlStyle);
       addNotification("Preset Updated", "success");
+  };
+
+  // --- SECTION SCROLL LOGIC ---
+  const handleSectionToggle = (sectionId: string, index: number) => {
+      if (wasDragged.current) return;
+
+      setOpenSections(prev => {
+          const willOpen = !prev[sectionId];
+          
+          if (willOpen) {
+              setTimeout(() => {
+                  if (!scrollContainerRef.current) return;
+                  
+                  const headerEl = document.getElementById(`section-header-${sectionId}`);
+                  if (headerEl) {
+                      // Calculate the offset reserved for previous sticky headers
+                      // Each header is 36px tall.
+                      const stickyOffset = index * 36;
+                      
+                      // Calculate exact scroll position: Element's position in list minus space for sticky headers
+                      const targetScroll = headerEl.offsetTop - stickyOffset;
+                      
+                      scrollContainerRef.current.scrollTo({
+                          top: targetScroll,
+                          behavior: 'smooth'
+                      });
+                  }
+              }, 100);
+          }
+          
+          return { ...prev, [sectionId]: willOpen };
+      });
   };
 
   // --- DRAG TO SCROLL HANDLERS ---
@@ -248,6 +358,8 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
     { value: 'classic-warm', label: t('cursor_warm'), color: '#ff8c00' },
     { value: 'classic-white', label: t('cursor_white'), color: '#ffffff' },
     { value: 'classic-ocean', label: t('cursor_ocean'), color: '#4B8CA8' },
+    { value: 'crosshair', label: t('cursor_crosshair'), color: '#ff3333' },
+    { value: 'rounded', label: t('cursor_rounded'), color: 'theme' }, // NEW
     { value: 'system', label: t('cursor_system'), color: '#ffffff' }, 
   ];
 
@@ -269,7 +381,7 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
   return (
     <div className="w-full h-full flex flex-col bg-theme-bg border-r-4 border-theme-panel shadow-inner overflow-hidden">
       {/* Header */}
-      <div className="p-4 pb-0 mb-4 bg-theme-bg z-10">
+      <div className="p-4 pb-0 mb-4 bg-theme-bg z-40">
         <div className="flex items-center justify-between pb-2">
           <div className="flex items-center gap-2">
             <Settings className="animate-spin-slow text-theme-primary" size={24} />
@@ -297,8 +409,14 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
             <div className="w-px h-4 bg-theme-border mx-1"></div>
             <div className="relative flex items-center bg-theme-panel border border-theme-border rounded h-7 w-20 cursor-pointer overflow-hidden shadow-inner">
                 <div className={`absolute top-0 bottom-0 w-1/2 bg-theme-primary rounded-sm transition-all duration-300 ease-out shadow-[0_0_10px_var(--color-primary)] opacity-90`} style={{ transform: language === 'en' ? 'translateX(2px)' : 'translateX(calc(100% + 2px))' }} />
-                <button onClick={() => setLanguage('en')} className={`z-10 flex-1 text-[10px] font-mono font-bold text-center transition-colors duration-300 ${language === 'en' ? 'text-black' : 'text-theme-muted hover:text-theme-text'}`}>EN</button>
-                <button onClick={() => setLanguage('ru')} className={`z-10 flex-1 text-[10px] font-mono font-bold text-center transition-colors duration-300 ${language === 'ru' ? 'text-black' : 'text-theme-muted hover:text-theme-text'}`}>RU</button>
+                
+                <Tooltip content="ENGLISH" position="bottom" className="flex-1 z-10 h-full">
+                    <button onClick={() => setLanguage('en')} className={`w-full h-full text-[10px] font-mono font-bold text-center transition-colors duration-300 ${language === 'en' ? 'text-black' : 'text-theme-muted hover:text-theme-text'}`}>EN</button>
+                </Tooltip>
+                
+                <Tooltip content="RUSSIAN" position="bottom" className="flex-1 z-10 h-full">
+                    <button onClick={() => setLanguage('ru')} className={`w-full h-full text-[10px] font-mono font-bold text-center transition-colors duration-300 ${language === 'ru' ? 'text-black' : 'text-theme-muted hover:text-theme-text'}`}>RU</button>
+                </Tooltip>
             </div>
           </div>
         </div>
@@ -308,130 +426,209 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
       <div 
         ref={scrollContainerRef}
         onMouseDown={handleMouseDown}
-        className="flex-1 overflow-y-auto px-4 pb-20 space-y-3 no-scrollbar select-none"
+        className="flex-1 overflow-y-auto px-4 pb-20 no-scrollbar select-none"
       >
-        <h3 className="text-xs font-mono text-theme-text mb-2 opacity-80 sticky top-0 bg-theme-bg pb-2 z-10 border-b border-theme-primary pointer-events-none">
-            <TranslatedText k="system_params" />
-        </h3>
+        {/* --- STACKED SECTIONS --- */}
+        <SettingsSection 
+            id="sys" 
+            title={<TranslatedText k="system_params" />} 
+            isOpen={openSections['sys']} 
+            onToggle={() => handleSectionToggle('sys', 0)}
+            stickyTop="0px"
+            sectionContent={
+                <>
+                    <ModuleWrapper id="files" label={<TranslatedText k="file_management" />} icon={Files} isEnabled={true} isAlwaysOn={true} isExpanded={expandedState['files']} onToggleExpand={() => toggleExpand('files')} onToggleEnable={() => {}}>
+                        <FileManagement onBgMediaUpload={onBgMediaUpload} onAudioUpload={onAudioUpload} onSfxUpload={onSfxUpload} onExportConfig={onExportConfig} sfxMap={sfxMap} />
+                    </ModuleWrapper>
 
-        {/* FILES, PRESETS, THEMES (Existing) */}
-        <ModuleWrapper id="files" label={<TranslatedText k="file_management" />} icon={Files} isEnabled={true} isAlwaysOn={true} isExpanded={expandedState['files']} onToggleExpand={() => toggleExpand('files')} onToggleEnable={() => {}}>
-            <FileManagement onBgMediaUpload={onBgMediaUpload} onAudioUpload={onAudioUpload} onSfxUpload={onSfxUpload} onExportConfig={onExportConfig} sfxMap={sfxMap} />
-        </ModuleWrapper>
+                    <ModuleWrapper id="presets" label={<TranslatedText k="config_manager" />} icon={Save} isEnabled={true} isAlwaysOn={true} isExpanded={expandedState['presets']} onToggleExpand={() => toggleExpand('presets')} onToggleEnable={() => {}}>
+                        <ConfigManager presets={savedPresets} activePresetId={activePresetId} onSave={savePreset} onOverwrite={handleOverwrite} onLoad={loadPreset} onDelete={deletePreset} onRename={renamePreset} onResetDefault={onResetDefault} />
+                    </ModuleWrapper>
 
-        <ModuleWrapper id="presets" label={<TranslatedText k="config_manager" />} icon={Save} isEnabled={true} isAlwaysOn={true} isExpanded={expandedState['presets']} onToggleExpand={() => toggleExpand('presets')} onToggleEnable={() => {}}>
-            <ConfigManager presets={savedPresets} activePresetId={activePresetId} onSave={savePreset} onOverwrite={handleOverwrite} onLoad={loadPreset} onDelete={deletePreset} onRename={renamePreset} onResetDefault={onResetDefault} />
-        </ModuleWrapper>
-
-        <ModuleWrapper id="themes" label={<TranslatedText k="color_schemes" />} icon={Palette} isEnabled={true} isAlwaysOn={true} isExpanded={expandedState['themes']} onToggleExpand={() => toggleExpand('themes')} onToggleEnable={() => {}}>
-            <div className="pt-2">
-                <CustomSelect label={<TranslatedText k="theme_select" />} value={currentTheme} options={themeOptions} onChange={(v) => setTheme(v as ThemeType)} />
-                <div className="pt-2 border-t border-theme-border mt-2 space-y-4">
-                    <div className="flex items-center gap-2 mb-2"><MousePointer2 size={12} className="text-theme-muted" /><span className="text-[10px] font-mono text-theme-muted tracking-widest uppercase"><TranslatedText k="cursor_style" /></span></div>
-                    <CustomSelect label={<TranslatedText k="cursor_style" />} value={cursorStyle} options={cursorOptions} onChange={(v) => setCursorStyle(v as CursorStyle)} />
-                    <div className="flex items-center gap-2 mb-2"><Sliders size={12} className="text-theme-muted" /><span className="text-[10px] font-mono text-theme-muted tracking-widest uppercase"><TranslatedText k="control_style" /></span></div>
-                    <CustomSelect label={<TranslatedText k="control_style" />} value={controlStyle} options={controlStyleOptions} onChange={(v) => setControlStyle(v as ControlStyle)} />
-                    {watermarkConfig && (
-                        <div className={`mt-4 bg-theme-panel/40 border border-theme-border ${innerWrapperRadius} overflow-hidden hover:border-theme-primary transition-colors`}>
-                            <div className="flex items-center justify-between p-3 cursor-pointer border-b border-theme-primary" onClick={() => setExpandWatermark(!expandWatermark)}>
-                                <div className="flex items-center gap-3"><div className="text-theme-muted opacity-80"><Stamp size={16} /></div><span className="font-mono text-[11px] tracking-widest text-theme-muted uppercase"><TranslatedText k="watermark_settings" /></span></div>
-                                <ChevronDown size={14} className={`text-theme-primary opacity-70 transition-transform ${expandWatermark ? 'rotate-180' : ''}`} />
+                    <ModuleWrapper id="themes" label={<TranslatedText k="color_schemes" />} icon={Palette} isEnabled={true} isAlwaysOn={true} isExpanded={expandedState['themes']} onToggleExpand={() => toggleExpand('themes')} onToggleEnable={() => {}}>
+                        <div className="pt-2 space-y-6">
+                            
+                            {/* UI STYLE */}
+                            <div>
+                                <div className="flex items-center gap-2 mb-1">
+                                    <Palette size={12} className="text-theme-muted" />
+                                    <span className="text-[10px] font-mono text-theme-muted tracking-widest uppercase">UI STYLE</span>
+                                </div>
+                                <div className="h-px bg-theme-border mb-3 opacity-50"></div>
+                                <CustomSelect label={<TranslatedText k="theme_select" />} value={currentTheme} options={themeOptions} onChange={(v) => setTheme(v as ThemeType)} />
                             </div>
-                            <div className={`grid transition-[grid-template-rows,padding,opacity] duration-300 ease-in-out ${expandWatermark ? 'grid-rows-[1fr] opacity-100 p-3 pt-2' : 'grid-rows-[0fr] opacity-0 p-0'}`}>
-                                <div className="overflow-hidden"><div className="pl-4 space-y-3 border-l-2 border-theme-primary ml-2">
-                                    <RangeControl label={<TranslatedText k="scale" />} value={watermarkConfig.scale} min={0.5} max={2.0} step={0.1} onChange={(v) => updateWatermark('scale', v)} className="mb-0" />
-                                    <RangeControl label={<TranslatedText k="opacity" />} value={watermarkConfig.opacity} min={0} max={1.0} step={0.1} onChange={(v) => updateWatermark('opacity', v)} className="mb-0" />
-                                    <RangeControl label={<TranslatedText k="flash_intensity" />} value={watermarkConfig.flashIntensity} min={0} max={1.0} step={0.1} onChange={(v) => updateWatermark('flashIntensity', v)} className="mb-0" />
-                                </div></div>
+
+                            {/* CURSOR STYLE */}
+                            <div>
+                                <div className="flex items-center gap-2 mb-1">
+                                    <MousePointer2 size={12} className="text-theme-muted" />
+                                    <span className="text-[10px] font-mono text-theme-muted tracking-widest uppercase"><TranslatedText k="cursor_style" /></span>
+                                </div>
+                                <div className="h-px bg-theme-border mb-3 opacity-50"></div>
+                                <div className="space-y-1">
+                                    <CustomSelect label={<TranslatedText k="cursor_style" />} value={cursorStyle} options={cursorOptions} onChange={(v) => setCursorStyle(v as CursorStyle)} />
+                                    <CustomSelect label={<TranslatedText k="retro_cursor_style" />} value={retroScreenCursorStyle} options={cursorOptions} onChange={(v) => setRetroScreenCursorStyle(v as CursorStyle)} />
+                                </div>
                             </div>
+
+                            {/* CONTROLS STYLE */}
+                            <div>
+                                <div className="flex items-center gap-2 mb-1">
+                                    <Sliders size={12} className="text-theme-muted" />
+                                    <span className="text-[10px] font-mono text-theme-muted tracking-widest uppercase"><TranslatedText k="control_style" /></span>
+                                </div>
+                                <div className="h-px bg-theme-border mb-3 opacity-50"></div>
+                                <CustomSelect label={<TranslatedText k="control_style" />} value={controlStyle} options={controlStyleOptions} onChange={(v) => setControlStyle(v as ControlStyle)} />
+                            </div>
+                            
+                            {/* WATERMARK SETTINGS */}
+                            {watermarkConfig && (
+                                <div className={`mt-4 bg-theme-panel/40 border ${expandWatermark ? 'border-theme-primary' : 'border-theme-border'} ${innerWrapperRadius} overflow-hidden hover:border-theme-primary transition-colors relative`}>
+                                    {/* Header */}
+                                    <div 
+                                        className={`flex items-center justify-between p-3 cursor-pointer ${expandWatermark ? '' : ''}`} 
+                                        onClick={() => setExpandWatermark(!expandWatermark)}
+                                    >
+                                        <div className="flex items-center gap-3">
+                                            <div className="text-theme-muted opacity-80"><Stamp size={16} /></div>
+                                            <span className="font-mono text-[11px] tracking-widest text-theme-muted uppercase"><TranslatedText k="watermark_settings" /></span>
+                                        </div>
+                                        <div className="flex items-center gap-2">
+                                            {!isAdvancedMode && <Lock size={12} className="text-theme-muted opacity-50" />}
+                                            <ChevronDown size={14} className={`text-theme-primary opacity-70 transition-transform ${expandWatermark ? 'rotate-180' : ''}`} />
+                                        </div>
+                                    </div>
+                                    
+                                    {/* Content */}
+                                    <div className={`grid transition-[grid-template-rows,padding,opacity] duration-300 ease-in-out ${expandWatermark ? 'grid-rows-[1fr] opacity-100 p-3 pt-0' : 'grid-rows-[0fr] opacity-0 p-0'}`}>
+                                        <div className="overflow-hidden relative">
+                                            <div className="h-px w-full bg-theme-primary opacity-50 mb-3 mt-1"></div>
+                                            <div className="pl-4 space-y-3 border-l-2 border-theme-primary ml-2">
+                                                <RangeControl label={<TranslatedText k="scale" />} value={watermarkConfig.scale} min={0.5} max={2.0} step={0.1} onChange={(v) => updateWatermark('scale', v)} className="mb-0" />
+                                                <RangeControl label={<TranslatedText k="opacity" />} value={watermarkConfig.opacity} min={0} max={1.0} step={0.1} onChange={(v) => updateWatermark('opacity', v)} className="mb-0" />
+                                                <RangeControl label={<TranslatedText k="flash_intensity" />} value={watermarkConfig.flashIntensity} min={0} max={1.0} step={0.1} onChange={(v) => updateWatermark('flashIntensity', v)} className="mb-0" />
+                                            </div>
+                                            {!isAdvancedMode && (
+                                                <div className="absolute inset-0 bg-black/60 backdrop-blur-[2px] z-10 flex items-center justify-center flex-col gap-2 rounded">
+                                                    <Lock size={20} className="text-theme-muted" />
+                                                    <span className="text-[9px] font-mono text-theme-muted uppercase tracking-wider">LOCKED</span>
+                                                </div>
+                                            )}
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
                         </div>
-                    )}
-                </div>
-            </div>
-        </ModuleWrapper>
+                    </ModuleWrapper>
 
-        <ModuleWrapper id="debug" label={<TranslatedText k="debug_console" />} icon={Bug} isEnabled={true} isAlwaysOn={true} isExpanded={expandedState['debug']} onToggleExpand={() => toggleExpand('debug')} onToggleEnable={() => {}}>
-            <DebugSettings config={effectsConfig.debugConsole} update={(v) => updateEffect('debugConsole', v)} />
-        </ModuleWrapper>
+                    <ModuleWrapper id="debug" label={<TranslatedText k="debug_console" />} icon={Bug} isEnabled={true} isAlwaysOn={true} isExpanded={expandedState['debug']} onToggleExpand={() => toggleExpand('debug')} onToggleEnable={() => {}}>
+                        <DebugSettings config={effectsConfig.debugConsole} update={(v) => updateEffect('debugConsole', v)} />
+                    </ModuleWrapper>
+                </>
+            }
+        >
+            <SettingsSection 
+                id="bg" 
+                title={<TranslatedText k="cat_backgrounds" />} 
+                isOpen={openSections['bg']} 
+                onToggle={() => handleSectionToggle('bg', 1)}
+                stickyTop="36px"
+                sectionContent={
+                    <>
+                        <ModuleWrapper id="bg" label={<TranslatedText k="background" />} icon={ImageIcon} isEnabled={true} isAlwaysOn={true} isExpanded={expandedState['bg']} onToggleExpand={() => toggleExpand('bg')} onToggleEnable={() => {}}>
+                            <BackgroundSettings bgColor={bgColor} setBgColor={setBgColor} bgPattern={bgPattern} setBgPattern={setBgPattern} bgPatternConfig={bgPatternConfig} setBgPatternConfig={setBgPatternConfig} bgMedia={bgMedia} bgList={bgList} currentBgIndex={currentBgIndex} onRemoveBg={onRemoveBg} onMoveBg={onMoveBg} onSelectBg={onSelectBg} onDeselectBg={onDeselectBg} onClearBgMedia={onClearBgMedia} bgAutoplayInterval={bgAutoplayInterval} setBgAutoplayInterval={setBgAutoplayInterval} bgTransition={bgTransition} setBgTransition={setBgTransition} />
+                            <div className="mt-4 pt-4 border-t border-theme-border">
+                                <label className="text-theme-text font-mono text-[10px] block mb-2 tracking-widest uppercase opacity-70">SCREEN SHARE</label>
+                                <ScreenVideoModule isVideoActive={isVideoActive} toggleVideo={toggleVideo} />
+                            </div>
+                        </ModuleWrapper>
+                    </>
+                }
+            >
+                <SettingsSection 
+                    id="sfx" 
+                    title={<TranslatedText k="cat_sound_effects" />} 
+                    isOpen={openSections['sfx']} 
+                    onToggle={() => handleSectionToggle('sfx', 2)}
+                    stickyTop="72px"
+                    sectionContent={
+                        <>
+                            <ModuleWrapper id="mixer" label={<TranslatedText k="mixer_deck" />} icon={AudioWaveform} isEnabled={true} isAlwaysOn={true} isExpanded={expandedState['mixer']} onToggleExpand={() => toggleExpand('mixer')} onToggleEnable={() => {}}>
+                                <MixerSettings crossfadeDuration={crossfadeDuration} setCrossfadeDuration={setCrossfadeDuration} sfxVolume={sfxVolume} setSfxVolume={setSfxVolume} />
+                            </ModuleWrapper>
 
-        {/* BACKGROUNDS + SCREEN VIDEO */}
-        <h3 className="text-xs font-mono text-theme-text mb-2 opacity-80 sticky top-0 bg-theme-bg pb-2 z-10 border-b border-theme-primary mt-6 pointer-events-none">
-            <TranslatedText k="cat_backgrounds" />
-        </h3>
+                            <ModuleWrapper id="ambience" label={<TranslatedText k="ambience" />} icon={CloudRain} isEnabled={true} isExpanded={expandedState['ambience']} onToggleExpand={() => toggleExpand('ambience')} isAlwaysOn={true} onToggleEnable={() => {}}>
+                                <AmbienceSettings files={ambienceFiles} config={ambienceConfig} onUpload={onAmbienceUpload} onDelete={onAmbienceDelete} onSetActive={onAmbienceSetActive} onTogglePlay={onAmbienceTogglePlay} onVolumeChange={onAmbienceVolume} />
+                            </ModuleWrapper>
 
-        <ModuleWrapper id="bg" label={<TranslatedText k="background" />} icon={ImageIcon} isEnabled={true} isAlwaysOn={true} isExpanded={expandedState['bg']} onToggleExpand={() => toggleExpand('bg')} onToggleEnable={() => {}}>
-            <BackgroundSettings bgColor={bgColor} setBgColor={setBgColor} bgPattern={bgPattern} setBgPattern={setBgPattern} bgPatternConfig={bgPatternConfig} setBgPatternConfig={setBgPatternConfig} bgMedia={bgMedia} bgList={bgList} currentBgIndex={currentBgIndex} onRemoveBg={onRemoveBg} onMoveBg={onMoveBg} onSelectBg={onSelectBg} onDeselectBg={onDeselectBg} onClearBgMedia={onClearBgMedia} bgAutoplayInterval={bgAutoplayInterval} setBgAutoplayInterval={setBgAutoplayInterval} bgTransition={bgTransition} setBgTransition={setBgTransition} />
-            <div className="mt-4 pt-4 border-t border-theme-border">
-                <label className="text-theme-text font-mono text-[10px] block mb-2 tracking-widest uppercase opacity-70">SCREEN SHARE</label>
-                <ScreenVideoModule isVideoActive={isVideoActive} toggleVideo={toggleVideo} />
-            </div>
-        </ModuleWrapper>
-
-        {/* SOUND EFFECTS + SYSTEM AUDIO */}
-        <h3 className="text-xs font-mono text-theme-text mb-2 opacity-80 sticky top-0 bg-theme-bg pb-2 z-10 border-b border-theme-primary mt-6 pointer-events-none">
-            <TranslatedText k="cat_sound_effects" />
-        </h3>
-
-        <ModuleWrapper id="mixer" label={<TranslatedText k="mixer_deck" />} icon={AudioWaveform} isEnabled={true} isAlwaysOn={true} isExpanded={expandedState['mixer']} onToggleExpand={() => toggleExpand('mixer')} onToggleEnable={() => {}}>
-            <MixerSettings crossfadeDuration={crossfadeDuration} setCrossfadeDuration={setCrossfadeDuration} />
-        </ModuleWrapper>
-
-        <ModuleWrapper id="ambience" label={<TranslatedText k="ambience" />} icon={CloudRain} isEnabled={true} isExpanded={expandedState['ambience']} onToggleExpand={() => toggleExpand('ambience')} isAlwaysOn={true} onToggleEnable={() => {}}>
-            <AmbienceSettings files={ambienceFiles} config={ambienceConfig} onUpload={onAmbienceUpload} onDelete={onAmbienceDelete} onSetActive={onAmbienceSetActive} onTogglePlay={onAmbienceTogglePlay} onVolumeChange={onAmbienceVolume} />
-        </ModuleWrapper>
-
-        <ModuleWrapper id="sysaudio" label={<TranslatedText k="sys_audio_input" />} icon={RadioReceiver} isEnabled={true} isExpanded={expandedState['sysaudio']} isAlwaysOn={true} onToggleExpand={() => toggleExpand('sysaudio')} onToggleEnable={() => {}}>
-            <SystemAudioModule 
-                isAudioActive={isAudioActive} 
-                toggleAudio={toggleAudio} 
-            />
-        </ModuleWrapper>
-
-        {/* Modules Header */}
-        <h3 className="text-xs font-mono text-theme-text mb-2 opacity-80 sticky top-0 bg-theme-bg pb-2 z-10 border-b border-theme-primary mt-6 pointer-events-none">
-            <TranslatedText k="modules" />
-        </h3>
-        
-        <div id="tutorial-modules" className="space-y-3">
-            <ModuleWrapper id="wave" label={<NumberedLabel num="01" k="waveform" />} icon={Activity} isEnabled={showVisualizer} isExpanded={expandedState['wave']} onToggleExpand={() => toggleExpand('wave')} onToggleEnable={() => safeAction(() => setShowVisualizer(!showVisualizer))}>
-                <VisualizerSettings config={visualizerConfig} update={updateVisualizer} mode="waveform" />
-            </ModuleWrapper>
-            <ModuleWrapper id="marquee" label={<NumberedLabel num="02" k="top_marquee" />} icon={Type} isEnabled={marqueeConfig.enabled} isExpanded={expandedState['marquee']} onToggleExpand={() => toggleExpand('marquee')} onToggleEnable={() => safeAction(() => updateMarquee('enabled', !marqueeConfig.enabled))}>
-                <MarqueeSettings config={marqueeConfig} update={updateMarquee} />
-            </ModuleWrapper>
-            <ModuleWrapper id="dvd" label={<NumberedLabel num="03" k="dvd_saver" />} icon={Disc} isEnabled={showDvd} isExpanded={expandedState['dvd']} onToggleExpand={() => toggleExpand('dvd')} onToggleEnable={() => safeAction(() => setShowDvd(!showDvd))}>
-                <DvdSettings config={dvdConfig} update={updateDvd} />
-            </ModuleWrapper>
-            <ModuleWrapper id="leaks" label={<NumberedLabel num="04" k="light_leaks" />} icon={Sun} isEnabled={effectsConfig.lightLeaks.enabled} isExpanded={expandedState['leaks']} onToggleExpand={() => toggleExpand('leaks')} onToggleEnable={() => safeAction(() => updateEffect('lightLeaks', { ...effectsConfig.lightLeaks, enabled: !effectsConfig.lightLeaks.enabled }))}>
-                <LightLeaksSettings config={effectsConfig.lightLeaks} update={(v) => updateEffect('lightLeaks', v)} />
-            </ModuleWrapper>
-            <ModuleWrapper id="hologram" label={<NumberedLabel num="05" k="holograms" />} icon={MessageSquare} isEnabled={effectsConfig.holograms.enabled} isExpanded={expandedState['hologram']} onToggleExpand={() => toggleExpand('hologram')} onToggleEnable={() => safeAction(() => updateEffect('holograms', { ...effectsConfig.holograms, enabled: !effectsConfig.holograms.enabled }))}>
-                <HologramSettings config={effectsConfig.holograms} update={(v) => updateEffect('holograms', v)} />
-            </ModuleWrapper>
-            <ModuleWrapper id="gemini" label={<NumberedLabel num="06" k="gemini_chat" />} icon={Bot} isEnabled={effectsConfig.geminiChat.enabled} isExpanded={expandedState['gemini']} onToggleExpand={() => toggleExpand('gemini')} onToggleEnable={() => safeAction(() => updateEffect('geminiChat', { ...effectsConfig.geminiChat, enabled: !effectsConfig.geminiChat.enabled }))}>
-                <GeminiSettings config={effectsConfig.geminiChat} update={(v) => updateEffect('geminiChat', v)} apiKey={apiKey} setApiKey={setApiKey} />
-            </ModuleWrapper>
-            <ModuleWrapper id="scan" label={<NumberedLabel num="07" k="scanlines" />} icon={Tv} isEnabled={effectsConfig.scanlineEnabled} isExpanded={expandedState['scan']} onToggleExpand={() => toggleExpand('scan')} onToggleEnable={() => safeAction(() => updateEffect('scanlineEnabled', !effectsConfig.scanlineEnabled))}>
-                <ScanlineSettings config={effectsConfig} update={updateEffect} />
-            </ModuleWrapper>
-            <ModuleWrapper id="cyber" label={<NumberedLabel num="08" k="cyber_hack" />} icon={Terminal} isEnabled={effectsConfig.cyberHack.enabled} isExpanded={expandedState['cyber']} onToggleExpand={() => toggleExpand('cyber')} onToggleEnable={() => safeAction(() => updateEffect('cyberHack', { ...effectsConfig.cyberHack, enabled: !effectsConfig.cyberHack.enabled }))}>
-                <CyberSettings config={effectsConfig.cyberHack} update={(v) => updateEffect('cyberHack', v)} />
-            </ModuleWrapper>
-            <ModuleWrapper id="glitch" label={<NumberedLabel num="09" k="digital_glitch" />} icon={AlertTriangle} isEnabled={effectsConfig.glitch.enabled} isExpanded={expandedState['glitch']} onToggleExpand={() => toggleExpand('glitch')} onToggleEnable={() => safeAction(() => updateEffect('glitch', { ...effectsConfig.glitch, enabled: !effectsConfig.glitch.enabled }))}>
-                <GlitchSettings config={effectsConfig.glitch} update={(v) => updateEffect('glitch', v)} />
-            </ModuleWrapper>
-            {setShowVisualizer3D && reactorConfig && (
-            <ModuleWrapper id="reactor" label={<span className="flex items-center gap-2"><span className="text-theme-muted opacity-50 font-normal">10 //</span> 3D REACTOR</span>} icon={Box} isEnabled={showVisualizer3D || false} isExpanded={expandedState['reactor']} onToggleExpand={() => toggleExpand('reactor')} onToggleEnable={() => safeAction(() => setShowVisualizer3D(!showVisualizer3D))}>
-                <VisualizerSettings config={reactorConfig} update={updateReactor} mode="reactor" />
-            </ModuleWrapper>
-            )}
-            <ModuleWrapper id="signal" label={<NumberedLabel num="11" k="signal_processor" />} icon={Zap} isEnabled={true} isAlwaysOn={true} isExpanded={expandedState['signal']} onToggleExpand={() => toggleExpand('signal')} onToggleEnable={() => {}}>
-                <SignalSettings config={effectsConfig} update={updateEffect} />
-            </ModuleWrapper>
-        </div>
+                            <ModuleWrapper id="sysaudio" label={<TranslatedText k="sys_audio_input" />} icon={RadioReceiver} isEnabled={true} isExpanded={expandedState['sysaudio']} isAlwaysOn={true} onToggleExpand={() => toggleExpand('sysaudio')} onToggleEnable={() => {}}>
+                                <SystemAudioModule 
+                                    isAudioActive={isAudioActive} 
+                                    toggleAudio={toggleAudio} 
+                                />
+                            </ModuleWrapper>
+                        </>
+                    }
+                >
+                    <SettingsSection 
+                        id="mod" 
+                        title={<TranslatedText k="modules" />} 
+                        isOpen={openSections['mod']} 
+                        onToggle={() => handleSectionToggle('mod', 3)}
+                        stickyTop="108px"
+                        sectionContent={
+                            <div id="tutorial-modules" className="space-y-3">
+                                <ModuleWrapper id="wave" label={<NumberedLabel num="01" k="waveform" />} icon={Activity} isEnabled={showVisualizer} isExpanded={expandedState['wave']} onToggleExpand={() => toggleExpand('wave')} onToggleEnable={() => safeAction(() => setShowVisualizer(!showVisualizer))}>
+                                    <VisualizerSettings config={visualizerConfig} update={updateVisualizer} mode="waveform" />
+                                </ModuleWrapper>
+                                <ModuleWrapper id="marquee" label={<NumberedLabel num="02" k="top_marquee" />} icon={Type} isEnabled={marqueeConfig.enabled} isExpanded={expandedState['marquee']} onToggleExpand={() => toggleExpand('marquee')} onToggleEnable={() => safeAction(() => updateMarquee('enabled', !marqueeConfig.enabled))}>
+                                    <MarqueeSettings config={marqueeConfig} update={updateMarquee} />
+                                </ModuleWrapper>
+                                <ModuleWrapper id="dvd" label={<NumberedLabel num="03" k="dvd_saver" />} icon={Disc} isEnabled={showDvd} isExpanded={expandedState['dvd']} onToggleExpand={() => toggleExpand('dvd')} onToggleEnable={() => safeAction(() => setShowDvd(!showDvd))}>
+                                    <DvdSettings config={dvdConfig} update={updateDvd} />
+                                </ModuleWrapper>
+                                <ModuleWrapper id="leaks" label={<NumberedLabel num="04" k="light_leaks" />} icon={Sun} isEnabled={effectsConfig.lightLeaks.enabled} isExpanded={expandedState['leaks']} onToggleExpand={() => toggleExpand('leaks')} onToggleEnable={() => safeAction(() => updateEffect('lightLeaks', { ...effectsConfig.lightLeaks, enabled: !effectsConfig.lightLeaks.enabled }))}>
+                                    <LightLeaksSettings config={effectsConfig.lightLeaks} update={(v) => updateEffect('lightLeaks', v)} />
+                                </ModuleWrapper>
+                                <ModuleWrapper id="hologram" label={<NumberedLabel num="05" k="holograms" />} icon={MessageSquare} isEnabled={effectsConfig.holograms.enabled} isExpanded={expandedState['hologram']} onToggleExpand={() => toggleExpand('hologram')} onToggleEnable={() => safeAction(() => updateEffect('holograms', { ...effectsConfig.holograms, enabled: !effectsConfig.holograms.enabled }))}>
+                                    <HologramSettings config={effectsConfig.holograms} update={(v) => updateEffect('holograms', v)} />
+                                </ModuleWrapper>
+                                <ModuleWrapper id="gemini" label={<NumberedLabel num="06" k="gemini_chat" />} icon={Bot} isEnabled={effectsConfig.geminiChat.enabled} isExpanded={expandedState['gemini']} onToggleExpand={() => toggleExpand('gemini')} onToggleEnable={() => safeAction(() => updateEffect('geminiChat', { ...effectsConfig.geminiChat, enabled: !effectsConfig.geminiChat.enabled }))}>
+                                    <GeminiSettings config={effectsConfig.geminiChat} update={(v) => updateEffect('geminiChat', v)} apiKey={apiKey} setApiKey={setApiKey} />
+                                </ModuleWrapper>
+                                <ModuleWrapper id="scan" label={<NumberedLabel num="07" k="scanlines" />} icon={Tv} isEnabled={effectsConfig.scanlineEnabled} isExpanded={expandedState['scan']} onToggleExpand={() => toggleExpand('scan')} onToggleEnable={() => safeAction(() => updateEffect('scanlineEnabled', !effectsConfig.scanlineEnabled))}>
+                                    <ScanlineSettings config={effectsConfig} update={updateEffect} />
+                                </ModuleWrapper>
+                                <ModuleWrapper id="cyber" label={<NumberedLabel num="08" k="cyber_hack" />} icon={Terminal} isEnabled={effectsConfig.cyberHack.enabled} isExpanded={expandedState['cyber']} onToggleExpand={() => toggleExpand('cyber')} onToggleEnable={() => safeAction(() => updateEffect('cyberHack', { ...effectsConfig.cyberHack, enabled: !effectsConfig.cyberHack.enabled }))}>
+                                    <CyberSettings config={effectsConfig.cyberHack} update={(v) => updateEffect('cyberHack', v)} />
+                                </ModuleWrapper>
+                                <ModuleWrapper id="glitch" label={<NumberedLabel num="09" k="digital_glitch" />} icon={AlertTriangle} isEnabled={effectsConfig.glitch.enabled} isExpanded={expandedState['glitch']} onToggleExpand={() => toggleExpand('glitch')} onToggleEnable={() => safeAction(() => updateEffect('glitch', { ...effectsConfig.glitch, enabled: !effectsConfig.glitch.enabled }))}>
+                                    <GlitchSettings config={effectsConfig.glitch} update={(v) => updateEffect('glitch', v)} />
+                                </ModuleWrapper>
+                                {setShowVisualizer3D && reactorConfig && (
+                                <ModuleWrapper id="reactor" label={<span className="flex items-center gap-2"><span className="text-theme-muted opacity-50 font-normal">10 //</span> 3D REACTOR</span>} icon={Box} isEnabled={showVisualizer3D || false} isExpanded={expandedState['reactor']} onToggleExpand={() => toggleExpand('reactor')} onToggleEnable={() => safeAction(() => setShowVisualizer3D(!showVisualizer3D))}>
+                                    <VisualizerSettings config={reactorConfig} update={updateReactor} mode="reactor" />
+                                </ModuleWrapper>
+                                )}
+                                <ModuleWrapper id="signal" label={<NumberedLabel num="11" k="signal_processor" />} icon={Zap} isEnabled={true} isAlwaysOn={true} isExpanded={expandedState['signal']} onToggleExpand={() => toggleExpand('signal')} onToggleEnable={() => {}}>
+                                    <SignalSettings config={effectsConfig} update={updateEffect} />
+                                </ModuleWrapper>
+                            </div>
+                        }
+                    />
+                </SettingsSection>
+            </SettingsSection>
+        </SettingsSection>
       </div>
       
-      {showHelp && <HelpModal onClose={() => setShowHelp(false)} onRestartTutorial={onRestartTutorial} />}
+      {showHelp && <HelpModal onClose={() => setShowHelp(false)} onRestartTutorial={onRestartTutorial} onUnlockAdvanced={(pass) => {
+          if (pass === 'Meow' && setAdvancedMode) {
+              setAdvancedMode(true);
+              addNotification("ADVANCED MODE UNLOCKED", "success");
+              return true;
+          }
+          return false;
+      }} isAdvanced={isAdvancedMode} />}
     </div>
   );
 };

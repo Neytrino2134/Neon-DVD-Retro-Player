@@ -107,7 +107,8 @@ const MediaRenderer: React.FC<MediaRendererProps> = ({ type, url, stream, bgColo
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
-    const ctx = canvas.getContext('2d', { alpha: false });
+    // Enabled alpha to allow transparency when bgColor is 'transparent'
+    const ctx = canvas.getContext('2d', { alpha: true });
     if (!ctx) return;
 
     const render = (timestamp: number) => {
@@ -126,6 +127,9 @@ const MediaRenderer: React.FC<MediaRendererProps> = ({ type, url, stream, bgColo
       }
       const w = canvas.width;
       const h = canvas.height;
+
+      // Clear previous frame to support transparency
+      ctx.clearRect(0, 0, w, h);
 
       // Draw Background Color
       ctx.fillStyle = bgColor;

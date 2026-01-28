@@ -5,11 +5,11 @@ import { saveSFX, getAllSFX } from '../lib/db';
 import { useNotification } from '../contexts/NotificationContext';
 
 export const REQUIRED_SFX_FILES = [
-  'Binary_Code_Sound_Effects_Reboot',
-  'Binary_Code_Sound_Effects_Start',
-  'Boing_0',
-  'Boing_1',
-  'Boing_2'
+  'SFX_REBOOT',
+  'SFX_START',
+  'UI_BEEP',
+  'WHOOSH_IN',
+  'WHOOSH_OUT'
 ];
 
 export const useSFX = () => {
@@ -17,6 +17,17 @@ export const useSFX = () => {
   const [isLoaded, setIsLoaded] = useState(false);
   const activeAudioRef = useRef<HTMLAudioElement[]>([]);
   const { addNotification } = useNotification();
+
+  // SFX Volume State (Persisted)
+  const [sfxVolume, setSfxVolumeState] = useState(() => {
+      const saved = localStorage.getItem('neon_sfx_volume');
+      return saved ? parseFloat(saved) : 0.6; // Default 0.6
+  });
+
+  const setSfxVolume = (vol: number) => {
+      setSfxVolumeState(vol);
+      localStorage.setItem('neon_sfx_volume', vol.toString());
+  };
 
   // Load SFX from DB or Public Folder on mount
   useEffect(() => {
@@ -152,7 +163,7 @@ export const useSFX = () => {
 
     try {
         const audio = new Audio(url);
-        audio.volume = 0.6; // Slightly lower than music
+        audio.volume = sfxVolume; // Use dynamic volume state
         
         activeAudioRef.current.push(audio);
         
@@ -173,13 +184,15 @@ export const useSFX = () => {
     } catch (e) {
         console.warn("Error playing SFX", e);
     }
-  }, [sfxMap]);
+  }, [sfxMap, sfxVolume]);
 
   return {
     sfxMap,
     isLoaded,
     handleZipUpload,
     playSFX,
-    stopAllSFX
+    stopAllSFX,
+    sfxVolume,
+    setSfxVolume
   };
 };

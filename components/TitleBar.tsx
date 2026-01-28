@@ -56,7 +56,7 @@ const TitleBar: React.FC<TitleBarProps> = ({ viewMode = 'default', onRestore, cu
             {/* Window Controls - Mini */}
             <div className="flex h-full app-no-drag">
                 {/* RESTORE BUTTON */}
-                <Tooltip content="RESTORE FULL VIEW" position="bottom">
+                <Tooltip content="RESTORE VIEW" position="bottom">
                     <button 
                         onClick={onRestore}
                         className="system-cursor w-10 h-full flex items-center justify-center text-theme-accent transition-all duration-200 hover:bg-white/5 hover:text-white focus:outline-none"
@@ -65,19 +65,23 @@ const TitleBar: React.FC<TitleBarProps> = ({ viewMode = 'default', onRestore, cu
                     </button>
                 </Tooltip>
 
-                <button 
-                    onClick={handleMinimize}
-                    className="system-cursor w-10 h-full flex items-center justify-center text-theme-muted transition-all duration-200 hover:bg-white/5 hover:text-theme-primary focus:outline-none"
-                >
-                    <Minus size={12} />
-                </button>
+                <Tooltip content="MINIMIZE" position="bottom">
+                    <button 
+                        onClick={handleMinimize}
+                        className="system-cursor w-10 h-full flex items-center justify-center text-theme-muted transition-all duration-200 hover:bg-white/5 hover:text-theme-primary focus:outline-none"
+                    >
+                        <Minus size={12} />
+                    </button>
+                </Tooltip>
                 
-                <button 
-                    onClick={handleClose}
-                    className="system-cursor w-10 h-full flex items-center justify-center text-theme-muted transition-all duration-200 hover:bg-white/5 hover:text-red-500 focus:outline-none"
-                >
-                    <X size={12} />
-                </button>
+                <Tooltip content="CLOSE" position="bottom-right">
+                    <button 
+                        onClick={handleClose}
+                        className="system-cursor w-10 h-full flex items-center justify-center text-theme-muted transition-all duration-200 hover:bg-white/5 hover:text-red-500 focus:outline-none"
+                    >
+                        <X size={12} />
+                    </button>
+                </Tooltip>
             </div>
         </div>
       );
@@ -100,31 +104,34 @@ const TitleBar: React.FC<TitleBarProps> = ({ viewMode = 'default', onRestore, cu
       {/* Window Controls (No Drag) */}
       <div className="flex h-full app-no-drag">
         {/* Minimize Button - Theme Highlight on Hover */}
-        <button 
-          onClick={handleMinimize}
-          className="system-cursor w-12 h-full flex items-center justify-center text-theme-muted transition-all duration-200 hover:bg-white/5 hover:text-theme-primary hover:shadow-[inset_0_-2px_0_var(--color-primary)] focus:outline-none"
-          title="Minimize"
-        >
-          <Minus size={14} />
-        </button>
+        <Tooltip content="MINIMIZE" position="bottom">
+            <button 
+            onClick={handleMinimize}
+            className="system-cursor w-12 h-full flex items-center justify-center text-theme-muted transition-all duration-200 hover:bg-white/5 hover:text-theme-primary hover:shadow-[inset_0_-2px_0_var(--color-primary)] focus:outline-none"
+            >
+            <Minus size={14} />
+            </button>
+        </Tooltip>
         
         {/* Maximize Button - Theme Highlight on Hover */}
-        <button 
-          onClick={handleMaximize}
-          className="system-cursor w-12 h-full flex items-center justify-center text-theme-muted transition-all duration-200 hover:bg-white/5 hover:text-theme-primary hover:shadow-[inset_0_-2px_0_var(--color-primary)] focus:outline-none"
-          title="Maximize"
-        >
-          <Square size={12} />
-        </button>
+        <Tooltip content="MAXIMIZE" position="bottom">
+            <button 
+            onClick={handleMaximize}
+            className="system-cursor w-12 h-full flex items-center justify-center text-theme-muted transition-all duration-200 hover:bg-white/5 hover:text-theme-primary hover:shadow-[inset_0_-2px_0_var(--color-primary)] focus:outline-none"
+            >
+            <Square size={12} />
+            </button>
+        </Tooltip>
         
         {/* Close Button - Red Icon + Red Underline on Hover */}
-        <button 
-          onClick={handleClose}
-          className="system-cursor w-12 h-full flex items-center justify-center text-theme-muted transition-all duration-200 hover:bg-white/5 hover:text-red-500 hover:shadow-[inset_0_-2px_0_#ef4444] focus:outline-none"
-          title="Close"
-        >
-          <X size={14} />
-        </button>
+        <Tooltip content="CLOSE" position="bottom-right">
+            <button 
+            onClick={handleClose}
+            className="system-cursor w-12 h-full flex items-center justify-center text-theme-muted transition-all duration-200 hover:bg-white/5 hover:text-red-500 hover:shadow-[inset_0_-2px_0_#ef4444] focus:outline-none"
+            >
+            <X size={14} />
+            </button>
+        </Tooltip>
       </div>
     </div>
   );

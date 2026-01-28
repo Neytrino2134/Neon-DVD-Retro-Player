@@ -152,6 +152,7 @@ body {
 /* Custom Scrollbar */
 ::-webkit-scrollbar {
   width: 8px;
+  display: block; /* Ensure it is visible, especially in Electron Mini Mode */
 }
 ::-webkit-scrollbar-track {
   background: #111; 
@@ -374,4 +375,23 @@ body, button, a, input, select, textarea, [role="button"], .cursor-pointer {
     #root {
         min-width: 800px;
     }
+}
+
+/* --- PLAYER BREATHING ANIMATION --- */
+@keyframes player-breathe {
+  /* State 1: Visible (Subtle Glow) */
+  0%, 100% {
+    box-shadow: 0 0 15px color-mix(in srgb, var(--color-primary), transparent 60%);
+    border-color: color-mix(in srgb, var(--color-primary), transparent 50%);
+  }
+  /* State 2: Faded Out (Almost Invisible) */
+  50% {
+    box-shadow: 0 0 4px color-mix(in srgb, var(--color-primary), transparent 95%);
+    border-color: color-mix(in srgb, var(--color-primary), transparent 90%);
+  }
+}
+
+.animate-player-breathe {
+  animation: player-breathe 4s ease-in-out infinite;
+  will-change: box-shadow, border-color; /* Performance optimization for smoother rendering */
 }

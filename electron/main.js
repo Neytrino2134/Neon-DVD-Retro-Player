@@ -7,14 +7,12 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 let mainWindow;
-// Default to the large size requested
-let previousBounds = { width: 1700, height: 900, x: 0, y: 0 }; 
 
 function createWindow() {
   mainWindow = new BrowserWindow({
     width: 1700, // Default to Normal Mode size
     height: 900,
-    minWidth: 780, // Allow smaller for initialization, but logic below enforces specific modes
+    minWidth: 770, // Updated to 770 to match new mini-mode constraint
     minHeight: 900, 
     backgroundColor: '#030712', // Critical: Matches app background to hide resize flash
     title: "Neon Retro Player",
@@ -78,46 +76,43 @@ function createWindow() {
   ipcMain.on('set-mini-mode', (event, { width, height }) => {
     if (!mainWindow) return;
     
-    // 1. Save current bounds if we are currently in "Large" mode (width > 1000)
-    const currentBounds = mainWindow.getBounds();
-    if (!mainWindow.isMaximized() && currentBounds.width > 1000) {
-        previousBounds = currentBounds;
+    // Set minimum constraints as requested: 770px width, 900px height
+    mainWindow.setMinimumSize(770, 900);
+    
+    // If the window is currently smaller than the new minimums, resize it up
+    const bounds = mainWindow.getBounds();
+    if (bounds.width < 770 || bounds.height < 900) {
+        mainWindow.setSize(Math.max(bounds.width, 770), Math.max(bounds.height, 900), true);
     }
     
-    // CRITICAL FIX: Reset Minimum Size BEFORE resizing to prevent "width must be > minWidth" error
-    // We set it to a very small safe value temporarily.
-    mainWindow.setMinimumSize(400, 600);
-    
-    // 2. Resize Window
-    // Use integers to prevent blurry rendering
-    // NOTE: width/height come from App.tsx (e.g. 540x920)
-    // The third parameter 'true' enables animation on macOS
-    mainWindow.setSize(Math.round(width), Math.round(height), true); 
-
-    // 3. Set New Minimum Constraints for Mini Mode
-    // Must match or be smaller than the requested size in step 2 (540)
-    mainWindow.setMinimumSize(540, 920);
+    // Note: We do NOT force it to shrink if it's larger, preserving user's resize preference 
+    // unless they manually resize it down.
   });
 
   ipcMain.on('set-full-mode', () => {
     if (!mainWindow) return;
     
-    // CRITICAL FIX: Reset constraints BEFORE resizing
-    // If we are currently 540px wide (Mini), and we set minWidth to 1700px BEFORE resizing,
-    // Electron might crash or throw an error because current window violates new constraint.
-    mainWindow.setMinimumSize(400, 600);
+    // Temporarily relax constraints to allow resizing logic
+    mainWindow.setMinimumSize(770, 900);
 
-    // 1. Determine restore size
-    // If previous saved size is smaller than our new minimum (1700x900), force the minimum.
-    const w = Math.max(1700, Math.round(previousBounds.width));
-    const h = Math.max(900, Math.round(previousBounds.height));
+    const currentBounds = mainWindow.getBounds();
+    const targetW = 1700;
+    const targetH = 900;
+
+    // Logic: 
+    // If current size < 1700x900 -> Expand to 1700x900
+    // If current size >= 1700x900 -> Keep current size (do not shrink)
+    const newW = Math.max(currentBounds.width, targetW);
+    const newH = Math.max(currentBounds.height, targetH);
     
-    // 2. Resize Window
-    mainWindow.setSize(w, h, true);
-    mainWindow.center(); 
+    // Only apply resize if dimensions actually need to change
+    if (newW !== currentBounds.width || newH !== currentBounds.height) {
+        mainWindow.setSize(newW, newH, true);
+        mainWindow.center(); // Center only if we had to resize/expand
+    }
 
-    // 3. Set Minimum Constraints for Normal Mode AFTER resize logic is processed
-    mainWindow.setMinimumSize(1700, 900);
+    // Enforce strict minimum constraints for Full Mode
+    mainWindow.setMinimumSize(targetW, targetH);
   });
 
   mainWindow.on('closed', () => {

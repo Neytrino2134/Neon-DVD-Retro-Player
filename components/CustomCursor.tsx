@@ -13,19 +13,28 @@ const GLITCH_COLORS = [
 // Tech/Glitch symbols
 const SYMBOLS = ['0', '1', 'X', '+', '<', '>', '_', '█', '▓', '▒', 'ERR', 'NaN', '0x'];
 
+// SVG PATHS DEFINITIONS
+// New Hand Cursor Path (Finger)
+const HAND_PATH_D = "M10 11V8.99c0-.88.59-1.64 1.44-1.86h.05A1.99 1.99 0 0 1 14 9.05V12v-2c0-.88.6-1.65 1.46-1.87h.05A1.98 1.98 0 0 1 18 10.06V13v-1.94a2 2 0 0 1 1.51-1.94h0A2 2 0 0 1 22 11.06V14c0 .6-.08 1.27-.21 1.97a7.96 7.96 0 0 1-7.55 6.48 54.98 54.98 0 0 1-4.48 0 7.96 7.96 0 0 1-7.55-6.48C2.08 15.27 2 14.59 2 14v-1.49c0-1.11.9-2.01 2.01-2.01h0a2 2 0 0 1 2.01 2.03l-.01.97v-10c0-1.1.9-2 2-2h0a2 2 0 0 1 2 2V11Z";
+
+// New Grab Cursor Path (Move/Arrows)
+const GRAB_PATH_D = "m2 12 3.5-3.5v7L2 12Zm20 0-3.5 3.5v-7L22 12Zm-3.5 0h-13M12 2l3.5 3.5h-7L12 2Zm0 20-3.5-3.5h7L12 22Zm0-3.5v-13";
+
+// New Rounded Cursor Path
+const ROUNDED_PATH_D = "M5.5 3.21V20.8c0 .45.54.67.85.35l4.86-4.86a.5.5 0 0 1 .35-.15h6.87a.5.5 0 0 0 .35-.85L6.35 2.85a.5.5 0 0 0-.85.35Z";
+
 // --- GLOBAL MOUSE TRACKING STATE ---
-// This exists outside React lifecycle to persist across re-renders/unmounts
 const mouseState = {
     x: -100,
     y: -100,
     isClicked: false,
     forceSystemCursor: false,
     isHovering: false,
+    isScreenHover: false,
     hideCrosshair: false,
-    isOut: false // New: Track if mouse is outside window
+    isOut: false 
 };
 
-// Global listener setup flag to ensure we only attach once per app lifecycle
 let listenersAttached = false;
 
 interface Particle {
@@ -39,19 +48,25 @@ interface Particle {
   char: string;
   size: number;
   isBlock: boolean;
-  updateTimer: number; // Time until next random behavior change
+  updateTimer: number; 
 }
 
 interface CustomCursorProps {
   style?: CursorStyle;
+  retroScreenStyle?: CursorStyle; // New Prop
 }
 
-const CustomCursor: React.FC<CustomCursorProps> = ({ style = 'default' }) => {
+const CustomCursor: React.FC<CustomCursorProps> = ({ style = 'default', retroScreenStyle = 'crosshair' }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const cursorRef = useRef<HTMLDivElement>(null);
+  const dosCursorRef = useRef<HTMLDivElement>(null);
+  
+  // Refs for SVG Cursors
   const arrowRef = useRef<SVGSVGElement>(null);
   const handRef = useRef<SVGSVGElement>(null);
-  const grabRef = useRef<SVGSVGElement>(null); // New Hand Ref
+  const grabRef = useRef<SVGSVGElement>(null); 
+  const crosshairRef = useRef<SVGSVGElement>(null);
+  const roundedRef = useRef<SVGSVGElement>(null);
   
   const { colors } = useTheme();
   
@@ -59,7 +74,7 @@ const CustomCursor: React.FC<CustomCursorProps> = ({ style = 'default' }) => {
   const particlesRef = useRef<Particle[]>([]);
   const frameRef = useRef(0);
 
-  // --- 1. GLOBAL INPUT TRACKER (Runs Once) ---
+  // --- 1. GLOBAL INPUT TRACKER ---
   useEffect(() => {
       if (listenersAttached) return;
       listenersAttached = true;
@@ -69,31 +84,14 @@ const CustomCursor: React.FC<CustomCursorProps> = ({ style = 'default' }) => {
           mouseState.y = e.clientY;
           mouseState.isOut = false; 
 
-          // --- SCROLLBAR & SYSTEM CURSOR DETECTION ---
           const target = e.target as HTMLElement;
           let forceSystem = false;
 
-          // 1. Check Explicit Class
+          // Only force system cursor if explicit class is present.
+          // Removed automatic scrollbar detection logic.
           if (target.closest && target.closest('.system-cursor')) {
               forceSystem = true;
           } 
-          // 2. Check Scrollbar Hover
-          // Optimization: Check simple properties first to avoid heavy calcs
-          else if (target.scrollHeight > target.clientHeight) {
-              try {
-                  const rect = target.getBoundingClientRect();
-                  // Check vertical scrollbar zone (Right side, approx 16px buffer for 8px scrollbar)
-                  if (e.clientX >= rect.right - 16 && e.clientX <= rect.right && 
-                      e.clientY >= rect.top && e.clientY <= rect.bottom) {
-                      
-                      // Verify overflow style only if in zone to save perf
-                      const style = window.getComputedStyle(target);
-                      if (style.overflowY === 'auto' || style.overflowY === 'scroll') {
-                          forceSystem = true;
-                      }
-                  }
-              } catch (err) { /* ignore non-element targets */ }
-          }
 
           mouseState.forceSystemCursor = forceSystem;
 
@@ -104,21 +102,10 @@ const CustomCursor: React.FC<CustomCursorProps> = ({ style = 'default' }) => {
           }
       };
 
-      const handleDown = () => {
-          mouseState.isClicked = true;
-      };
-
-      const handleUp = () => {
-          mouseState.isClicked = false;
-      };
-
-      const handleOut = () => {
-          mouseState.isOut = true;
-      };
-
-      const handleIn = () => {
-          mouseState.isOut = false;
-      };
+      const handleDown = () => { mouseState.isClicked = true; };
+      const handleUp = () => { mouseState.isClicked = false; };
+      const handleOut = () => { mouseState.isOut = true; };
+      const handleIn = () => { mouseState.isOut = false; };
 
       const handleMouseOver = (e: MouseEvent) => {
           const target = e.target as HTMLElement;
@@ -130,25 +117,24 @@ const CustomCursor: React.FC<CustomCursorProps> = ({ style = 'default' }) => {
             target.classList.contains('cursor-pointer') ||
             target.closest('button') || 
             target.closest('a') ||
-            target.closest('.cursor-pointer'); // Explicitly check for parent with cursor-pointer
+            target.closest('.cursor-pointer'); 
           
           mouseState.isHovering = !!isInteractive;
           
           const hideZone = target.closest('.cursor-hide-center');
           mouseState.hideCrosshair = !!hideZone;
           
-          // NOTE: forceSystemCursor logic is now handled in handleMove for continuous accuracy
+          const isScreen = target.closest('.cursor-target-screen');
+          mouseState.isScreenHover = !!isScreen;
       };
 
-      // Attach global listeners
       window.addEventListener('pointermove', handleMove, { passive: true });
       window.addEventListener('pointerdown', handleDown);
       window.addEventListener('pointerup', handleUp);
       document.addEventListener('mouseover', handleMouseOver);
-      document.addEventListener('mouseleave', handleOut); // Track exit
-      document.addEventListener('mouseenter', handleIn);  // Track enter
+      document.addEventListener('mouseleave', handleOut); 
+      document.addEventListener('mouseenter', handleIn);
 
-      // Cleanup not strictly necessary for global singleton, but good practice if app unmounts completely
       return () => {
           window.removeEventListener('pointermove', handleMove);
           window.removeEventListener('pointerdown', handleDown);
@@ -162,7 +148,6 @@ const CustomCursor: React.FC<CustomCursorProps> = ({ style = 'default' }) => {
 
   // --- 2. SYSTEM CURSOR CLASS SYNC ---
   useEffect(() => {
-    // This effect ensures the body class matches the style prop
     if (style === 'system') {
       document.body.classList.add('force-system-cursor');
     } else {
@@ -171,89 +156,54 @@ const CustomCursor: React.FC<CustomCursorProps> = ({ style = 'default' }) => {
     return () => document.body.classList.remove('force-system-cursor');
   }, [style]);
 
-  // --- 3. DEV HOTKEYS (Ctrl+R) ---
+  // --- 3. CANVAS RESIZE (For Default Style) ---
   useEffect(() => {
-      const handleDevKeys = (e: KeyboardEvent) => {
-          if (e.ctrlKey && !e.shiftKey && (e.key === 'r' || e.code === 'KeyR')) {
-              e.preventDefault();
-              e.stopPropagation();
-              console.log('[DEV] Cursor Reset. Coords:', mouseState.x, mouseState.y);
-              // Force DOM update manually just in case loop stopped
-              if (cursorRef.current) {
-                  cursorRef.current.style.transform = `translate(${mouseState.x}px, ${mouseState.y}px)`;
-                  cursorRef.current.style.opacity = '1';
-              }
-          }
+      const canvas = canvasRef.current;
+      if (!canvas) return;
+      const resize = () => {
+          canvas.width = window.innerWidth;
+          canvas.height = window.innerHeight;
       };
-      window.addEventListener('keydown', handleDevKeys, { capture: true });
-      return () => window.removeEventListener('keydown', handleDevKeys, { capture: true });
+      window.addEventListener('resize', resize);
+      resize();
+      return () => window.removeEventListener('resize', resize);
   }, []);
 
-  // --- 4. RENDER LOOP (The "Game Loop") ---
+  // --- 4. RENDER LOOP ---
   useEffect(() => {
-      if (style === 'system') return;
-
       let rAF = 0;
       const canvas = canvasRef.current;
       const ctx = canvas ? canvas.getContext('2d') : null;
 
-      // Init Canvas Size if needed
-      if (style === 'default' && canvas) {
-          const resize = () => {
-              canvas.width = window.innerWidth;
-              canvas.height = window.innerHeight;
-          };
-          window.addEventListener('resize', resize);
-          resize();
-      }
-
       const loop = () => {
-          // Common Visibility Logic
-          const { x, y, forceSystemCursor, isOut, isHovering, isClicked } = mouseState;
-          
-          // Check for App Dragging state (Set by SettingsPanel)
+          const { x, y, forceSystemCursor, isOut, isHovering, isClicked, isScreenHover } = mouseState;
           const isAppDragging = document.body.classList.contains('app-dragging');
-
-          // Hide if system cursor is forced (by hover class) OR if mouse is outside window
           const shouldHide = forceSystemCursor || isOut;
 
-          // --- LOGIC FOR DOM CURSOR (CLASSIC / THEME / DOS) ---
-          if (style !== 'default' && cursorRef.current) {
-              const scale = isClicked ? 0.9 : 1;
-              cursorRef.current.style.transform = `translate(${x}px, ${y}px) scale(${scale})`;
-              cursorRef.current.style.opacity = shouldHide ? '0' : '1';
-              
-              if (x > 0 && cursorRef.current.style.display === 'none') {
-                  cursorRef.current.style.display = 'block';
-              }
+          // DETERMINE ACTIVE STYLE
+          const activeStyle = (isScreenHover) ? retroScreenStyle : style;
 
-              // Handle Arrow vs Hand vs Grab toggle for classic/theme styles
-              if (arrowRef.current && handRef.current && grabRef.current) {
-                  if (isAppDragging) {
-                      arrowRef.current.style.opacity = '0';
-                      handRef.current.style.opacity = '0';
-                      grabRef.current.style.opacity = '1';
-                  } else if (isHovering) {
-                      arrowRef.current.style.opacity = '0';
-                      handRef.current.style.opacity = '1';
-                      grabRef.current.style.opacity = '0';
-                  } else {
-                      arrowRef.current.style.opacity = '1';
-                      handRef.current.style.opacity = '0';
-                      grabRef.current.style.opacity = '0';
-                  }
-              }
+          if (activeStyle === 'system') {
+              // Hide everything if active style is system
+              if (canvas) ctx?.clearRect(0, 0, canvas.width, canvas.height);
+              if (cursorRef.current) cursorRef.current.style.opacity = '0';
+              if (dosCursorRef.current) dosCursorRef.current.style.opacity = '0';
+              rAF = requestAnimationFrame(loop);
+              return;
           }
 
-          // --- LOGIC FOR CANVAS CURSOR (Default) ---
-          if (style === 'default' && ctx && canvas) {
+          // --- CANVAS (DEFAULT) MODE ---
+          if (activeStyle === 'default' && ctx && canvas) {
+              // Ensure other cursors hidden
+              if (cursorRef.current) cursorRef.current.style.opacity = '0';
+              if (dosCursorRef.current) dosCursorRef.current.style.opacity = '0';
+
               const { hideCrosshair } = mouseState;
               const particles = particlesRef.current;
               frameRef.current++;
 
               ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-              // 1. Spawn Particles (Only if visible)
               if (!shouldHide && x > 0) {
                   const chance = isClicked ? 1.0 : 0.4;
                   const count = isClicked ? 5 : 1;
@@ -283,13 +233,10 @@ const CustomCursor: React.FC<CustomCursorProps> = ({ style = 'default' }) => {
                   }
               }
 
-              // 2. Update & Draw Particles
               for (let i = particles.length - 1; i >= 0; i--) {
                   const p = particles[i];
                   p.updateTimer--;
-                  
                   if (p.updateTimer <= 0) {
-                      // Glitch movement
                       const glitchType = Math.random();
                       if (glitchType < 0.3) {
                           p.x += (Math.random() - 0.5) * 20;
@@ -300,24 +247,15 @@ const CustomCursor: React.FC<CustomCursorProps> = ({ style = 'default' }) => {
                           p.vx = Math.cos(angle) * speed;
                           p.vy = Math.sin(angle) * speed;
                       } else {
-                          p.vx = 0;
-                          p.vy = 0;
+                          p.vx = 0; p.vy = 0;
                       }
                       p.updateTimer = Math.floor(Math.random() * 10) + 2;
                   }
-
-                  p.x += p.vx;
-                  p.y += p.vy;
+                  p.x += p.vx; p.y += p.vy;
                   p.life -= p.decay;
-
-                  if (p.life <= 0) {
-                      particles.splice(i, 1);
-                      continue;
-                  }
-
+                  if (p.life <= 0) { particles.splice(i, 1); continue; }
                   ctx.globalAlpha = p.life;
                   ctx.fillStyle = p.color;
-                  
                   if (p.isBlock) {
                       const w = p.size;
                       const h = Math.random() > 0.5 ? p.size : p.size / 4; 
@@ -328,188 +266,180 @@ const CustomCursor: React.FC<CustomCursorProps> = ({ style = 'default' }) => {
                   }
               }
 
-              // 3. Draw Crosshair (Only if visible)
               if (!shouldHide && x > 0 && !hideCrosshair) {
                   ctx.globalAlpha = 0.8;
                   ctx.strokeStyle = isClicked ? '#bc13fe' : '#00f3ff'; 
                   ctx.lineWidth = 2;
-                  
                   const gap = isHovering ? 15 : 5;
                   const len = isHovering ? 15 : 10;
-
-                  ctx.beginPath();
-                  ctx.moveTo(x - gap - len, y);
-                  ctx.lineTo(x - gap, y);
-                  ctx.stroke();
-
-                  ctx.beginPath();
-                  ctx.moveTo(x + gap, y);
-                  ctx.lineTo(x + gap + len, y);
-                  ctx.stroke();
-
-                  ctx.beginPath();
-                  ctx.moveTo(x, y - gap - len);
-                  ctx.lineTo(x, y - gap);
-                  ctx.stroke();
-
-                  ctx.beginPath();
-                  ctx.moveTo(x, y + gap);
-                  ctx.lineTo(x, y + gap + len);
-                  ctx.stroke();
-                  
+                  // Crosshair logic
+                  ctx.beginPath(); ctx.moveTo(x - gap - len, y); ctx.lineTo(x - gap, y); ctx.stroke();
+                  ctx.beginPath(); ctx.moveTo(x + gap, y); ctx.lineTo(x + gap + len, y); ctx.stroke();
+                  ctx.beginPath(); ctx.moveTo(x, y - gap - len); ctx.lineTo(x, y - gap); ctx.stroke();
+                  ctx.beginPath(); ctx.moveTo(x, y + gap); ctx.lineTo(x, y + gap + len); ctx.stroke();
                   if (!isHovering && !isClicked) {
-                      ctx.fillStyle = '#fff';
-                      ctx.fillRect(x - 1, y - 1, 2, 2);
+                      ctx.fillStyle = '#fff'; ctx.fillRect(x - 1, y - 1, 2, 2);
                   }
-
                   if (isHovering) {
-                      ctx.save();
-                      ctx.translate(x, y);
-                      ctx.rotate(frameRef.current * 0.05);
-                      ctx.strokeStyle = '#bc13fe';
-                      ctx.strokeRect(-8, -8, 16, 16);
-                      ctx.restore();
+                      ctx.save(); ctx.translate(x, y); ctx.rotate(frameRef.current * 0.05);
+                      ctx.strokeStyle = '#bc13fe'; ctx.strokeRect(-8, -8, 16, 16); ctx.restore();
                   }
               }
+          }
+          
+          // --- DOS TERMINAL MODE ---
+          else if (activeStyle === 'dos-terminal' && dosCursorRef.current) {
+              if (canvas) ctx?.clearRect(0, 0, canvas.width, canvas.height);
+              if (cursorRef.current) cursorRef.current.style.opacity = '0';
+              
+              dosCursorRef.current.style.transform = `translate(${x}px, ${y}px)`;
+              dosCursorRef.current.style.opacity = shouldHide ? '0' : '1';
+          }
+
+          // --- DOM / SVG MODE ---
+          else if (cursorRef.current) {
+              if (canvas) ctx?.clearRect(0, 0, canvas.width, canvas.height);
+              if (dosCursorRef.current) dosCursorRef.current.style.opacity = '0';
+
+              const scale = isClicked ? 0.9 : 1;
+              cursorRef.current.style.transform = `translate(${x}px, ${y}px) scale(${scale})`;
+              cursorRef.current.style.opacity = shouldHide ? '0' : '1';
+              
+              if (x > 0 && cursorRef.current.style.display === 'none') {
+                  cursorRef.current.style.display = 'block';
+              }
+
+              // Determine Visibility of internal SVGs
+              let showArrow = false;
+              let showHand = false;
+              let showGrab = false;
+              let showCrosshair = false;
+              let showRounded = false;
+
+              if (isAppDragging) {
+                  showGrab = true;
+              } else if (isHovering) {
+                  showHand = true;
+              } else if (activeStyle === 'crosshair') {
+                  showCrosshair = true;
+              } else if (activeStyle === 'rounded') {
+                  showRounded = true;
+              } else {
+                  showArrow = true;
+              }
+
+              if (arrowRef.current) arrowRef.current.style.opacity = showArrow ? '1' : '0';
+              if (handRef.current) handRef.current.style.opacity = showHand ? '1' : '0';
+              if (grabRef.current) grabRef.current.style.opacity = showGrab ? '1' : '0';
+              if (crosshairRef.current) crosshairRef.current.style.opacity = showCrosshair ? '1' : '0';
+              if (roundedRef.current) roundedRef.current.style.opacity = showRounded ? '1' : '0';
           }
 
           rAF = requestAnimationFrame(loop);
       };
-
+      
       loop();
+      return () => { cancelAnimationFrame(rAF); };
+  }, [style, retroScreenStyle]); 
 
-      return () => {
-          cancelAnimationFrame(rAF);
-      };
-  }, [style]); // Only restart loop if style changes
-
-  if (style === 'system') return null;
-
-  // --- CLASSIC / THEME CURSOR LOGIC ---
-  const isThemeSync = style === 'theme-sync';
-  const isClassic = style.startsWith('classic');
+  // --- Determine Colors for SVG Mode ---
   
-  let primaryColor = '#ffffff';
-  let secondaryColor = '#808080';
+  const getColorsForStyle = (s: string) => {
+      if (s === 'theme-sync') return { primary: colors.primary, secondary: colors.secondary };
+      if (s === 'classic-blue') return { primary: '#00f3ff', secondary: '#4d79ff' };
+      if (s === 'classic-warm') return { primary: '#ffd700', secondary: '#ff8c00' };
+      if (s === 'classic-ocean') return { primary: '#70C6D6', secondary: '#4B8CA8' };
+      if (s === 'crosshair') return { primary: colors.primary, secondary: colors.secondary }; // ADAPTIVE CROSSHAIR
+      if (s === 'rounded') return { primary: colors.primary, secondary: colors.secondary }; // ADAPTIVE ROUNDED
+      return { primary: '#ffffff', secondary: '#808080' }; // Default/White
+  };
 
-  if (isThemeSync) {
-      primaryColor = colors.primary;
-      secondaryColor = colors.secondary;
-  } else if (isClassic) {
-      if (style === 'classic-blue') { primaryColor = '#00f3ff'; secondaryColor = '#4d79ff'; }
-      else if (style === 'classic-warm') { primaryColor = '#ffd700'; secondaryColor = '#ff8c00'; }
-      else if (style === 'classic-ocean') { primaryColor = '#70C6D6'; secondaryColor = '#4B8CA8'; }
-      // classic-white defaults
-  }
+  const globalColors = getColorsForStyle(style);
+  const retroColors = getColorsForStyle(retroScreenStyle);
 
-  // UPDATED Z-INDEX: 999999 (Highest Layer)
+  const colorMapRef = useRef({ global: globalColors, retro: retroColors });
+  useEffect(() => {
+      colorMapRef.current = { global: getColorsForStyle(style), retro: getColorsForStyle(retroScreenStyle) };
+  }, [style, retroScreenStyle, colors]);
+
+  // Update loop to apply colors
+  useEffect(() => {
+      const loop = () => {
+          const { isScreenHover } = mouseState;
+          const activeStyle = isScreenHover ? retroScreenStyle : style;
+          
+          if (activeStyle !== 'default' && activeStyle !== 'dos-terminal' && activeStyle !== 'system' && cursorRef.current) {
+              const pal = isScreenHover ? colorMapRef.current.retro : colorMapRef.current.global;
+              
+              // Apply colors to SVGs directly
+              const targets = [arrowRef.current, handRef.current, grabRef.current, crosshairRef.current, roundedRef.current];
+              targets.forEach(svg => {
+                  if (svg) {
+                      svg.style.color = pal.primary;
+                  }
+              });
+          }
+          requestAnimationFrame(loop);
+      };
+      const id = requestAnimationFrame(loop);
+      return () => cancelAnimationFrame(id);
+  }, [style, retroScreenStyle]); 
+
   return (
     <>
-        {/* DEFAULT CANVAS CURSOR */}
-        {style === 'default' && (
-            <canvas 
-                ref={canvasRef}
-                className="fixed inset-0 pointer-events-none z-[999999] mix-blend-screen"
-            />
-        )}
+        {/* CANVAS */}
+        <canvas 
+            ref={canvasRef}
+            className="fixed inset-0 pointer-events-none z-[999999] mix-blend-screen"
+        />
 
-        {/* DOS TERMINAL CURSOR */}
-        {style === 'dos-terminal' && (
-            <div 
-                ref={cursorRef}
-                className="fixed top-0 left-0 pointer-events-none z-[999999] will-change-transform mix-blend-difference"
-                style={{ marginTop: '0px', marginLeft: '0px', opacity: 0 }} // Init hidden
-            >
-                <div className="w-3 h-5 bg-white animate-[pulse_1s_steps(2)_infinite]"></div>
-            </div>
-        )}
+        {/* DOS */}
+        <div 
+            ref={dosCursorRef}
+            className="fixed top-0 left-0 pointer-events-none z-[999999] will-change-transform mix-blend-difference"
+            style={{ marginTop: '0px', marginLeft: '0px', opacity: 0 }} 
+        >
+            <div className="w-3 h-5 bg-white animate-[pulse_1s_steps(2)_infinite]"></div>
+        </div>
 
-        {/* UNIFIED CLASSIC & THEME CURSORS (Arrow + Hand + Grab) */}
-        {(isClassic || isThemeSync) && (
-            <div 
-                ref={cursorRef}
-                className="fixed top-0 left-0 pointer-events-none z-[999999] will-change-transform"
-                style={{ marginTop: '-2px', marginLeft: '-2px', opacity: 0 }}
-            >
-                <style>{`
-                    @keyframes pulse-stroke-${style} {
-                        0% { stroke: ${secondaryColor}; filter: drop-shadow(0 0 2px ${secondaryColor}); }
-                        50% { stroke: ${primaryColor}; filter: drop-shadow(0 0 8px ${primaryColor}); }
-                        100% { stroke: ${secondaryColor}; filter: drop-shadow(0 0 2px ${secondaryColor}); }
-                    }
-                    .classic-cursor-path {
-                        animation: pulse-stroke-${style} 2s infinite ease-in-out;
-                    }
-                `}</style>
-                
-                {/* STANDARD ARROW */}
-                <svg 
-                    ref={arrowRef} 
-                    width="24" 
-                    height="24" 
-                    viewBox="0 0 24 24" 
-                    className="absolute top-0 left-0 transition-opacity duration-200"
-                    style={{ overflow: 'visible' }} // Added to prevent clipping of thick strokes
-                >
-                    <path 
-                        d="M2 2 L14 14 L9 14 L12 20 L9 21 L6 15 L2 19 Z" 
-                        fill="black" 
-                        strokeWidth="3" // Increased width for better visibility
-                        strokeLinejoin="round"
-                        className="classic-cursor-path"
-                        style={{ paintOrder: 'stroke' }} // Ensure fill stays clean on top
-                    />
-                </svg>
+        {/* SVG CONTAINER */}
+        <div 
+            ref={cursorRef}
+            className="fixed top-0 left-0 pointer-events-none z-[999999] will-change-transform"
+            style={{ marginTop: '-2px', marginLeft: '-2px', opacity: 0 }}
+        >
+            {/* 1. ARROW (Standard) */}
+            <svg ref={arrowRef} width="24" height="24" viewBox="0 0 24 24" className="absolute top-0 left-0 transition-opacity duration-200" style={{ overflow: 'visible' }}>
+                <path d="M2 2 L14 14 L9 14 L12 20 L9 21 L6 15 L2 19 Z" fill="black" stroke="currentColor" strokeWidth="2" strokeLinejoin="round" />
+            </svg>
 
-                {/* HAND (LINK) POINTER */}
-                {/* Scaled down to 17x22, increased path stroke width significantly for visibility */}
-                <svg 
-                    ref={handRef} 
-                    width="17" 
-                    height="22" 
-                    viewBox="0 0 988 1280" 
-                    className="absolute top-0 left-0 transition-opacity duration-200 opacity-0" 
-                    style={{ transform: 'translate(-7px, -1px)', overflow: 'visible' }} // Shifted left to align index finger tip with hotspot
-                >
-                    <g transform="translate(0,1280) scale(0.1,-0.1)" fill="black" stroke="none">
-                       <path 
-                         className="classic-cursor-path" 
-                         strokeWidth="2200" // Massive value due to scaling (effectively ~2px on screen)
-                         style={{ paintOrder: 'stroke' }}
-                         d="M2920 12520 l0 -280 -275 0 -275 0 0 -2640 0 -2640 -280 0 -280 0 0
-                            275 0 275 -905 0 -905 0 0 -835 0 -835 280 0 280 0 0 -275 0 -275 275 0 275 0
-                            2 -628 3 -627 348 -3 347 -2 0 -555 0 -555 280 0 280 0 0 -555 0 -555 275 0
-                            275 0 0 -905 0 -905 2925 0 2925 0 0 905 0 905 275 0 275 0 0 835 0 835 280 0
-                            280 0 0 2015 0 2015 -280 0 -280 0 0 350 0 350 -275 0 -275 0 -2 278 -3 277
-                            -627 3 -628 2 0 275 0 275 -835 0 -836 0 1 278 1 277 -625 3 -626 2 0 1180 0
-                            1180 -276 2 -275 3 1 278 1 277 -561 0 -560 0 0 -280z"
-                       />
-                    </g>
-                </svg>
+            {/* 2. HAND (Link/Hover) */}
+            <svg ref={handRef} width="24" height="24" viewBox="0 0 24 24" className="absolute top-0 left-0 transition-opacity duration-200 opacity-0" style={{ transform: 'translate(-2px, -1px)', overflow: 'visible' }}>
+                {/* Changed fill to dark theme background (#030712) instead of white */}
+                <path d={HAND_PATH_D} fill="#030712" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round" />
+            </svg>
 
-                {/* GRAB HAND (DRAGGING) */}
-                <svg
-                    ref={grabRef}
-                    width="24"
-                    height="24"
-                    viewBox="100 55 65 65" // Adjusted Box for the user's path coordinates
-                    className="absolute top-0 left-0 transition-opacity duration-200 opacity-0"
-                    style={{ transform: 'translate(-12px, -12px)', overflow: 'visible' }} // Center origin
-                >
-                    <path 
-                        className="classic-cursor-path"
-                        strokeWidth="10" // Increased stroke width significantly
-                        strokeLinejoin="round" 
-                        strokeLinecap="round" // Smooth edges
-                        fill="black" // Solid Fill
-                        style={{ paintOrder: 'stroke' }} // Paint stroke first, so fill covers the inner half, effectively making stroke "outside"
-                        // Updated path from user
-                        d="m157.78 103.596-.353 1.862-.416 1.807-.464 1.736-.493 1.647-.505 1.536-.502 1.413-.481 1.265-.445 1.103-.392.923h-50.117l-.39-.921-.445-1.102-.482-1.264-.502-1.409-.505-1.535-.493-1.645-.464-1.734-.416-1.81-.352-1.861-.272-1.9-.176-1.92-.062-1.918V80.196l.033-.5.1-.482.157-.457.215-.428.266-.393.315-.356.355-.314.394-.266.427-.214.457-.159.482-.099.5-.033.502.033.482.099.457.16.427.213.394.266.356.314.312.356.268.393.213.428.16.457.099.481.033.501v16.528h5.554V66.762l.033-.5.099-.482.16-.458.215-.427.266-.394.312-.355.356-.314.393-.266.43-.215.455-.158.481-.1.502-.033.503.034.481.099.456.158.427.215.394.266.355.314.314.355.266.394.216.427.157.458.1.481.034.5v6.718h5.554V60.626l.033-.5.1-.481.157-.458.215-.427.266-.394.314-.355.356-.314.394-.267.427-.215.457-.158.482-.098.5-.034.502.034.482.098.457.158.427.215.394.267.355.314.313.355.266.394.215.427.16.458.099.48.033.501V73.48h5.553v-6.717l.034-.5.099-.482.16-.458.214-.427.267-.394.312-.355.355-.314.394-.266.429-.215.456-.158.481-.1.502-.033.502.034.482.099.456.158.427.215.394.266.355.314.314.355.266.394.215.427.158.458.1.481.034.5v6.718h5.554l.033-.5.099-.482.158-.458.215-.427.266-.393.314-.356.356-.314.393-.266.428-.214.457-.16.481-.098.501-.033.502.033.481.099.458.16.427.213.394.266.355.314.313.356.266.393.215.427.16.458.098.481.034.5V97.87l-.062 1.914-.177 1.914z"
-                        transform="translate(2, 2) scale(0.9)" // Slight adjustment to center visually
-                    />
-                </svg>
-            </div>
-        )}
+            {/* 3. GRAB (App Dragging) */}
+            {/* Updated ViewBox and Path for new Grab Icon */}
+            <svg ref={grabRef} width="32" height="32" viewBox="0 0 24 24" className="absolute top-0 left-0 transition-opacity duration-200 opacity-0" style={{ transform: 'translate(-12px, -12px)', overflow: 'visible' }}>
+                <path d={GRAB_PATH_D} stroke="currentColor" strokeWidth="2" strokeLinejoin="round" fill="#030712" />
+            </svg>
+
+            {/* 4. CROSSHAIR (Retro Screen Alt) */}
+            <svg ref={crosshairRef} width="24" height="24" viewBox="0 0 24 24" className="absolute top-0 left-0 transition-opacity duration-200 opacity-0" style={{ transform: 'translate(-12px, -12px)', overflow: 'visible' }}>
+                <circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" strokeWidth="2" />
+                <line x1="12" y1="2" x2="12" y2="8" stroke="currentColor" strokeWidth="2" />
+                <line x1="12" y1="16" x2="12" y2="22" stroke="currentColor" strokeWidth="2" />
+                <line x1="2" y1="12" x2="8" y2="12" stroke="currentColor" strokeWidth="2" />
+                <line x1="16" y1="12" x2="22" y2="12" stroke="currentColor" strokeWidth="2" />
+                <circle cx="12" cy="12" r="1.5" fill="currentColor" />
+            </svg>
+
+            {/* 5. ROUNDED (New Style) */}
+            <svg ref={roundedRef} width="24" height="24" viewBox="0 0 24 24" className="absolute top-0 left-0 transition-opacity duration-200 opacity-0" style={{ overflow: 'visible' }}>
+                <path d={ROUNDED_PATH_D} fill="#030712" stroke="currentColor" strokeWidth="2" strokeLinejoin="round" />
+            </svg>
+        </div>
     </>
   );
 };

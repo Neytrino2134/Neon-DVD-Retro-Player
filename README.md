@@ -1,7 +1,7 @@
 
 # 💿 NEON RETRO PLAYER
 
-![Version](https://img.shields.io/badge/version-0.1.4-00f3ff?style=for-the-badge)
+![Version](https://img.shields.io/badge/version-0.1.5-00f3ff?style=for-the-badge)
 ![License](https://img.shields.io/badge/license-MIT-bc13fe?style=for-the-badge)
 ![Built With](https://img.shields.io/badge/Built%20With-Google%20AI%20Studio-orange?style=for-the-badge&logo=google&logoColor=white)
 
