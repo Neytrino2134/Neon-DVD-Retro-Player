@@ -91,18 +91,21 @@ export const useAppHotkeys = ({
           return;
       }
 
-      if (e.code === 'KeyA') {
+      // Check for modifiers to avoid collisions with Ctrl+A, Ctrl+S, etc.
+      const hasModifier = e.ctrlKey || e.metaKey || e.altKey;
+
+      if (e.code === 'KeyA' && !hasModifier) {
           player.prevTrack();
       } else if (e.code === 'KeyS') {
           if (e.shiftKey) {
               // Shift + S: Toggle System Panel (Left Panel)
               toggleLeftPanel();
-          } else {
+          } else if (!hasModifier) {
               // S: Stop Playback
               player.stop();
               addNotification("STOPPED", "info");
           }
-      } else if (e.code === 'KeyD') {
+      } else if (e.code === 'KeyD' && !hasModifier) {
           player.nextTrack();
       } else if (e.code === 'ArrowUp') {
           e.preventDefault();

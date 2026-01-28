@@ -6,6 +6,16 @@ export interface AudioTrack {
   url: string;
   file: File;
   artworkUrl?: string; // NEW: Album art blob URL
+  tags?: TagMetadata; // NEW: ID3 Tags
+}
+
+export interface TagMetadata {
+  title?: string;
+  artist?: string;
+  album?: string;
+  year?: string;
+  genre?: string;
+  trackNumber?: string;
 }
 
 export interface Playlist {
@@ -88,7 +98,8 @@ export type CursorStyle = 'default' | 'classic-blue' | 'classic-warm' | 'classic
 
 export type ThemeType = 'neon-retro' | 'neon-blue' | 'warm-cozy' | 'neutral-gray' | 'neutral-ocean';
 export type ControlStyle = 'default' | 'round' | 'circle';
-export type BgTransitionType = 'glitch' | 'leaks' | 'none'; // NEW
+export type BgTransitionType = 'glitch' | 'leaks' | 'none';
+export type BgAnimationType = 'none' | 'zoom' | 'sway' | 'handheld' | 'cinematic' | 'chaos'; // NEW
 
 // NEW: View Mode for Application Layout
 export type ViewMode = 'default' | 'cinema' | 'mini';
@@ -239,5 +250,6 @@ export interface AppPreset {
     controlStyle?: ControlStyle;
     bgTransition?: BgTransitionType; // New
     ambienceConfig?: AmbienceConfig; // NEW
+    bgAnimation?: BgAnimationType; // NEW
   }
 }

@@ -12,6 +12,7 @@ import ShutdownOverlay from './components/ShutdownOverlay';
 import TutorialOverlay from './components/TutorialOverlay'; 
 import ContextMenu from './components/ContextMenu';
 import CustomCursor from './components/CustomCursor';
+import StreamWindow from './components/ui/StreamWindow'; // NEW
 
 // Components - Main Modules
 import SettingsPanel from './components/settings/SettingsPanel';
@@ -19,6 +20,8 @@ import Controls from './components/Controls';
 import RetroScreen from './components/RetroScreen';
 import MusicEditor from './components/editor/MusicEditor';
 import EditorControls from './components/editor/EditorControls';
+import TagEditor from './components/tags/TagEditor';
+import TagControls from './components/tags/TagControls';
 
 // Hooks
 import { useAudioPlayer } from './hooks/useAudioPlayer';
@@ -33,16 +36,19 @@ import { useMusicEngine } from './hooks/useMusicEngine';
 import { useViewLayout } from './hooks/useViewLayout';
 import { useSystemCycle } from './hooks/useSystemCycle';
 import { useFileHandler } from './hooks/useFileHandler';
+import { AudioTrack, TagMetadata } from './types';
 
 function AppContent() {
   // --- UI LOCAL STATE ---
   const [isEditorMode, setIsEditorMode] = useState(false);
+  const [isTagEditorMode, setIsTagEditorMode] = useState(false);
   const [devSkip, setDevSkip] = useState(false);
   
   // --- SCREEN CAPTURE STATE ---
   const [screenVideo, setScreenVideo] = useState<MediaStream | null>(null);
   const [sysAudioVolume, setSysAudioVolume] = useState(1);
   const [sysAudioMonitor, setSysAudioMonitor] = useState(false);
+  const [streamMode, setStreamMode] = useState<'bg' | 'window'>('bg'); // NEW STATE
 
   // --- REFS ---
   const appContainerRef = useRef<HTMLDivElement>(null);
@@ -64,7 +70,7 @@ function AppContent() {
       player, 
       setViewMode: (m) => view.setViewMode(m), 
       setDevSkip, 
-      setIsEditorMode, 
+      setIsEditorMode: (v) => { setIsEditorMode(v); if(v) setIsTagEditorMode(false); }, 
       stopAllSFX 
   });
 
@@ -105,14 +111,31 @@ function AppContent() {
       } else {
           if (player.isPlaying) player.stop();
           setIsEditorMode(true);
+          setIsTagEditorMode(false); // Close Tag Editor if open
           if (!view.showLeftPanel) view.setShowLeftPanel(true);
           addNotification("MUSIC STUDIO INITIALIZED", "success");
       }
   };
 
+  // Handle Tag Editor Toggle
+  const handleToggleTagEditor = () => {
+      if (isTagEditorMode) {
+          setIsTagEditorMode(false);
+          addNotification("TAG EDITOR CLOSED", "info");
+      } else {
+          setIsTagEditorMode(true);
+          setIsEditorMode(false); // Close Music Editor if open
+          if (!view.showLeftPanel) view.setShowLeftPanel(true);
+          addNotification("TAG EDITOR INITIALIZED", "success");
+      }
+  };
+
+  const handleUpdateTrackTags = (_id: string, _updates: Partial<AudioTrack> & { tags?: TagMetadata }) => {
+      addNotification("Track Updated (Visual)", "success");
+  };
+
   const handleResetDefault = () => {
       const defaults = config.resetDefaultPreset();
-      // Reset logic
       config.setVisualizerConfig(defaults.visualizerConfig);
       if (defaults.reactorConfig && config.setReactorConfig) config.setReactorConfig(defaults.reactorConfig);
       config.setDvdConfig(defaults.dvdConfig);
@@ -169,6 +192,14 @@ function AppContent() {
             viewMode={view.viewMode} 
             onRestore={() => view.setViewMode('default')}
             currentTrack={player.currentTrack} 
+          />
+      )}
+
+      {/* Floating Stream Window */}
+      {screenVideo && streamMode === 'window' && (
+          <StreamWindow 
+              stream={screenVideo} 
+              onClose={screenCapture.toggleVideoCapture} 
           />
       )}
 
@@ -260,6 +291,11 @@ function AppContent() {
                     onClearPattern={musicEngine.clearPattern}
                     onExit={handleToggleEditor}
                  />
+             ) : isTagEditorMode ? (
+                 <TagControls 
+                    onExit={handleToggleTagEditor}
+                    onSaveAll={() => addNotification("All tags saved", "success")}
+                 />
              ) : (
                  <SettingsPanel 
                    showVisualizer={config.showVisualizer} setShowVisualizer={config.setShowVisualizer}
@@ -319,6 +355,8 @@ function AppContent() {
                    setApiKey={config.setApiKey}
                    bgTransition={config.bgTransition}
                    setBgTransition={config.setBgTransition}
+                   bgAnimation={config.bgAnimation}
+                   setBgAnimation={config.setBgAnimation}
                    onRestartTutorial={() => system.setShowTutorial(true)}
                    ambienceFiles={ambience.files}
                    ambienceConfig={ambience.config}
@@ -337,22 +375,34 @@ function AppContent() {
                    setMonitoring={setSysAudioMonitor}
                    isAdvancedMode={config.isAdvancedMode}
                    setAdvancedMode={config.setAdvancedMode}
+                   useAlbumArtAsBackground={config.useAlbumArtAsBackground}
+                   setUseAlbumArtAsBackground={config.setUseAlbumArtAsBackground}
+                   streamMode={streamMode} // NEW
+                   setStreamMode={setStreamMode} // NEW
                  />
              )}
              
-             {!isEditorMode && (
+             {!isEditorMode && !isTagEditorMode && (
                  <div className="absolute bottom-0 left-0 right-0 z-50 bg-theme-bg border-t border-theme-border p-3">
-                     <div className="flex items-center justify-between px-1">
+                     <div className="flex items-center justify-between px-1 gap-2">
                         <span className="text-[9px] font-mono text-theme-muted tracking-widest opacity-40 select-none">
-                            EXPANSION SLOT
+                            EXPANSION
                         </span>
-                        <button
-                            onClick={handleToggleEditor}
-                            className="px-3 py-1.5 bg-gray-900 border border-gray-700 rounded text-[10px] font-mono text-gray-400 hover:text-white hover:border-gray-500 hover:bg-gray-800 transition-all flex items-center gap-2 group shadow-sm"
-                        >
-                            <span>Open studio</span>
-                            <span className="text-[9px] text-yellow-600 group-hover:text-yellow-500 transition-colors opacity-80">(Alpha)</span>
-                        </button>
+                        <div className="flex gap-2">
+                            <button
+                                onClick={handleToggleTagEditor}
+                                className="px-3 py-1.5 bg-gray-900 border border-gray-700 rounded text-[10px] font-mono text-gray-400 hover:text-white hover:border-gray-500 hover:bg-gray-800 transition-all flex items-center gap-2 group shadow-sm"
+                            >
+                                <span>Tag Editor</span>
+                            </button>
+                            <button
+                                onClick={handleToggleEditor}
+                                className="px-3 py-1.5 bg-gray-900 border border-gray-700 rounded text-[10px] font-mono text-gray-400 hover:text-white hover:border-gray-500 hover:bg-gray-800 transition-all flex items-center gap-2 group shadow-sm"
+                            >
+                                <span>Studio</span>
+                                <span className="text-[9px] text-yellow-600 group-hover:text-yellow-500 transition-colors opacity-80">(Alpha)</span>
+                            </button>
+                        </div>
                      </div>
                  </div>
              )}
@@ -360,14 +410,14 @@ function AppContent() {
         </div>
         )}
 
-        {/* CENTER PANEL: SCREEN OR MUSIC EDITOR */}
+        {/* CENTER PANEL: SCREEN OR MUSIC EDITOR OR TAG EDITOR */}
         {view.viewMode !== 'mini' && (
         <div 
           id="tutorial-screen"
           className={view.screenContainerClass}
         >
             {/* Collapse Tongues */}
-            {system.introState >= 2 && view.animSequence === 'idle' && !isEditorMode && (
+            {system.introState >= 2 && view.animSequence === 'idle' && !isEditorMode && !isTagEditorMode && (
               <>
                 <CollapseTab side="left" isOpen={view.showLeftPanel} onClick={view.toggleLeftPanel} />
                 <CollapseTab side="right" isOpen={view.showRightPanel} onClick={view.toggleRightPanel} />
@@ -380,6 +430,11 @@ function AppContent() {
                     currentStep={musicEngine.currentStep}
                     onToggleStep={musicEngine.toggleStep}
                     isPlaying={musicEngine.isPlaying}
+                />
+            ) : isTagEditorMode ? (
+                <TagEditor 
+                    tracks={player.tracks}
+                    onUpdateTrack={handleUpdateTrackTags}
                 />
             ) : (
                 <RetroScreen 
@@ -419,6 +474,10 @@ function AppContent() {
                   onPlaySfx={playSFX}
                   volume={screenCapture.isAudioActive ? 1 : player.volume}
                   apiKey={config.apiKey}
+                  useAlbumArtAsBackground={config.useAlbumArtAsBackground} 
+                  bgAnimation={config.bgAnimation} 
+                  isSystemAudioActive={screenCapture.isAudioActive}
+                  streamMode={streamMode} // NEW
                 />
             )}
         </div>

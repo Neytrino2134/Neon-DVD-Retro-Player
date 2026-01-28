@@ -1,7 +1,7 @@
 
 import React, { useRef, useEffect, forwardRef, useMemo, useState, useCallback } from 'react';
 import { Upload, Minimize, Maximize, Monitor, Power, List, Music, HelpCircle } from 'lucide-react';
-import { AudioTrack, VisualizerConfig, EffectsConfig, DvdConfig, MarqueeConfig, PatternConfig, WatermarkConfig, BgTransitionType } from '../types';
+import { AudioTrack, VisualizerConfig, EffectsConfig, DvdConfig, MarqueeConfig, PatternConfig, WatermarkConfig, BgTransitionType, BgAnimationType } from '../types';
 import DvdLogo from './DvdLogo';
 import Visualizer from './Visualizer';
 import Visualizer3D from './Visualizer3D'; 
@@ -50,6 +50,8 @@ interface RetroScreenProps {
   
   // Live Stream
   videoStream?: MediaStream | null; 
+  isSystemAudioActive?: boolean;
+  streamMode?: 'bg' | 'window'; // NEW PROP
 
   // Configs
   visualizerConfig: VisualizerConfig;
@@ -90,17 +92,25 @@ interface RetroScreenProps {
   
   // API
   apiKey?: string; 
+  
+  // Album Art
+  useAlbumArtAsBackground?: boolean;
+
+  // Animation
+  bgAnimation?: BgAnimationType;
 }
 
 const RetroScreen = forwardRef<HTMLDivElement, RetroScreenProps>(({
   analyser, isPlaying, currentTrack, tracks, onTrackSelect, bgMedia, bgColor, bgPattern = 'none', bgPatternConfig,
-  videoStream, 
+  videoStream, isSystemAudioActive, streamMode = 'bg',
   visualizerConfig, setVisualizerConfig, reactorConfig, showVisualizer, showVisualizer3D, dvdConfig, showDvd, effectsConfig, marqueeConfig, watermarkConfig,
   progress = 0, currentTime, duration,
   focusMode, setFocusMode, isDragging,
   onDragOver, onDragEnter, onDragLeave, onDrop,
   onScheduleReload, rebootPhase,
-  onPlaySfx, volume, apiKey
+  onPlaySfx, volume, apiKey,
+  useAlbumArtAsBackground = false,
+  bgAnimation = 'none'
 }, externalRef) => {
   
   const { t } = useLanguage();
@@ -145,30 +155,39 @@ const RetroScreen = forwardRef<HTMLDivElement, RetroScreenProps>(({
     },
   });
 
+  // Calculate Effective Media (Album Art or User Selection)
+  const effectiveMedia = useMemo(() => {
+      if (useAlbumArtAsBackground && currentTrack?.artworkUrl) {
+          // Construct a temporary media object for the artwork
+          return { type: 'image' as const, url: currentTrack.artworkUrl };
+      }
+      return bgMedia;
+  }, [useAlbumArtAsBackground, currentTrack, bgMedia]);
+
   // Transition State
-  const [activeMedia, setActiveMedia] = useState(bgMedia);
+  const [activeMedia, setActiveMedia] = useState(effectiveMedia);
   const [transitionPhase, setTransitionPhase] = useState<'idle' | 'out' | 'in'>('idle');
 
   // Handle media switching
   useEffect(() => {
-    // If video stream is active, it overrides everything, no transition needed or simple cut
-    if (videoStream) return;
+    // If video stream is active AND we are in background mode, it overrides everything
+    if (videoStream && streamMode === 'bg') return;
 
-    if (activeMedia === bgMedia) return;
+    if (activeMedia?.url === effectiveMedia?.url) return;
 
     const stored = localStorage.getItem('neon_bg_transition');
     const currentTransition = stored ? JSON.parse(stored) as BgTransitionType : 'glitch';
     setBgTransition(currentTransition);
 
     if (currentTransition === 'none') {
-        setActiveMedia(bgMedia);
+        setActiveMedia(effectiveMedia);
         return;
     }
 
     setTransitionPhase('out');
 
     const timeout1 = setTimeout(() => {
-      setActiveMedia(bgMedia); 
+      setActiveMedia(effectiveMedia); 
       setTransitionPhase('in'); 
 
       const timeout2 = setTimeout(() => {
@@ -179,7 +198,7 @@ const RetroScreen = forwardRef<HTMLDivElement, RetroScreenProps>(({
     }, 800);
 
     return () => clearTimeout(timeout1);
-  }, [bgMedia, videoStream]); 
+  }, [effectiveMedia, videoStream, streamMode]); 
 
   // Screen Shake Loop (Only for Glitch)
   useEffect(() => {
@@ -299,11 +318,15 @@ const RetroScreen = forwardRef<HTMLDivElement, RetroScreenProps>(({
        return `${r()}${r()}${r()}`;
     };
 
+    if (isSystemAudioActive) {
+         return `SYSTEM AUDIO CAPTURE ACTIVE  ${dots}  STREAMING MODE  ${dots}  ${brand}  ${dots}  LIVE SIGNAL DETECTED  ${dots}  ${getRandomGlitch()}  ${dots} `;
+    }
+
     if (currentTrack) {
         return `NOW PLAYING: ${currentTrack.name.toUpperCase()}  ${dots} ${brand} ${dots} ${getRandomGlitch()} ${dots}  ${currentTrack.name.toUpperCase()}  ${dots} ${brand} ${dots} `;
     }
     return `INSERT DISK  ${dots}  SYSTEM READY  ${dots}  ${brand}  ${dots}  WAITING FOR INPUT  ${dots} ${getRandomGlitch()} ${dots} `;
-  }, [currentTrack]);
+  }, [currentTrack, isSystemAudioActive]);
 
   const getMarqueeColor = (style: string) => {
       switch (style) {
@@ -346,10 +369,17 @@ const RetroScreen = forwardRef<HTMLDivElement, RetroScreenProps>(({
       transition: bgTransition === 'leaks' ? 'opacity 0.8s ease-in-out' : 'none'
   };
 
-  // Check if we actually need to render the media canvas
-  // If no stream and no media file (Color mode), we skip MediaRenderer entirely
-  // to allow the background color div to be fully visible and performant.
-  const hasMediaContent = !!(videoStream || activeMedia);
+  // Logic to determine what to render
+  // If streaming AND mode is BG, use stream.
+  // Else if stream mode is window, render active media (backgrounds) instead of stream
+  const activeStream = (videoStream && streamMode === 'bg') ? videoStream : null;
+  const hasMediaContent = !!(activeStream || activeMedia);
+
+  // Determine animation class
+  let animClass = '';
+  if (bgAnimation && bgAnimation !== 'none' && !activeStream) {
+      animClass = `bg-anim-${bgAnimation}`;
+  }
 
   return (
     <div 
@@ -465,12 +495,13 @@ const RetroScreen = forwardRef<HTMLDivElement, RetroScreenProps>(({
                     style={{ backgroundColor: resolvedBgColor }}
                 ></div>
 
-                <div className="absolute inset-0 w-full h-full" style={mediaStyle}>
+                {/* ANIMATED MEDIA CONTAINER */}
+                <div className={`absolute inset-0 w-full h-full ${animClass}`} style={mediaStyle}>
                     {hasMediaContent && (
                         <MediaRenderer 
                             type={activeMedia ? activeMedia.type : 'video'} 
                             url={activeMedia?.url} 
-                            stream={videoStream} 
+                            stream={activeStream} 
                             // Pass transparent so underlying div shows through if media has transparency
                             bgColor={'transparent'} 
                             effects={effectsConfig} 
@@ -618,7 +649,7 @@ const RetroScreen = forwardRef<HTMLDivElement, RetroScreenProps>(({
               </div>
             )}
 
-            {!isPlaying && !currentTrack && !isDragging && (
+            {!isPlaying && !currentTrack && !isDragging && !isSystemAudioActive && (
                 <div className="absolute inset-0 flex items-center justify-center z-20 pointer-events-none">
                     <div 
                         className="font-mono text-xl border px-8 py-4 rounded bg-black/20 backdrop-blur-[2px]"

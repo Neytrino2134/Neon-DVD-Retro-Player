@@ -52,20 +52,12 @@ body.force-system-cursor * {
 
 /* 
    === GLOBAL FONT SCALING === 
-   1. Увеличиваем базовый шрифт html. По умолчанию он 16px.
-      Установка в 17px или 18px автоматически масштабирует все классы Tailwind, 
-      использующие 'rem' (text-xs, text-sm, p-2, m-4 и т.д.).
 */
 html {
   font-size: 17px; 
   touch-action: manipulation; /* Improves click delay */
 }
 
-/* 
-   2. Переопределение жестких значений.
-   В компонентах используются классы вроде text-[10px]. Они не зависят от корневого шрифта.
-   Мы принудительно увеличиваем их через CSS, чтобы не редактировать каждый файл.
-*/
 .text-\[8px\] {
   font-size: 10px !important;
 }
@@ -87,7 +79,6 @@ html {
   user-select: none;
 }
 
-/* Allow text selection only in text inputs and textareas if they are used */
 input[type="text"], 
 input[type="password"], 
 input[type="email"], 
@@ -190,7 +181,6 @@ input[type=range]::-webkit-slider-runnable-track {
   background: var(--color-panel); /* Dark background */
   border: 1px solid var(--color-border);
   box-shadow: inset 0 2px 4px rgba(0,0,0,0.8);
-  /* Dynamic Border Radius handled below via data-attribute */
 }
 
 /* Chrome/Safari Thumb */
@@ -204,7 +194,6 @@ input[type=range]::-webkit-slider-thumb {
   margin-top: -4px; /* Centers thumb on track (14px track - 20px thumb) / 2 = -3px */
   box-shadow: 0 0 8px var(--color-primary), inset 0 0 2px rgba(255,255,255,0.5);
   transition: transform 0.1s;
-  /* Dynamic Border Radius handled below via data-attribute */
 }
 
 input[type=range]::-webkit-slider-thumb:hover {
@@ -238,39 +227,27 @@ input[type=range]:focus {
 
 /* --- CONTROL STYLES (Dynamic via data-attribute) --- */
 
-/* DEFAULT (Square) */
 [data-control-style="default"] input[type=range]::-webkit-slider-runnable-track { border-radius: 0; }
 [data-control-style="default"] input[type=range]::-webkit-slider-thumb { border-radius: 0; }
 [data-control-style="default"] input[type=range]::-moz-range-track { border-radius: 0; }
 [data-control-style="default"] input[type=range]::-moz-range-thumb { border-radius: 0; }
 
-/* ROUND */
 [data-control-style="round"] input[type=range]::-webkit-slider-runnable-track { border-radius: 6px; }
 [data-control-style="round"] input[type=range]::-webkit-slider-thumb { border-radius: 3px; }
 [data-control-style="round"] input[type=range]::-moz-range-track { border-radius: 6px; }
 [data-control-style="round"] input[type=range]::-moz-range-thumb { border-radius: 3px; }
 
-/* CIRCLE */
 [data-control-style="circle"] input[type=range]::-webkit-slider-runnable-track { border-radius: 999px; }
-[data-control-style="circle"] input[type=range]::-webkit-slider-thumb { border-radius: 50%; width: 20px; } /* Wider thumb for circle */
+[data-control-style="circle"] input[type=range]::-webkit-slider-thumb { border-radius: 50%; width: 20px; }
 [data-control-style="circle"] input[type=range]::-moz-range-track { border-radius: 999px; }
 [data-control-style="circle"] input[type=range]::-moz-range-thumb { border-radius: 50%; width: 20px; }
 
 
 @keyframes text-flash {
-  /* Idle state: Made lighter gray (#9ca3af) and increased opacity (0.85) to be more visible */
   0%, 92% { color: #9ca3af; text-shadow: none; opacity: 0.85; }
-  
-  /* Flash state: Made slightly grayer (#d4d4d4) instead of pure white to reduce brightness */
   93% { color: #d4d4d4; text-shadow: 0 0 8px #d4d4d4; opacity: 1; }
-  
-  /* Return to Idle */
   94% { color: #9ca3af; text-shadow: none; opacity: 0.85; }
-  
-  /* Flash again */
   96% { color: #d4d4d4; text-shadow: 0 0 8px #d4d4d4; opacity: 1; }
-  
-  /* Return to Idle */
   100% { color: #9ca3af; text-shadow: none; opacity: 0.85; }
 }
 
@@ -283,10 +260,7 @@ body, button, a, input, select, textarea, [role="button"], .cursor-pointer {
   cursor: none !important;
 }
 
-/* Restore cursor for touch devices if needed, or rely on visual feedback */
 @media (hover: none) and (pointer: coarse) {
-    /* Optional: Show system cursor on touch devices if 'none' causes confusion, 
-       though usually cursor:none is ignored on touch anyway */
 }
 
 /* --- ANIMATIONS FOR REBOOT SEQUENCE --- */
@@ -320,7 +294,6 @@ body, button, a, input, select, textarea, [role="button"], .cursor-pointer {
   animation: typewriter 2s steps(40, end) forwards;
 }
 
-/* TV TURN OFF EFFECT */
 @keyframes tv-off-scale {
   0% { transform: scale(1, 1); }
   40% { transform: scale(1, 0.002); }
@@ -352,7 +325,6 @@ body, button, a, input, select, textarea, [role="button"], .cursor-pointer {
   pointer-events: none;
 }
 
-/* Notification Exit Animation */
 @keyframes slide-out-up {
   0% { transform: translateY(0); opacity: 1; }
   100% { transform: translateY(-20px); opacity: 0; }
@@ -362,36 +334,80 @@ body, button, a, input, select, textarea, [role="button"], .cursor-pointer {
   animation: slide-out-up 0.5s cubic-bezier(0.4, 0, 0.2, 1) forwards;
 }
 
-/* FIX: Prevent layout singularity during resize events */
-/* If the window shrinks below 500px while in full mode, keep content structure intact */
-/* This prevents canvas 0-width errors */
 #root {
-  min-width: 0; /* Default */
+  min-width: 0;
 }
 
-/* When not in mini-mode, enforce a minimum layout width to prevent crushing */
-/* Adjusted to allow 1700px width comfortably */
 @media (min-width: 800px) {
     #root {
         min-width: 800px;
     }
 }
 
-/* --- PLAYER BREATHING ANIMATION --- */
-@keyframes player-breathe {
-  /* State 1: Visible (Subtle Glow) */
-  0%, 100% {
-    box-shadow: 0 0 15px color-mix(in srgb, var(--color-primary), transparent 60%);
-    border-color: color-mix(in srgb, var(--color-primary), transparent 50%);
-  }
-  /* State 2: Faded Out (Almost Invisible) */
-  50% {
-    box-shadow: 0 0 4px color-mix(in srgb, var(--color-primary), transparent 95%);
-    border-color: color-mix(in srgb, var(--color-primary), transparent 90%);
-  }
+/* --- PLAYER CHASSIS STYLING --- 
+   Replaces the old JS-driven logic.
+   STATIC GLOW (No pulsing) with smooth transition.
+*/
+
+.player-chassis {
+  border: 1px solid;
+  /* Base State: Dim Border, Default Shadow */
+  border-color: color-mix(in srgb, var(--color-primary), transparent 80%);
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+  
+  /* Smooth transition for when hover ENDS */
+  transition: border-color 0.3s ease, box-shadow 0.3s ease;
+  will-change: border-color, box-shadow;
 }
 
-.animate-player-breathe {
-  animation: player-breathe 4s ease-in-out infinite;
-  will-change: box-shadow, border-color; /* Performance optimization for smoother rendering */
+.player-chassis:hover {
+  /* Hover State: Bright Border (Static), Static Strong Glow */
+  border-color: var(--color-primary);
+  /* Static strong glow, NO animation */
+  box-shadow: 0 0 20px color-mix(in srgb, var(--color-primary), transparent 50%);
 }
+
+/* --- BACKGROUND ANIMATIONS --- */
+
+@keyframes bg-zoom {
+  0%, 100% { transform: scale(1.05); }
+  50% { transform: scale(1.25); }
+}
+
+@keyframes bg-sway {
+  0%, 100% { transform: translateX(-3%) scale(1.1); }
+  50% { transform: translateX(3%) scale(1.1); }
+}
+
+@keyframes bg-handheld {
+  0% { transform: translate(0, 0) scale(1.1); }
+  25% { transform: translate(1%, 1%) scale(1.11) rotate(0.5deg); }
+  50% { transform: translate(-1%, 0) scale(1.1) rotate(-0.5deg); }
+  75% { transform: translate(0, -1%) scale(1.11) rotate(0.2deg); }
+  100% { transform: translate(0, 0) scale(1.1); }
+}
+
+@keyframes bg-cinematic {
+  0% { transform: scale(1.1) translate(0, 0); }
+  33% { transform: scale(1.2) translate(-2%, 1%); }
+  66% { transform: scale(1.15) translate(2%, -1%); }
+  100% { transform: scale(1.1) translate(0, 0); }
+}
+
+@keyframes bg-chaos {
+  0% { transform: scale(1.1) translate(0, 0); }
+  40% { transform: scale(1.2) translate(-2%, 1%); }
+  41% { transform: scale(1.3) translate(2%, -3%) rotate(2deg); }
+  45% { transform: scale(1.3) translate(2%, -3%) rotate(2deg); }
+  60% { transform: scale(1.15) translate(2%, -1%); }
+  85% { transform: scale(1.15) translate(-1%, 2%); }
+  86% { transform: scale(1.25) translate(3%, 3%) rotate(-2deg); }
+  90% { transform: scale(1.25) translate(3%, 3%) rotate(-2deg); }
+  100% { transform: scale(1.1) translate(0, 0); }
+}
+
+.bg-anim-zoom { animation: bg-zoom 20s ease-in-out infinite; will-change: transform; }
+.bg-anim-sway { animation: bg-sway 15s ease-in-out infinite; will-change: transform; }
+.bg-anim-handheld { animation: bg-handheld 8s ease-in-out infinite; will-change: transform; }
+.bg-anim-cinematic { animation: bg-cinematic 25s ease-in-out infinite; will-change: transform; }
+.bg-anim-chaos { animation: bg-chaos 18s ease-in-out infinite; will-change: transform; }

@@ -106,6 +106,12 @@ const StartupOverlay: React.FC<StartupOverlayProps> = ({ onComplete, onFadeOut, 
   // Guard to ensure sequence only runs once even if dependencies change
   const sequenceRunningRef = useRef(false);
 
+  // --- WAVE ANIMATION REFS ---
+  const wavePath1Ref = useRef<SVGPathElement>(null);
+  const wavePath2Ref = useRef<SVGPathElement>(null);
+  const wavePath3Ref = useRef<SVGPathElement>(null);
+  const animationRef = useRef<number>(0);
+
   const addLine = (text: string) => {
     setLines(prev => [...prev, text]);
   };
@@ -119,6 +125,60 @@ const StartupOverlay: React.FC<StartupOverlayProps> = ({ onComplete, onFadeOut, 
       linesEndRef.current.scrollIntoView({ behavior: 'smooth' });
     }
   }, [lines, postLoginLines, showLogin, showPass, showProgress]);
+
+  // --- WAVE ANIMATION LOOP ---
+  useEffect(() => {
+    if (hasStarted || forceSkip) return;
+
+    let time = 0;
+    // SLOWED DOWN BY 4x (0.003 / 4 = 0.00075)
+    const speed = 0.00075; 
+
+    const animate = () => {
+      time += speed;
+      const width = 300; 
+      const step = 5;
+      
+      // WAVE 1
+      const amp1 = 15 + 5 * Math.sin(time * 0.8); 
+      const startY1 = 50 + amp1 * Math.sin(0 * 0.05 - time * 9);
+      let points1 = `M0,${startY1}`;
+      for (let x = step; x <= width; x += step) {
+        const y = 50 + amp1 * Math.sin(x * 0.05 - time * 9);
+        points1 += ` L${x},${y}`;
+      }
+
+      // WAVE 2
+      const amp2 = 12 + 4 * Math.sin(time * 0.5 + 2);
+      const startY2 = 50 + amp2 * Math.sin(0 * 0.03 - time * 4 + 1);
+      let points2 = `M0,${startY2}`;
+      for (let x = step; x <= width; x += step) {
+        const y = 50 + amp2 * Math.sin(x * 0.03 - time * 4 + 1);
+        points2 += ` L${x},${y}`;
+      }
+
+      // WAVE 3
+      const amp3 = 15 + 8 * Math.sin(time * 0.2 + 4);
+      const startY3 = 50 + amp3 * Math.sin(0 * 0.015 - time * 1.5 + 3);
+      let points3 = `M0,${startY3}`;
+      for (let x = step; x <= width; x += step) {
+        const y = 50 + amp3 * Math.sin(x * 0.015 - time * 1.5 + 3);
+        points3 += ` L${x},${y}`;
+      }
+
+      if (wavePath1Ref.current) wavePath1Ref.current.setAttribute('d', points1);
+      if (wavePath2Ref.current) wavePath2Ref.current.setAttribute('d', points2);
+      if (wavePath3Ref.current) wavePath3Ref.current.setAttribute('d', points3);
+
+      animationRef.current = requestAnimationFrame(animate);
+    };
+
+    animationRef.current = requestAnimationFrame(animate);
+
+    return () => {
+      cancelAnimationFrame(animationRef.current);
+    };
+  }, [hasStarted, forceSkip]);
 
   // --- FORCE SKIP HANDLER ---
   useEffect(() => {
@@ -495,7 +555,35 @@ const StartupOverlay: React.FC<StartupOverlayProps> = ({ onComplete, onFadeOut, 
                         className="flex flex-col items-center w-full h-full p-8 transition-opacity duration-300 relative"
                         style={{ opacity: collapsePhase === 'idle' ? 1 : 0 }}
                      >
-                        <div className="absolute inset-0 bg-[linear-gradient(rgba(0,243,255,0.03)_1px,transparent_1px),linear-gradient(90deg,rgba(0,243,255,0.03)_1px,transparent_1px)] bg-[length:20px_20px] pointer-events-none z-0"></div>
+                        {/* REPLACED STATIC GRID WITH RUNNING WAVES ANIMATION */}
+                        <div className="absolute inset-0 pointer-events-none z-0 overflow-hidden opacity-20">
+                            <svg viewBox="0 0 300 100" preserveAspectRatio="none" className="w-full h-full">
+                                <path 
+                                    ref={wavePath3Ref} 
+                                    fill="none" 
+                                    stroke="#00f3ff" 
+                                    strokeWidth="1" 
+                                    vectorEffect="non-scaling-stroke" 
+                                    style={{ filter: 'drop-shadow(0 0 5px #00f3ff)' }} 
+                                />
+                                <path 
+                                    ref={wavePath2Ref} 
+                                    fill="none" 
+                                    stroke="#00f3ff" 
+                                    strokeWidth="1" 
+                                    vectorEffect="non-scaling-stroke" 
+                                    style={{ filter: 'drop-shadow(0 0 5px #00f3ff)', opacity: 0.7 }} 
+                                />
+                                <path 
+                                    ref={wavePath1Ref} 
+                                    fill="none" 
+                                    stroke="#00f3ff" 
+                                    strokeWidth="1.5" 
+                                    vectorEffect="non-scaling-stroke" 
+                                    style={{ filter: 'drop-shadow(0 0 8px #00f3ff)' }} 
+                                />
+                            </svg>
+                        </div>
 
                         {/* CENTER AREA: POWER BUTTON */}
                         <div className="flex-1 flex items-center justify-center w-full z-10">
@@ -504,7 +592,6 @@ const StartupOverlay: React.FC<StartupOverlayProps> = ({ onComplete, onFadeOut, 
                                 className="w-32 h-32 rounded-full border-2 border-neon-blue flex items-center justify-center bg-neon-blue/5 shadow-[0_0_20px_rgba(0,243,255,0.3)] transition-all hover:scale-105 hover:shadow-[0_0_50px_#00f3ff] hover:bg-neon-blue/20 cursor-pointer group"
                             >
                                 <Power size={64} className="text-neon-blue group-hover:animate-pulse" />
-                                <div className="absolute inset-0 rounded-full border border-dashed border-neon-blue/30 animate-spin-slow pointer-events-none"></div>
                             </div>
                         </div>
 

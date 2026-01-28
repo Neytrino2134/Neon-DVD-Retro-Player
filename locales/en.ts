@@ -192,6 +192,14 @@ export const en = {
   trans_glitch: "GLITCH - DEFAULT",
   trans_leaks: "LEAKS - FADE",
   trans_none: "NONE (CUT)",
+  use_album_art: "USE TRACK COVER ART",
+  bg_animation: "BG ANIMATION",
+  anim_none: "NONE (STATIC)",
+  anim_zoom: "SMOOTH ZOOM",
+  anim_sway: "SIDE SWAY",
+  anim_handheld: "HANDHELD CAM",
+  anim_cinematic: "CINEMATIC DRIFT",
+  anim_chaos: "CHAOTIC JUMPS",
 
   // Config Manager
   save_preset: "SAVE CURRENT",

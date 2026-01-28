@@ -1,7 +1,7 @@
 
 import React, { useState, useRef, useEffect } from 'react';
 import { Settings, Disc, Activity, Zap, Terminal, AlertTriangle, Tv, Type, Bug, Power, MessageSquare, AudioWaveform, HelpCircle, Save, ChevronDown, Home, Sun, Palette, MousePointer2, Sliders, Stamp, Bot, Image as ImageIcon, Files, CloudRain, Box, RadioReceiver, Lock, ChevronRight } from 'lucide-react';
-import { VisualizerConfig, EffectsConfig, DvdConfig, MarqueeConfig, PatternConfig, BackgroundMedia, AppPreset, CursorStyle, WatermarkConfig, ThemeType, ControlStyle, BgTransitionType, AmbienceFile, AmbienceConfig } from '../../types';
+import { VisualizerConfig, EffectsConfig, DvdConfig, MarqueeConfig, PatternConfig, BackgroundMedia, AppPreset, CursorStyle, WatermarkConfig, ThemeType, ControlStyle, BgTransitionType, AmbienceFile, AmbienceConfig, BgAnimationType } from '../../types';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { useTheme } from '../../contexts/ThemeContext';
 import { useNotification } from '../../contexts/NotificationContext';
@@ -30,7 +30,7 @@ interface SettingsSectionProps {
   id: string;
   title: React.ReactNode;
   isOpen: boolean;
-  onToggle: () => void;
+  onToggle: (e: React.MouseEvent) => void;
   stickyTop: string; // The pixel value for top (e.g. "0px", "36px")
   sectionContent: React.ReactNode; // The content of THIS section
   children?: React.ReactNode; // Nested next sections
@@ -43,13 +43,19 @@ const SettingsSection: React.FC<SettingsSectionProps> = ({ id, title, isOpen, on
       <div 
         id={`section-header-${id}`}
         onClick={onToggle}
-        className="sticky z-30 bg-theme-bg border-b border-theme-border text-theme-text cursor-pointer flex items-center justify-between px-2 py-2 hover:bg-theme-panel/50 transition-colors shadow-lg"
+        className={`
+            sticky z-30 cursor-pointer flex items-center justify-between px-3 py-2 transition-all duration-300 shadow-lg border-b backdrop-blur-sm
+            ${isOpen 
+                ? 'bg-theme-primary/10 border-theme-primary text-theme-primary shadow-[0_4px_15px_-10px_var(--color-primary)]' 
+                : 'bg-theme-bg border-theme-border text-theme-muted hover:bg-theme-panel hover:text-theme-text'
+            }
+        `}
         style={{ top: stickyTop, height: '36px' }}
       >
-        <h3 className="text-xs font-mono font-bold tracking-widest opacity-90 uppercase flex items-center gap-2">
+        <h3 className={`text-xs font-mono font-bold tracking-widest opacity-90 uppercase flex items-center gap-2 ${isOpen ? 'text-theme-primary drop-shadow-[0_0_5px_rgba(var(--color-primary),0.5)]' : ''}`}>
            {title}
         </h3>
-        <div className={`text-theme-primary transition-transform duration-500 ease-[cubic-bezier(0.34,1.56,0.64,1)] ${isOpen ? 'rotate-90' : 'rotate-0'}`}>
+        <div className={`transition-transform duration-500 ease-[cubic-bezier(0.34,1.56,0.64,1)] ${isOpen ? 'rotate-90 text-theme-primary' : 'rotate-0 text-theme-muted'}`}>
            <ChevronRight size={14} />
         </div>
       </div>
@@ -159,6 +165,10 @@ interface SettingsPanelProps {
   // Transition 
   bgTransition: BgTransitionType;
   setBgTransition: (t: BgTransitionType) => void;
+  
+  // Animation
+  bgAnimation: BgAnimationType;
+  setBgAnimation: (a: BgAnimationType) => void;
 
   // Tutorial
   onRestartTutorial: () => void;
@@ -185,6 +195,14 @@ interface SettingsPanelProps {
   // Advanced Mode
   isAdvancedMode?: boolean;
   setAdvancedMode?: (v: boolean) => void;
+
+  // Album Art BG
+  useAlbumArtAsBackground?: boolean;
+  setUseAlbumArtAsBackground?: (v: boolean) => void;
+
+  // Stream Mode
+  streamMode?: 'bg' | 'window';
+  setStreamMode?: (m: 'bg' | 'window') => void;
 }
 
 const SettingsPanel: React.FC<SettingsPanelProps> = ({
@@ -197,11 +215,13 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
   savedPresets, activePresetId, savePreset, overwritePreset, loadPreset, deletePreset, renamePreset, onResetDefault,
   sfxMap, sfxVolume, setSfxVolume,
   cursorStyle, setCursorStyle, retroScreenCursorStyle, setRetroScreenCursorStyle, apiKey, setApiKey,
-  bgTransition, setBgTransition,
+  bgTransition, setBgTransition, bgAnimation, setBgAnimation,
   onRestartTutorial,
   ambienceFiles, ambienceConfig, onAmbienceUpload, onAmbienceDelete, onAmbienceSetActive, onAmbienceTogglePlay, onAmbienceVolume,
   isVideoActive, toggleVideo, isAudioActive, toggleAudio,
-  isAdvancedMode, setAdvancedMode
+  isAdvancedMode, setAdvancedMode,
+  useAlbumArtAsBackground = false, setUseAlbumArtAsBackground = () => {},
+  streamMode, setStreamMode
 }) => {
   // Module Expansion State
   const [expandedState, setExpandedState] = useState<Record<string, boolean>>({});
@@ -258,13 +278,33 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
   };
 
   // --- SECTION SCROLL LOGIC ---
-  const handleSectionToggle = (sectionId: string, index: number) => {
+  const handleSectionToggle = (sectionId: string, index: number, e: React.MouseEvent) => {
       if (wasDragged.current) return;
 
+      const isAdditive = e.shiftKey;
+
       setOpenSections(prev => {
-          const willOpen = !prev[sectionId];
+          const isCurrentlyOpen = prev[sectionId];
           
-          if (willOpen) {
+          let newState: Record<string, boolean>;
+
+          if (isAdditive) {
+              // Additive Mode: Toggle only target, keep others
+              newState = { ...prev, [sectionId]: !isCurrentlyOpen };
+          } else {
+              // Focus Mode: Close all others, open target (FORCE OPEN)
+              // This creates standard accordion behavior where one is always open
+              // or clicking an open one does nothing but ensure it's the only one open
+              newState = {
+                  sys: false,
+                  bg: false,
+                  sfx: false,
+                  mod: false
+              };
+              newState[sectionId] = true;
+          }
+          
+          if (newState[sectionId]) {
               setTimeout(() => {
                   if (!scrollContainerRef.current) return;
                   
@@ -285,7 +325,7 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
               }, 100);
           }
           
-          return { ...prev, [sectionId]: willOpen };
+          return newState;
       });
   };
 
@@ -433,7 +473,7 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
             id="sys" 
             title={<TranslatedText k="system_params" />} 
             isOpen={openSections['sys']} 
-            onToggle={() => handleSectionToggle('sys', 0)}
+            onToggle={(e) => handleSectionToggle('sys', 0, e)}
             stickyTop="0px"
             sectionContent={
                 <>
@@ -531,15 +571,39 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
                 id="bg" 
                 title={<TranslatedText k="cat_backgrounds" />} 
                 isOpen={openSections['bg']} 
-                onToggle={() => handleSectionToggle('bg', 1)}
+                onToggle={(e) => handleSectionToggle('bg', 1, e)}
                 stickyTop="36px"
                 sectionContent={
                     <>
                         <ModuleWrapper id="bg" label={<TranslatedText k="background" />} icon={ImageIcon} isEnabled={true} isAlwaysOn={true} isExpanded={expandedState['bg']} onToggleExpand={() => toggleExpand('bg')} onToggleEnable={() => {}}>
-                            <BackgroundSettings bgColor={bgColor} setBgColor={setBgColor} bgPattern={bgPattern} setBgPattern={setBgPattern} bgPatternConfig={bgPatternConfig} setBgPatternConfig={setBgPatternConfig} bgMedia={bgMedia} bgList={bgList} currentBgIndex={currentBgIndex} onRemoveBg={onRemoveBg} onMoveBg={onMoveBg} onSelectBg={onSelectBg} onDeselectBg={onDeselectBg} onClearBgMedia={onClearBgMedia} bgAutoplayInterval={bgAutoplayInterval} setBgAutoplayInterval={setBgAutoplayInterval} bgTransition={bgTransition} setBgTransition={setBgTransition} />
+                            <BackgroundSettings 
+                                bgColor={bgColor} 
+                                setBgColor={setBgColor} 
+                                bgPattern={bgPattern} 
+                                setBgPattern={setBgPattern} 
+                                bgPatternConfig={bgPatternConfig} 
+                                setBgPatternConfig={setBgPatternConfig} 
+                                bgMedia={bgMedia} 
+                                bgList={bgList} 
+                                currentBgIndex={currentBgIndex} 
+                                onRemoveBg={onRemoveBg} 
+                                onMoveBg={onMoveBg} 
+                                onSelectBg={onSelectBg} 
+                                onDeselectBg={onDeselectBg} 
+                                onClearBgMedia={onClearBgMedia} 
+                                bgAutoplayInterval={bgAutoplayInterval} 
+                                setBgAutoplayInterval={setBgAutoplayInterval} 
+                                bgTransition={bgTransition} 
+                                setBgTransition={setBgTransition}
+                                bgAnimation={bgAnimation}
+                                setBgAnimation={setBgAnimation}
+                                useAlbumArtAsBackground={useAlbumArtAsBackground}
+                                setUseAlbumArtAsBackground={setUseAlbumArtAsBackground}
+                                onBgMediaUpload={onBgMediaUpload}
+                            />
                             <div className="mt-4 pt-4 border-t border-theme-border">
                                 <label className="text-theme-text font-mono text-[10px] block mb-2 tracking-widest uppercase opacity-70">SCREEN SHARE</label>
-                                <ScreenVideoModule isVideoActive={isVideoActive} toggleVideo={toggleVideo} />
+                                <ScreenVideoModule isVideoActive={isVideoActive} toggleVideo={toggleVideo} streamMode={streamMode} setStreamMode={setStreamMode} />
                             </div>
                         </ModuleWrapper>
                     </>
@@ -549,7 +613,7 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
                     id="sfx" 
                     title={<TranslatedText k="cat_sound_effects" />} 
                     isOpen={openSections['sfx']} 
-                    onToggle={() => handleSectionToggle('sfx', 2)}
+                    onToggle={(e) => handleSectionToggle('sfx', 2, e)}
                     stickyTop="72px"
                     sectionContent={
                         <>
@@ -574,7 +638,7 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
                         id="mod" 
                         title={<TranslatedText k="modules" />} 
                         isOpen={openSections['mod']} 
-                        onToggle={() => handleSectionToggle('mod', 3)}
+                        onToggle={(e) => handleSectionToggle('mod', 3, e)}
                         stickyTop="108px"
                         sectionContent={
                             <div id="tutorial-modules" className="space-y-3">

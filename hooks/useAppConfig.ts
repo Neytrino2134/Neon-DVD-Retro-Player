@@ -1,6 +1,6 @@
 
 import { useState, useEffect, useCallback } from 'react';
-import { VisualizerConfig, DvdConfig, EffectsConfig, MarqueeConfig, PatternConfig, BackgroundMedia, AppPreset, CursorStyle, WatermarkConfig, ThemeType, ControlStyle, BgTransitionType } from '../types';
+import { VisualizerConfig, DvdConfig, EffectsConfig, MarqueeConfig, PatternConfig, BackgroundMedia, AppPreset, CursorStyle, WatermarkConfig, ThemeType, ControlStyle, BgTransitionType, BgAnimationType } from '../types';
 import { getAllBackgrounds, saveBackground, clearBackgrounds, deleteBackground } from '../lib/db';
 import { 
   DEFAULT_VISUALIZER_CONFIG, 
@@ -14,7 +14,7 @@ import { DEFAULT_PRESETS, DEFAULT_SYSTEM_PRESET } from '../config/presets';
 
 const STORAGE_KEYS = {
   VISUALIZER: 'neon_visualizer_config',
-  REACTOR: 'neon_reactor_config', // NEW
+  REACTOR: 'neon_reactor_config',
   DVD: 'neon_dvd_config',
   EFFECTS: 'neon_effects_config',
   BG_COLOR: 'neon_bg_color',
@@ -29,10 +29,12 @@ const STORAGE_KEYS = {
   PRESETS: 'neon_config_presets',
   ACTIVE_PRESET: 'neon_active_preset_id', 
   CURSOR: 'neon_cursor_style',
-  RETRO_CURSOR: 'neon_retro_cursor_style', // NEW
+  RETRO_CURSOR: 'neon_retro_cursor_style',
   API_KEY: 'neon_gemini_api_key',
   BG_TRANSITION: 'neon_bg_transition',
-  ADVANCED_MODE: 'neon_advanced_mode' // NEW
+  BG_ANIMATION: 'neon_bg_animation', // NEW KEY
+  ADVANCED_MODE: 'neon_advanced_mode',
+  USE_ALBUM_ART: 'neon_use_album_art'
 };
 
 // --- HELPER: SAFE MERGE ---
@@ -72,9 +74,11 @@ export const useAppConfig = () => {
   const [showVisualizer3D, setShowVisualizer3D] = useState(() => getInitial(STORAGE_KEYS.SHOW_VISUALIZER_3D, false)); 
   const [showDvd, setShowDvd] = useState(() => getInitial(STORAGE_KEYS.SHOW_DVD, true));
   const [cursorStyle, setCursorStyle] = useState<CursorStyle>(() => getInitial(STORAGE_KEYS.CURSOR, 'theme-sync'));
-  const [retroScreenCursorStyle, setRetroScreenCursorStyle] = useState<CursorStyle>(() => getInitial(STORAGE_KEYS.RETRO_CURSOR, 'dos-terminal')); // NEW
+  const [retroScreenCursorStyle, setRetroScreenCursorStyle] = useState<CursorStyle>(() => getInitial(STORAGE_KEYS.RETRO_CURSOR, 'dos-terminal'));
   const [bgTransition, setBgTransition] = useState<BgTransitionType>(() => getInitial(STORAGE_KEYS.BG_TRANSITION, 'glitch'));
+  const [bgAnimation, setBgAnimation] = useState<BgAnimationType>(() => getInitial(STORAGE_KEYS.BG_ANIMATION, 'none')); // NEW STATE
   const [isAdvancedMode, setAdvancedMode] = useState(() => getInitial(STORAGE_KEYS.ADVANCED_MODE, false));
+  const [useAlbumArtAsBackground, setUseAlbumArtAsBackground] = useState(() => getInitial(STORAGE_KEYS.USE_ALBUM_ART, false));
   
   const [marqueeConfig, setMarqueeConfig] = useState<MarqueeConfig>(() => getInitial(STORAGE_KEYS.MARQUEE, DEFAULT_MARQUEE_CONFIG));
   const [watermarkConfig, setWatermarkConfig] = useState<WatermarkConfig>(() => getInitial(STORAGE_KEYS.WATERMARK, DEFAULT_WATERMARK_CONFIG));
@@ -136,8 +140,10 @@ export const useAppConfig = () => {
     localStorage.setItem(STORAGE_KEYS.CURSOR, JSON.stringify(cursorStyle));
     localStorage.setItem(STORAGE_KEYS.RETRO_CURSOR, JSON.stringify(retroScreenCursorStyle));
     localStorage.setItem(STORAGE_KEYS.BG_TRANSITION, JSON.stringify(bgTransition));
+    localStorage.setItem(STORAGE_KEYS.BG_ANIMATION, JSON.stringify(bgAnimation)); // Save new state
     localStorage.setItem(STORAGE_KEYS.ADVANCED_MODE, JSON.stringify(isAdvancedMode));
-  }, [visualizerConfig, reactorConfig, dvdConfig, effectsConfig, bgColor, bgPattern, bgPatternConfig, showVisualizer, showVisualizer3D, showDvd, marqueeConfig, watermarkConfig, bgAutoplayInterval, cursorStyle, retroScreenCursorStyle, bgTransition, isAdvancedMode]);
+    localStorage.setItem(STORAGE_KEYS.USE_ALBUM_ART, JSON.stringify(useAlbumArtAsBackground));
+  }, [visualizerConfig, reactorConfig, dvdConfig, effectsConfig, bgColor, bgPattern, bgPatternConfig, showVisualizer, showVisualizer3D, showDvd, marqueeConfig, watermarkConfig, bgAutoplayInterval, cursorStyle, retroScreenCursorStyle, bgTransition, bgAnimation, isAdvancedMode, useAlbumArtAsBackground]);
 
   useEffect(() => {
     localStorage.setItem(STORAGE_KEYS.PRESETS, JSON.stringify(savedPresets));
@@ -263,7 +269,7 @@ export const useAppConfig = () => {
       createdAt: Date.now(),
       config: {
         visualizerConfig,
-        reactorConfig, // Save Reactor Config
+        reactorConfig, 
         dvdConfig,
         effectsConfig,
         marqueeConfig,
@@ -276,10 +282,11 @@ export const useAppConfig = () => {
         showDvd,
         bgAutoplayInterval,
         cursorStyle,
-        retroScreenCursorStyle, // NEW
+        retroScreenCursorStyle, 
         theme,
         controlStyle,
-        bgTransition
+        bgTransition,
+        bgAnimation // Save new state
       }
     };
     setSavedPresets(prev => [...prev, newPreset]);
@@ -309,7 +316,8 @@ export const useAppConfig = () => {
                     retroScreenCursorStyle,
                     theme: currentTheme,
                     controlStyle: currentControlStyle,
-                    bgTransition
+                    bgTransition,
+                    bgAnimation // Save new state
                   }
               };
           }
@@ -354,6 +362,7 @@ export const useAppConfig = () => {
     if (config.cursorStyle) setCursorStyle(config.cursorStyle);
     if (config.retroScreenCursorStyle) setRetroScreenCursorStyle(config.retroScreenCursorStyle);
     if (config.bgTransition) setBgTransition(config.bgTransition);
+    if (config.bgAnimation) setBgAnimation(config.bgAnimation); // Load new state
     
     return config;
   };
@@ -375,7 +384,7 @@ export const useAppConfig = () => {
 
   const exportConfig = (theme: ThemeType, controlStyle: ControlStyle) => {
     const config = {
-      visualizerConfig, reactorConfig, dvdConfig, effectsConfig, bgColor, bgPattern, bgPatternConfig, showVisualizer, showVisualizer3D, showDvd, marqueeConfig, watermarkConfig, bgAutoplayInterval, cursorStyle, retroScreenCursorStyle, theme, controlStyle, bgTransition, version: '1.4'
+      visualizerConfig, reactorConfig, dvdConfig, effectsConfig, bgColor, bgPattern, bgPatternConfig, showVisualizer, showVisualizer3D, showDvd, marqueeConfig, watermarkConfig, bgAutoplayInterval, cursorStyle, retroScreenCursorStyle, theme, controlStyle, bgTransition, bgAnimation, version: '1.5'
     };
     const blob = new Blob([JSON.stringify(config, null, 2)], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
@@ -423,6 +432,7 @@ export const useAppConfig = () => {
         if (rawContent.cursorStyle) setCursorStyle(rawContent.cursorStyle);
         if (rawContent.retroScreenCursorStyle) setRetroScreenCursorStyle(rawContent.retroScreenCursorStyle);
         if (rawContent.bgTransition) setBgTransition(rawContent.bgTransition);
+        if (rawContent.bgAnimation) setBgAnimation(rawContent.bgAnimation); // Import new state
         
         setActivePresetId(null);
 
@@ -442,6 +452,64 @@ export const useAppConfig = () => {
     reader.readAsText(file);
   };
 
+  // --- NEW: BATCH IMPORT FOR DRAG & DROP ---
+  const batchImportPresets = async (files: File[]): Promise<string | null> => {
+      const promises = files.map(file => new Promise<AppPreset | null>((resolve) => {
+          const reader = new FileReader();
+          reader.onload = (e) => {
+              try {
+                  const rawContent = JSON.parse(e.target?.result as string);
+                  
+                  // Sanitize config using the same logic as importConfig
+                  // Note: We don't apply it here, just prepare the object
+                  const config: AppPreset['config'] = {
+                      visualizerConfig: safeMerge(DEFAULT_VISUALIZER_CONFIG, rawContent.visualizerConfig),
+                      reactorConfig: safeMerge(DEFAULT_REACTOR_CONFIG, rawContent.reactorConfig || DEFAULT_REACTOR_CONFIG),
+                      dvdConfig: safeMerge(DEFAULT_DVD_CONFIG, rawContent.dvdConfig),
+                      effectsConfig: safeMerge(DEFAULT_EFFECTS_CONFIG, rawContent.effectsConfig),
+                      marqueeConfig: safeMerge(DEFAULT_MARQUEE_CONFIG, rawContent.marqueeConfig),
+                      watermarkConfig: safeMerge(DEFAULT_WATERMARK_CONFIG, rawContent.watermarkConfig),
+                      bgColor: rawContent.bgColor || '#000000',
+                      bgPattern: rawContent.bgPattern || 'none',
+                      bgPatternConfig: safeMerge({ intensity: 0.25, scale: 1.0 }, rawContent.bgPatternConfig),
+                      showVisualizer: rawContent.showVisualizer ?? true,
+                      showVisualizer3D: rawContent.showVisualizer3D ?? false,
+                      showDvd: rawContent.showDvd ?? true,
+                      bgAutoplayInterval: rawContent.bgAutoplayInterval ?? 5,
+                      cursorStyle: rawContent.cursorStyle || 'theme-sync',
+                      retroScreenCursorStyle: rawContent.retroScreenCursorStyle || 'dos-terminal',
+                      theme: rawContent.theme || 'neon-retro',
+                      controlStyle: rawContent.controlStyle || 'default',
+                      bgTransition: rawContent.bgTransition || 'glitch',
+                      bgAnimation: rawContent.bgAnimation || 'none' // Default to none
+                  };
+
+                  const presetName = file.name.replace(/\.nrp$/i, '').replace(/_/g, ' ');
+                  const newPreset: AppPreset = {
+                      id: crypto.randomUUID(),
+                      name: presetName,
+                      createdAt: Date.now(),
+                      config: config
+                  };
+                  resolve(newPreset);
+              } catch {
+                  resolve(null);
+              }
+          };
+          reader.readAsText(file);
+      }));
+
+      const results = await Promise.all(promises);
+      const validPresets = results.filter(p => p !== null) as AppPreset[];
+
+      if (validPresets.length > 0) {
+          setSavedPresets(prev => [...prev, ...validPresets]);
+          // Return the ID of the LAST imported preset so we can apply it
+          return validPresets[validPresets.length - 1].id;
+      }
+      return null;
+  };
+
   return {
     apiKey, setApiKey,
     showVisualizer, setShowVisualizer,
@@ -449,7 +517,7 @@ export const useAppConfig = () => {
     showDvd, setShowDvd,
     marqueeConfig, setMarqueeConfig,
     visualizerConfig, setVisualizerConfig,
-    reactorConfig, setReactorConfig, // Exposed
+    reactorConfig, setReactorConfig,
     dvdConfig, setDvdConfig,
     effectsConfig, setEffectsConfig,
     watermarkConfig, setWatermarkConfig,
@@ -464,18 +532,20 @@ export const useAppConfig = () => {
     removeBg, moveBg, selectBg, deselectBg,
     nextBg, prevBg,
     bgCount: bgList.length,
-    exportConfig, importConfig,
+    exportConfig, importConfig, batchImportPresets, // Exposed
     savedPresets,
     activePresetId,
     savePreset,
     overwritePreset,
-    resetDefaultPreset, // Exposed
+    resetDefaultPreset,
     loadPreset,
     deletePreset,
     renamePreset,
     cursorStyle, setCursorStyle,
     retroScreenCursorStyle, setRetroScreenCursorStyle,
     bgTransition, setBgTransition,
-    isAdvancedMode, setAdvancedMode // Exposed
+    bgAnimation, setBgAnimation, // Exposed New State
+    isAdvancedMode, setAdvancedMode,
+    useAlbumArtAsBackground, setUseAlbumArtAsBackground // Exposed New State
   };
 };

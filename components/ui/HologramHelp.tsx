@@ -36,6 +36,7 @@ const HologramHelp: React.FC<HologramHelpProps> = ({ onClose }) => {
   // 3: Content (Typing)
   const [phase, setPhase] = useState(0);
   const timeoutsRef = useRef<number[]>([]);
+  const isClosingRef = useRef(false);
 
   const schedule = (fn: () => void, ms: number) => {
       const id = window.setTimeout(fn, ms);
@@ -45,7 +46,7 @@ const HologramHelp: React.FC<HologramHelpProps> = ({ onClose }) => {
   useEffect(() => {
     // Start Opening Sequence
     schedule(() => setPhase(1), 50);  // Expand Width
-    schedule(() => setPhase(2), 450); // Expand Height
+    schedule(() => setPhase(2), 400); // Expand Height
     schedule(() => setPhase(3), 900); // Show Content
 
     return () => {
@@ -54,26 +55,44 @@ const HologramHelp: React.FC<HologramHelpProps> = ({ onClose }) => {
   }, []);
 
   const handleCloseSequence = () => {
-      // Clear pending animations
+      if (isClosingRef.current) return;
+      isClosingRef.current = true;
+
+      // Clear pending opening animations
       timeoutsRef.current.forEach(window.clearTimeout);
       timeoutsRef.current = [];
 
       // Reverse Sequence
-      setPhase(2); // Fade out content
+      // 1. Fade out content
+      setPhase(2); 
       
-      schedule(() => setPhase(1), 300); // Collapse Height
-      schedule(() => setPhase(0), 700); // Collapse Width
-      schedule(() => onClose(), 1100);  // Unmount
+      // 2. Collapse Height (Window -> Line)
+      schedule(() => setPhase(1), 300); 
+      
+      // 3. Collapse Width (Line -> Dot)
+      schedule(() => setPhase(0), 800); 
+      
+      // 4. Unmount
+      schedule(() => onClose(), 1300);  
   };
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
+        // Use capture-like logic or simply stop propagation if possible, 
+        // though React synthetic events vs native events can be tricky.
+        // We check for Escape or H.
         if (e.key === 'Escape' || e.code === 'KeyH') {
+            e.preventDefault();
+            e.stopPropagation();
+            e.stopImmediatePropagation(); // Try to stop parent from seeing it
             handleCloseSequence();
         }
     };
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
+
+    // Use { capture: true } to intercept the event before the parent (RetroScreen) sees it
+    // This allows us to run the animation instead of instant unmount.
+    window.addEventListener('keydown', handleKeyDown, { capture: true });
+    return () => window.removeEventListener('keydown', handleKeyDown, { capture: true });
   }, []);
 
   const baseColor = colors.primary;
@@ -160,16 +179,21 @@ const HologramHelp: React.FC<HologramHelpProps> = ({ onClose }) => {
     <div className="absolute inset-0 z-[70] flex items-center justify-center p-4 bg-transparent pointer-events-none">
         <div 
             ref={containerRef}
-            className="relative overflow-hidden pointer-events-auto flex flex-col transition-all ease-in-out duration-500"
+            className="relative overflow-hidden pointer-events-auto flex flex-col transition-all ease-in-out duration-500 backdrop-blur-md"
             style={{
                 width: phase >= 1 ? '100%' : '4px',
                 maxWidth: '56rem', // max-w-4xl
+                // Height Transition Logic
                 height: phase >= 2 ? 'auto' : '4px',
                 maxHeight: phase >= 2 ? '80vh' : '4px',
-                backgroundColor: `color-mix(in srgb, ${baseColor}, transparent 95%)`,
+                
+                // Colors & Borders
+                backgroundColor: `color-mix(in srgb, ${baseColor}, rgba(5, 5, 10, 0.9) 92%)`, // Denser background
                 border: `2px solid color-mix(in srgb, ${baseColor}, transparent 40%)`,
                 boxShadow: `0 0 40px color-mix(in srgb, ${baseColor}, transparent 80%)`,
-                borderRadius: phase >= 2 ? '16px' : '2px', // Square when line, rounded when window
+                
+                // Shape Transition
+                borderRadius: phase >= 2 ? '16px' : '2px',
                 opacity: phase === 0 ? 0 : 1
             }}
         >
@@ -177,7 +201,7 @@ const HologramHelp: React.FC<HologramHelpProps> = ({ onClose }) => {
             <div 
                 className="absolute inset-0 bg-[length:40px_40px] pointer-events-none transition-opacity duration-500"
                 style={{
-                    opacity: contentActive ? 0.2 : 0,
+                    opacity: contentActive ? 0.15 : 0,
                     backgroundImage: `linear-gradient(color-mix(in srgb, ${baseColor}, transparent 80%) 1px, transparent 1px), linear-gradient(90deg, color-mix(in srgb, ${baseColor}, transparent 80%) 1px, transparent 1px)`
                 }}
             ></div>

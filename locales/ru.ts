@@ -192,6 +192,14 @@ export const ru = {
   trans_glitch: "ГЛИТЧ - СТАНДАРТ",
   trans_leaks: "БЛИКИ - FADE",
   trans_none: "НЕТ (РЕЗКО)",
+  use_album_art: "ИСПОЛЬЗОВАТЬ ОБЛОЖКУ ТРЕКА",
+  bg_animation: "АНИМАЦИЯ ФОНА",
+  anim_none: "НЕТ (СТАТИКА)",
+  anim_zoom: "ПЛАВНЫЙ ЗУМ",
+  anim_sway: "ПОКАЧИВАНИЕ",
+  anim_handheld: "РУЧНАЯ КАМЕРА",
+  anim_cinematic: "КИНО-ДРЕЙФ",
+  anim_chaos: "ХАОС / РЫВКИ",
 
   // Config Manager
   save_preset: "СОХРАНИТЬ",

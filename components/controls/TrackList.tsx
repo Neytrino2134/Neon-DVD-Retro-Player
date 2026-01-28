@@ -62,6 +62,9 @@ export const TrackList: React.FC<TrackListProps> = ({
 
   // Drag counter to safely handle enter/leave on children
   const dragCounterRef = useRef(0);
+  
+  // Ref to track hover state for hotkeys
+  const listHoverRef = useRef(false);
 
   // Clear selection if switching tabs
   useEffect(() => {
@@ -127,13 +130,24 @@ export const TrackList: React.FC<TrackListProps> = ({
 
   useEffect(() => {
       const handleKeyDown = (e: KeyboardEvent) => {
+          // DELETE Selected
           if (e.key === 'Delete' && selectedTrackIds.size > 0 && !isLocked) {
               handleDeleteSelected();
+          }
+
+          // CTRL + A (Select All)
+          // Only triggers if the mouse is currently hovering over the tracklist
+          if ((e.ctrlKey || e.metaKey) && (e.code === 'KeyA')) {
+              if (listHoverRef.current && !isLocked && tracks.length > 0) {
+                  e.preventDefault(); // Prevent browser text selection
+                  const allIds = new Set(tracks.map(t => t.id));
+                  setSelectedTrackIds(allIds);
+              }
           }
       };
       window.addEventListener('keydown', handleKeyDown);
       return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [selectedTrackIds, isLocked, activePlaylistId]);
+  }, [selectedTrackIds, isLocked, activePlaylistId, tracks]);
 
   // Drag Handlers
   const handleTrackDragStart = (e: React.DragEvent, _index: number, trackId: string) => {
@@ -158,7 +172,12 @@ export const TrackList: React.FC<TrackListProps> = ({
       
       if (isLocked) return;
 
-      e.dataTransfer.dropEffect = 'copy'; // Default to copy for files
+      // Set proper drop effect
+      if (draggedTrackIds.length > 0) {
+          e.dataTransfer.dropEffect = 'move';
+      } else {
+          e.dataTransfer.dropEffect = 'copy';
+      }
 
       // Calculate if we are in the top or bottom half of the item
       const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
@@ -237,6 +256,11 @@ export const TrackList: React.FC<TrackListProps> = ({
   const handleListDragOver = (e: React.DragEvent) => {
       e.preventDefault();
       e.stopPropagation(); 
+      
+      if (draggedTrackIds.length > 0) {
+          e.dataTransfer.dropEffect = 'move';
+      }
+
       // If we are dragging over the list but NOT over a specific track (e.g. empty space at bottom),
       // clear the track-specific indicator
       setDropIndicator(null); 
@@ -299,6 +323,8 @@ export const TrackList: React.FC<TrackListProps> = ({
         onDragOver={handleListDragOver}
         onDragLeave={handleListDragLeave}
         onDrop={handleListDrop}
+        onMouseEnter={() => listHoverRef.current = true}
+        onMouseLeave={() => listHoverRef.current = false}
     >
         {showClearConfirm && (
             <ConfirmModal 
@@ -406,7 +432,6 @@ export const TrackList: React.FC<TrackListProps> = ({
         </div>
         
         {/* Track List Items Container */}
-        {/* Removed custom-scrollbar class to fix clipping in mini mode, added w-full */}
         <div className="flex-1 overflow-y-auto pr-1 space-y-0.5 p-1 flex flex-col min-h-0 relative z-10 transition-colors duration-300 w-full relative">
             
             {/* Background Visualizer Layer */}

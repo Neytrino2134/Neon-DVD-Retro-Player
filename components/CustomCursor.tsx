@@ -397,7 +397,7 @@ const CustomCursor: React.FC<CustomCursorProps> = ({ style = 'default', retroScr
         <div 
             ref={dosCursorRef}
             className="fixed top-0 left-0 pointer-events-none z-[999999] will-change-transform mix-blend-difference"
-            style={{ marginTop: '0px', marginLeft: '0px', opacity: 0 }} 
+            style={{ marginTop: '-10px', marginLeft: '-6px', opacity: 0 }} 
         >
             <div className="w-3 h-5 bg-white animate-[pulse_1s_steps(2)_infinite]"></div>
         </div>
