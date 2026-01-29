@@ -12,7 +12,7 @@ interface PlaylistTabsProps {
   // Actions
   onSwitchPlaylist: (id: string) => void;
   onAddPlaylist: () => void;
-  onRequestRemovePlaylist: (id: string, force?: boolean) => void; // UPDATED: Changed from onRemovePlaylist
+  onRequestRemovePlaylist: (id: string, force?: boolean) => void; 
   onRenamePlaylist: (id: string, name: string) => void;
   onReorderPlaylists: (dragIndex: number, hoverIndex: number) => void;
   // Drag Data props from parent to handle drop zones
@@ -204,8 +204,9 @@ export const PlaylistTabs: React.FC<PlaylistTabsProps> = ({
                         ${isDragTarget
                             ? 'bg-theme-accent text-black font-bold scale-105 z-30 border-theme-accent'
                             : isActive 
-                                ? 'bg-theme-bg/40 text-theme-primary font-bold z-20 shadow-[0_-2px_5px_rgba(0,0,0,0.2)] border-white/5' 
-                                : 'bg-transparent text-theme-muted hover:bg-white/5 hover:text-white z-0 opacity-70 hover:opacity-100 border-transparent'
+                                // CHANGED: Border to theme-border to avoid white glow effect
+                                ? 'bg-theme-bg/40 text-theme-primary font-bold z-20 shadow-[0_-2px_5px_rgba(0,0,0,0.2)] border-theme-border -mb-[1px]' 
+                                : 'bg-transparent text-theme-muted hover:bg-theme-panel hover:text-white z-0 opacity-70 hover:opacity-100 border-transparent'
                         }
                     `}
                 >
@@ -248,7 +249,7 @@ export const PlaylistTabs: React.FC<PlaylistTabsProps> = ({
                         px-2 py-2 rounded-t-lg transition-all duration-200 shrink-0 mb-0 z-0
                         ${isPlusDragOver 
                             ? 'bg-theme-accent text-black scale-110 z-30' 
-                            : 'bg-transparent text-theme-muted hover:text-theme-accent hover:bg-white/5'
+                            : 'bg-transparent text-theme-muted hover:text-theme-accent hover:bg-theme-primary/10'
                         }
                     `}
                 >

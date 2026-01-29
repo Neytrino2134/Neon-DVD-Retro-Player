@@ -6,8 +6,9 @@ export const ru = {
   color_schemes: "ЦВЕТОВЫЕ СХЕМЫ И СТИЛИ",
   theme_select: "ВЫБОР ТЕМЫ",
   cursor_style: "СТИЛЬ КУРСОРА",
-  retro_cursor_style: "КУРСОР РЕТРО-ЭКРАНА", // NEW
+  retro_cursor_style: "КУРСОР РЕТРО-ЭКРАНА", 
   cursor_default: "ХАКЕР (DEFAULT)",
+  cursor_music: "MUSIC FLOW (НОТЫ)",
   cursor_classic: "CLASSIC BLUE",
   cursor_warm: "CLASSIC WARM",
   cursor_white: "CLASSIC WHITE",
@@ -31,6 +32,7 @@ export const ru = {
   holograms: "ГОЛОГРАММЫ",
   gemini_chat: "GEMINI AI ЧАТ",
   light_leaks: "СВЕТОВЫЕ БЛИКИ",
+  rain_effect: "ДОЖДЬ",
   waveform_config: "НАСТРОЙКИ ВОЛНЫ",
   dvd_config: "НАСТРОЙКИ DVD",
   scanline_config: "НАСТРОЙКИ ЭЛТ",
@@ -38,10 +40,12 @@ export const ru = {
   glitch_config: "ГЛИТЧ ЭФФЕКТЫ",
   debug_config: "СИСТЕМНЫЕ ЛОГИ",
   leaks_config: "НАСТРОЙКИ БЛИКОВ",
+  rain_config: "НАСТРОЙКИ ДОЖДЯ",
   signal_processor: "ОБРАБОТКА СИГНАЛА",
   background: "ФОНОВЫЙ РЕЖИМ",
   cat_backgrounds: "ФОНЫ", 
   cat_sound_effects: "ЗВУКОВЫЕ ЭФФЕКТЫ", 
+  cat_screen_effects: "ПОСТ-ЭФФЕКТЫ ЭКРАНА",
   load_img: "ЗАГРУЗИТЬ ФОН",
   load_sfx_zip: "SFX АРХИВ (ZIP)",
   export_config: "ЭКСПОРТ КОНФИГА",
@@ -49,6 +53,7 @@ export const ru = {
   crossfade_duration: "КРОССФЕЙД (СЕК)",
   sfx_volume: "ГРОМКОСТЬ ЭФФЕКТОВ (SFX)",
   constant_power_hint: "Использует кривую постоянной мощности для плавности.",
+  smooth_start: "ПЛАВНЫЙ СТАРТ",
   config_manager: "СОХРАНЕННЫЕ ПРЕСЕТЫ",
   file_management: "УПРАВЛЕНИЕ ФАЙЛАМИ",
   
@@ -96,6 +101,19 @@ export const ru = {
   api_key_placeholder: "ВСТАВЬТЕ КЛЮЧ",
   start_session: "НАЧАТЬ СЕССИЮ",
   stop_session: "ОСТАНОВИТЬ",
+  vignette_effect: "ВИНЬЕТКА",
+  vignette_intensity: "ЗАТЕМНЕНИЕ",
+  vignette_roundness: "ОКРУГЛОСТЬ",
+
+  // Rain
+  rain_intensity: "ПЛОТНОСТЬ",
+  rain_speed: "СКОРОСТЬ",
+  rain_size: "РАЗМЕР КАПЕЛЬ",
+  rain_direction: "НАПРАВЛЕНИЕ",
+  rain_wind: "СИЛА ВЕТРА",
+  rain_gustiness: "ПОРЫВЫ",
+  rain_opacity: "ПРОЗР. КАПЕЛЬ", 
+  rain_wander: "ГУЛЯНИЕ ВЕТРА",
 
   // Hologram Categories
   cat_system: "СИСТЕМНЫЕ",
@@ -163,6 +181,7 @@ export const ru = {
   style_ocean: "ОКЕАН (TEAL)",
   style_theme_blue: "КОРОЛЕВСКИЙ СИНИЙ",
   style_theme_sync: "СИНХР. С ТЕМОЙ",
+  style_neon_gradient: "NEON GRADIENT (PINK-BLUE)",
 
   pos_top: "СВЕРХУ",
   pos_center: "ПО ЦЕНТРУ",

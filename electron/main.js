@@ -1,7 +1,8 @@
 
-import { app, BrowserWindow, ipcMain, globalShortcut, desktopCapturer } from 'electron';
+import { app, BrowserWindow, ipcMain, globalShortcut, desktopCapturer, dialog } from 'electron';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import fs from 'fs/promises';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -113,6 +114,21 @@ function createWindow() {
 
     // Enforce strict minimum constraints for Full Mode
     mainWindow.setMinimumSize(targetW, targetH);
+  });
+
+  // --- RECORDING SAVE HANDLER ---
+  ipcMain.handle('save-recording', async (event, buffer) => {
+    const { filePath } = await dialog.showSaveDialog(mainWindow, {
+      buttonLabel: 'Save Recording',
+      defaultPath: `Neon_Recording_${Date.now()}.webm`,
+      filters: [{ name: 'WebM Video', extensions: ['webm'] }]
+    });
+
+    if (filePath) {
+      await fs.writeFile(filePath, Buffer.from(buffer));
+      return { success: true, filePath };
+    }
+    return { canceled: true };
   });
 
   mainWindow.on('closed', () => {

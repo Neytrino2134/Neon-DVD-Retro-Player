@@ -1,92 +1,136 @@
 
 import { useState, useRef, useEffect, useCallback, SyntheticEvent } from 'react';
-import { AudioTrack, Playlist } from '../types';
-import { getAllTracks, saveTrack, getAllPlaylists, savePlaylist, deletePlaylistAndTracks, clearTracksInPlaylist, deleteTracksBulk, saveTracksBulk } from '../lib/db';
+import { AudioTrack, Playlist, TagMetadata } from '../types';
+import { getAllTracks, saveTrack, getAllPlaylists, savePlaylist, deletePlaylistAndTracks, clearTracksInPlaylist, deleteTracksBulk, saveTracksBulk, StoredTrack } from '../lib/db';
 
 type Deck = 'A' | 'B';
 
 const RESUME_KEY = 'neon_player_resume_state';
 
-// Simple function to parse basic ID3v2 tags for APIC frame (Cover Art)
-// This is a simplified parser to avoid heavy external dependencies
-const extractCoverArt = async (file: File): Promise<string | undefined> => {
+// --- ID3 TAG PARSER UTILITIES ---
+
+const decodeText = (buffer: ArrayBuffer, encoding: number): string => {
+    const view = new DataView(buffer);
+    const decoder = new TextDecoder(encoding === 0 ? 'iso-8859-1' : encoding === 1 ? 'utf-16' : encoding === 2 ? 'utf-16be' : 'utf-8');
+    
+    // Remove BOM for UTF-16
+    if (encoding === 1 && buffer.byteLength >= 2) {
+        const bom = view.getUint16(0, false); // Big Endian check
+        if (bom === 0xFEFF || bom === 0xFFFE) {
+            return decoder.decode(buffer.slice(2)).replace(/\0/g, '');
+        }
+    }
+    
+    return decoder.decode(buffer).replace(/\0/g, '');
+};
+
+const parseAudioMetadata = async (file: File): Promise<{ artwork?: string, tags: TagMetadata }> => {
     return new Promise((resolve) => {
-        // Only process MP3s for now
+        const tags: TagMetadata = {};
+        let artworkUrl: string | undefined = undefined;
+
         if (!file.type.includes('audio/mpeg') && !file.name.toLowerCase().endsWith('.mp3')) {
-            resolve(undefined);
+            resolve({ tags });
             return;
         }
 
         const reader = new FileReader();
         reader.onload = (e) => {
-            const buffer = e.target?.result as ArrayBuffer;
-            if (!buffer) { resolve(undefined); return; }
-            
-            const view = new DataView(buffer);
-            // Check for ID3 header
-            if (view.getUint8(0) !== 0x49 || view.getUint8(1) !== 0x44 || view.getUint8(2) !== 0x33) {
-                resolve(undefined);
-                return;
-            }
-
-            const version = view.getUint8(3);
-            const size = ((view.getUint8(6) & 0x7f) << 21) | ((view.getUint8(7) & 0x7f) << 14) | ((view.getUint8(8) & 0x7f) << 7) | (view.getUint8(9) & 0x7f);
-            
-            let offset = 10;
-            const limit = offset + size;
-
-            while (offset < limit) {
-                // Read frame header
-                let frameId = '';
-                let frameSize = 0;
+            try {
+                const buffer = e.target?.result as ArrayBuffer;
+                if (!buffer) { resolve({ tags }); return; }
                 
-                if (version === 2) {
-                    // ID3v2.2
-                    if (offset + 6 > limit) break;
-                    frameId = String.fromCharCode(view.getUint8(offset), view.getUint8(offset+1), view.getUint8(offset+2));
-                    frameSize = (view.getUint8(offset+3) << 16) | (view.getUint8(offset+4) << 8) | view.getUint8(offset+5);
-                    offset += 6;
-                } else if (version === 3 || version === 4) {
-                    // ID3v2.3 / ID3v2.4
-                    if (offset + 10 > limit) break;
-                    frameId = String.fromCharCode(view.getUint8(offset), view.getUint8(offset+1), view.getUint8(offset+2), view.getUint8(offset+3));
-                    frameSize = (view.getUint8(offset+4) << 24) | (view.getUint8(offset+5) << 16) | (view.getUint8(offset+6) << 8) | view.getUint8(offset+7);
-                    // Handle unsynchronization scheme in v2.4 size if necessary (omitted for simplicity in this basic parser)
-                    if (version === 4 && (frameSize & 0x80808080)) {
-                         // Basic synchsafe decode
-                         frameSize = ((view.getUint8(offset+4) & 0x7f) << 21) | ((view.getUint8(offset+5) & 0x7f) << 14) | ((view.getUint8(offset+6) & 0x7f) << 7) | (view.getUint8(offset+7) & 0x7f);
-                    }
-                    offset += 10;
-                } else {
-                    break;
-                }
-
-                if (frameId === 'APIC' || frameId === 'PIC') {
-                    const mimeStart = offset + 1; // Skip encoding byte
-                    let mimeEnd = mimeStart;
-                    while (view.getUint8(mimeEnd) !== 0 && mimeEnd < limit) mimeEnd++;
-                    const mimeType = new TextDecoder().decode(buffer.slice(mimeStart, mimeEnd)) || 'image/jpeg';
-                    
-                    let contentStart = mimeEnd + 1;
-                    // Skip picture type byte
-                    contentStart++; 
-                    // Skip description (search for null terminator)
-                    while (view.getUint8(contentStart) !== 0 && contentStart < limit) contentStart++;
-                    contentStart++; // Skip the null terminator
-
-                    const imageBuffer = buffer.slice(contentStart, offset + frameSize);
-                    const blob = new Blob([imageBuffer], { type: mimeType });
-                    resolve(URL.createObjectURL(blob));
+                const view = new DataView(buffer);
+                if (view.getUint8(0) !== 0x49 || view.getUint8(1) !== 0x44 || view.getUint8(2) !== 0x33) {
+                    resolve({ tags });
                     return;
                 }
 
-                offset += frameSize;
+                const version = view.getUint8(3);
+                // Synchsafe integer decoder
+                const decodeSyncSafe = (b1: number, b2: number, b3: number, b4: number) => {
+                    return (b1 << 21) | (b2 << 14) | (b3 << 7) | b4;
+                };
+                
+                const size = decodeSyncSafe(view.getUint8(6), view.getUint8(7), view.getUint8(8), view.getUint8(9));
+                
+                let offset = 10;
+                const limit = offset + size;
+
+                while (offset < limit) {
+                    // Prevent reading past buffer
+                    if (offset + 10 > buffer.byteLength) break;
+
+                    let frameId = '';
+                    let frameSize = 0;
+                    let headerSize = 10;
+
+                    if (version === 2) {
+                        frameId = String.fromCharCode(view.getUint8(offset), view.getUint8(offset+1), view.getUint8(offset+2));
+                        frameSize = (view.getUint8(offset+3) << 16) | (view.getUint8(offset+4) << 8) | view.getUint8(offset+5);
+                        headerSize = 6;
+                    } else if (version === 3 || version === 4) {
+                        frameId = String.fromCharCode(view.getUint8(offset), view.getUint8(offset+1), view.getUint8(offset+2), view.getUint8(offset+3));
+                        
+                        const s1 = view.getUint8(offset+4);
+                        const s2 = view.getUint8(offset+5);
+                        const s3 = view.getUint8(offset+6);
+                        const s4 = view.getUint8(offset+7);
+
+                        if (version === 4) {
+                            frameSize = decodeSyncSafe(s1, s2, s3, s4);
+                        } else {
+                            frameSize = (s1 << 24) | (s2 << 16) | (s3 << 8) | s4;
+                        }
+                    } else {
+                        break;
+                    }
+
+                    if (frameSize <= 0 || offset + headerSize + frameSize > buffer.byteLength) break;
+
+                    const contentOffset = offset + headerSize;
+                    
+                    // --- READ TAGS ---
+                    if (frameId === 'TIT2' || frameId === 'TT2') { // Title
+                        const encoding = view.getUint8(contentOffset);
+                        tags.title = decodeText(buffer.slice(contentOffset + 1, contentOffset + frameSize), encoding);
+                    } 
+                    else if (frameId === 'TPE1' || frameId === 'TP1') { // Artist
+                        const encoding = view.getUint8(contentOffset);
+                        tags.artist = decodeText(buffer.slice(contentOffset + 1, contentOffset + frameSize), encoding);
+                    }
+                    else if (frameId === 'TALB' || frameId === 'TAL') { // Album
+                        const encoding = view.getUint8(contentOffset);
+                        tags.album = decodeText(buffer.slice(contentOffset + 1, contentOffset + frameSize), encoding);
+                    }
+                    else if (frameId === 'APIC' || frameId === 'PIC') { // Cover Art
+                        const mimeStart = contentOffset + 1;
+                        let mimeEnd = mimeStart;
+                        while (view.getUint8(mimeEnd) !== 0 && mimeEnd < limit) mimeEnd++;
+                        const mimeType = new TextDecoder().decode(buffer.slice(mimeStart, mimeEnd)) || 'image/jpeg';
+                        
+                        let contentStart = mimeEnd + 1;
+                        contentStart++; // Skip picture type
+                        while (view.getUint8(contentStart) !== 0 && contentStart < limit) contentStart++; // Skip desc
+                        contentStart++;
+
+                        const imageBuffer = buffer.slice(contentStart, contentOffset + frameSize);
+                        const blob = new Blob([imageBuffer], { type: mimeType });
+                        artworkUrl = URL.createObjectURL(blob);
+                    }
+
+                    offset += headerSize + frameSize;
+                }
+                
+                resolve({ tags, artwork: artworkUrl });
+            } catch (e) {
+                console.warn("ID3 Parse error", e);
+                resolve({ tags });
             }
-            resolve(undefined);
         };
         
-        // Read first 500KB (usually enough for headers + art)
-        const slice = file.slice(0, 500 * 1024);
+        // Read first 2MB (usually covers headers and most art)
+        const slice = file.slice(0, 2 * 1024 * 1024);
         reader.readAsArrayBuffer(slice);
     });
 };
@@ -105,6 +149,12 @@ export const useAudioPlayer = () => {
   const [crossfadeDuration, setCrossfadeDuration] = useState(() => {
     const saved = localStorage.getItem('neon_crossfade');
     return saved ? parseFloat(saved) : 4; // Default 4 seconds
+  });
+
+  // Smooth Start Setting (Persisted)
+  const [smoothStart, setSmoothStart] = useState(() => {
+      const saved = localStorage.getItem('neon_smooth_start');
+      return saved !== null ? JSON.parse(saved) : true; // Default true
   });
 
   // Volume
@@ -137,6 +187,9 @@ export const useAudioPlayer = () => {
   const masterGainRef = useRef<GainNode | null>(null); // New Master Gain
   const analyserRef = useRef<AnalyserNode | null>(null); // Analyser Ref for immediate access
   
+  // Recording Destination
+  const recordingDestRef = useRef<MediaStreamAudioDestinationNode | null>(null);
+
   // --- AUX INPUT (System Audio) ---
   const auxSourceRef = useRef<MediaStreamAudioSourceNode | null>(null);
   const auxGainRef = useRef<GainNode | null>(null);
@@ -166,6 +219,10 @@ export const useAudioPlayer = () => {
      localStorage.setItem('neon_crossfade', crossfadeDuration.toString());
   }, [crossfadeDuration]);
 
+  useEffect(() => {
+      localStorage.setItem('neon_smooth_start', JSON.stringify(smoothStart));
+  }, [smoothStart]);
+
   // --- PERSISTENCE: Save State on Change ---
   useEffect(() => {
       // Only save if we have loaded playlists
@@ -180,7 +237,7 @@ export const useAudioPlayer = () => {
       }
   }, [activePlaylistId, playingPlaylistId, currentTrackIndex, currentTime, playlists]);
 
-  // INITIAL LOAD (Existing logic preserved...)
+  // INITIAL LOAD
   useEffect(() => {
     const loadData = async () => {
       try {
@@ -190,42 +247,52 @@ export const useAudioPlayer = () => {
         let hydratedPlaylists: Playlist[] = [];
 
         if (savedPlaylists.length === 0) {
+            // Init Default
             const defaultId = crypto.randomUUID();
             const defaultPl = { id: defaultId, name: 'MAIN DECK', order: 0 };
             await savePlaylist(defaultPl);
             
-            // Process saved tracks to get artwork if needed (lazy load or just map)
-            // For now, we don't re-extract on load to save time, we assume user adds files
-            // or we could store artwork in DB (not implemented to save space in this demo)
-            
+            // Handle migration of legacy tracks (if any exist without playlist)
             const migratedTracks: AudioTrack[] = [];
             for (const t of savedTracks) {
-                // Attempt to re-extract cover art on load since we don't store blob URL permanently in DB text
-                const artUrl = await extractCoverArt(t.file);
+                // Legacy tracks might not have order or tags
+                const { artwork, tags } = await parseAudioMetadata(t.file);
                 
                 const updated = { 
                     ...t, 
                     playlistId: defaultId, 
                     url: URL.createObjectURL(t.file),
-                    artworkUrl: artUrl
+                    artworkUrl: artwork,
+                    tags: t.tags || tags,
+                    order: t.order || 0
                 };
-                await saveTrack({ id: updated.id, playlistId: defaultId, name: updated.name, file: updated.file });
+                
+                await saveTrack({ 
+                    id: updated.id, 
+                    playlistId: defaultId, 
+                    name: updated.name, 
+                    file: updated.file,
+                    order: updated.order,
+                    tags: updated.tags
+                });
                 migratedTracks.push(updated);
             }
             
             hydratedPlaylists = [{ ...defaultPl, tracks: migratedTracks }];
         } else {
             // Re-hydrate playlists
-            // We need to re-extract art for saved files
             const processedTracks = await Promise.all(savedTracks.map(async t => ({
                 ...t,
                 url: URL.createObjectURL(t.file),
-                artworkUrl: await extractCoverArt(t.file)
+                artworkUrl: (await parseAudioMetadata(t.file)).artwork,
+                tags: t.tags || {}
             })));
 
             hydratedPlaylists = savedPlaylists.map(pl => ({
                 ...pl,
-                tracks: processedTracks.filter(t => t.playlistId === pl.id)
+                tracks: processedTracks
+                    .filter(t => t.playlistId === pl.id)
+                    .sort((a, b) => (a.order ?? 0) - (b.order ?? 0)) // Ensure correct order from DB
             }));
         }
         
@@ -299,20 +366,19 @@ export const useAudioPlayer = () => {
       const gainB = context.createGain();
       const masterGain = context.createGain();
       
-      // --- ROUTING FIX FOR SYSTEM AUDIO ---
-      // We split into two parallel paths:
-      
-      // 1. AUDIO OUTPUT PATH (To Speakers)
-      // Only the internal decks (A & B) go to the master gain and speakers.
+      // Routing
       gainA.connect(masterGain);
       gainB.connect(masterGain);
       masterGain.connect(context.destination);
 
-      // 2. VISUALIZATION PATH (To Analyser)
-      // Decks A & B also go to the analyser.
-      // Important: Analyser is NOT connected to destination anymore.
+      // Visualization
       gainA.connect(analyserNode);
       gainB.connect(analyserNode);
+
+      // Recording Output Node
+      const recDest = context.createMediaStreamDestination();
+      masterGain.connect(recDest);
+      recordingDestRef.current = recDest;
 
       gainARef.current = gainA;
       gainBRef.current = gainB;
@@ -345,11 +411,17 @@ export const useAudioPlayer = () => {
     }
   }, [volume]);
 
+  const getAudioStream = useCallback(() => {
+      // Ensure audio context is ready even if not playing
+      if (!audioContextRef.current) initAudio();
+      return recordingDestRef.current ? recordingDestRef.current.stream : null;
+  }, [initAudio]);
+
   // --- CONNECT SYSTEM AUDIO (AUX) ---
   const connectAuxSource = useCallback((stream: MediaStream | null) => {
       initAudio(); // Ensure context exists
       const ctx = audioContextRef.current;
-      const analyserNode = analyserRef.current; // Get from ref for guaranteed access
+      const analyserNode = analyserRef.current; 
 
       if (!ctx) return;
 
@@ -368,20 +440,12 @@ export const useAudioPlayer = () => {
               const source = ctx.createMediaStreamSource(stream);
               const gain = ctx.createGain();
               
-              // FORCE 100% Volume for Analyser Input
               gain.gain.value = 1.0;
-
-              // Connect Source -> Gain
               source.connect(gain);
 
-              // 1. Connect Gain -> Analyser (For Visualization)
               if (analyserNode) {
                   gain.connect(analyserNode);
               }
-
-              // 2. DO NOT Connect to Destination (Speakers)
-              // Since the routing logic in initAudio now decouples Analyser from Destination,
-              // simply connecting to Analyser here will visualize the sound without playing it back.
               
               auxSourceRef.current = source;
               auxGainRef.current = gain;
@@ -392,12 +456,11 @@ export const useAudioPlayer = () => {
       }
   }, [initAudio]);
 
-  // Empty placeholder to keep interface consistent
   const updateAuxVolume = useCallback((_volume: number) => {}, []);
   const updateAuxMonitor = useCallback((_monitor: boolean) => {}, []);
 
 
-  // --- CROSSFADE LOGIC (Existing...) ---
+  // --- CROSSFADE LOGIC ---
   const performCrossfade = useCallback((toTrackIndex: number, specificTracks?: AudioTrack[]) => {
       initAudio();
       const tracksToUse = specificTracks || getPlayingTracks();
@@ -510,13 +573,20 @@ export const useAudioPlayer = () => {
          const now = audioContextRef.current?.currentTime || 0;
          const activeGain = activeDeckRef.current === 'A' ? gainARef.current : gainBRef.current;
          const inactiveGain = activeDeckRef.current === 'A' ? gainBRef.current : gainARef.current;
+         
          activeGain.gain.cancelScheduledValues(now);
          inactiveGain.gain.cancelScheduledValues(now);
-         activeGain.gain.setValueAtTime(1, now);
+         
+         if (smoothStart && crossfadeDuration > 0 && !isCrossfadingRef.current) {
+             activeGain.gain.setValueAtTime(0, now);
+             activeGain.gain.linearRampToValueAtTime(1, now + crossfadeDuration);
+         } else {
+             activeGain.gain.setValueAtTime(1, now);
+         }
          inactiveGain.gain.setValueAtTime(0, now);
       }
     }
-  }, [isPlaying, initAudio, volume, getPlayingTracks]);
+  }, [isPlaying, initAudio, volume, getPlayingTracks, smoothStart, crossfadeDuration]);
 
   const nextTrack = useCallback(() => {
     if (activePlaylistId !== playingPlaylistId) {
@@ -614,14 +684,20 @@ export const useAudioPlayer = () => {
                  const inactiveGain = activeDeckRef.current === 'A' ? gainBRef.current : gainARef.current;
                  activeGain.gain.cancelScheduledValues(now);
                  inactiveGain.gain.cancelScheduledValues(now);
-                 activeGain.gain.setValueAtTime(1, now);
+                 
+                 if (smoothStart && crossfadeDuration > 0) {
+                     activeGain.gain.setValueAtTime(0, now);
+                     activeGain.gain.linearRampToValueAtTime(1, now + crossfadeDuration);
+                 } else {
+                     activeGain.gain.setValueAtTime(1, now);
+                 }
                  inactiveGain.gain.setValueAtTime(0, now);
               }
           }
           setCurrentTrackIndex(index);
           hasTriggeredAutoMixRef.current = false;
       }
-  }, [currentTrackIndex, isPlaying, performCrossfade, getPlayingTracks, activePlaylistId, playingPlaylistId, playlists, initAudio, togglePlay]);
+  }, [currentTrackIndex, isPlaying, performCrossfade, getPlayingTracks, activePlaylistId, playingPlaylistId, playlists, initAudio, togglePlay, smoothStart, crossfadeDuration]);
 
   const seek = useCallback((time: number) => {
     const audio = activeDeckRef.current === 'A' ? audioRefA.current : audioRefB.current;
@@ -659,22 +735,41 @@ export const useAudioPlayer = () => {
         targetPlaylistId = plId;
     }
 
+    // Determine starting order index
+    const currentPlaylist = playlists.find(p => p.id === targetPlaylistId);
+    let orderStart = currentPlaylist ? currentPlaylist.tracks.length : 0;
+
     const newTracks: AudioTrack[] = [];
+    const storedTracks: StoredTrack[] = [];
+
     for (const file of files) {
-        const artUrl = await extractCoverArt(file);
+        const { artwork, tags } = await parseAudioMetadata(file);
+        const trackId = crypto.randomUUID();
+        
         newTracks.push({ 
-            id: crypto.randomUUID(), 
+            id: trackId, 
             playlistId: targetPlaylistId,
             name: file.name, 
             url: URL.createObjectURL(file), 
             file,
-            artworkUrl: artUrl
+            artworkUrl: artwork,
+            tags,
+            order: orderStart
         });
+
+        storedTracks.push({
+            id: trackId,
+            playlistId: targetPlaylistId,
+            name: file.name,
+            file,
+            order: orderStart,
+            tags
+        });
+        
+        orderStart++;
     }
 
-    for (const t of newTracks) {
-        await saveTrack({ id: t.id, playlistId: t.playlistId, name: t.name, file: t.file });
-    }
+    await saveTracksBulk(storedTracks);
 
     setPlaylists(prev => prev.map(pl => {
         if (pl.id === targetPlaylistId) {
@@ -695,33 +790,56 @@ export const useAudioPlayer = () => {
 
   const insertAudioFiles = async (files: File[], insertIndex: number) => {
       if (!activePlaylistId) {
-          // If no playlist exists, fall back to simple append which creates one
           processAudioFiles(files);
           return;
       }
 
       const newTracks: AudioTrack[] = [];
+      const storedTracks: StoredTrack[] = [];
+      
       for (const file of files) {
-          const artUrl = await extractCoverArt(file);
+          const { artwork, tags } = await parseAudioMetadata(file);
+          const trackId = crypto.randomUUID();
+          
           newTracks.push({
-              id: crypto.randomUUID(),
+              id: trackId,
               playlistId: activePlaylistId,
               name: file.name,
               url: URL.createObjectURL(file),
               file,
-              artworkUrl: artUrl
+              artworkUrl: artwork,
+              tags,
+              order: 0 
+          });
+          
+          storedTracks.push({
+              id: trackId,
+              playlistId: activePlaylistId,
+              name: file.name,
+              file,
+              order: 0,
+              tags
           });
       }
-
-      await saveTracksBulk(newTracks.map(t => ({ id: t.id, playlistId: t.playlistId, name: t.name, file: t.file })));
 
       setPlaylists(prev => prev.map(pl => {
           if (pl.id === activePlaylistId) {
               const updatedTracks = [...pl.tracks];
-              // Insert new tracks at specific index
               updatedTracks.splice(insertIndex, 0, ...newTracks);
               
-              // Handle first track logic if playlist was empty
+              // Re-index order
+              const reordered = updatedTracks.map((t, i) => ({ ...t, order: i }));
+              
+              const updates = reordered.map(t => ({
+                  id: t.id,
+                  playlistId: t.playlistId,
+                  name: t.name,
+                  file: t.file,
+                  order: t.order,
+                  tags: t.tags
+              }));
+              saveTracksBulk(updates);
+
               if (pl.id === playingPlaylistId && pl.tracks.length === 0 && updatedTracks.length > 0) {
                   setCurrentTrackIndex(0);
                   if (audioRefA.current) {
@@ -730,12 +848,11 @@ export const useAudioPlayer = () => {
                   }
                   initAudio();
               }
-              // Adjust current index if we inserted ABOVE the current playing track
               else if (pl.id === playingPlaylistId && currentTrackIndex >= insertIndex) {
                   setCurrentTrackIndex(prevIndex => prevIndex + newTracks.length);
               }
 
-              return { ...pl, tracks: updatedTracks };
+              return { ...pl, tracks: reordered };
           }
           return pl;
       }));
@@ -749,19 +866,36 @@ export const useAudioPlayer = () => {
       await savePlaylist(newPlaylist);
       
       const newTracks: AudioTrack[] = [];
+      const storedTracks: StoredTrack[] = [];
+      let order = 0;
+
       for (const file of files) {
-          const artUrl = await extractCoverArt(file);
+          const { artwork, tags } = await parseAudioMetadata(file);
+          const trackId = crypto.randomUUID();
+          
           newTracks.push({ 
-              id: crypto.randomUUID(), 
+              id: trackId, 
               playlistId: plId,
               name: file.name, 
               url: URL.createObjectURL(file), 
               file,
-              artworkUrl: artUrl
+              artworkUrl: artwork,
+              tags,
+              order
           });
+          
+          storedTracks.push({
+              id: trackId,
+              playlistId: plId,
+              name: file.name,
+              file,
+              order,
+              tags
+          });
+          order++;
       }
 
-      await saveTracksBulk(newTracks.map(t => ({ id: t.id, playlistId: t.playlistId, name: t.name, file: t.file })));
+      await saveTracksBulk(storedTracks);
 
       setPlaylists(prev => [...prev, { ...newPlaylist, tracks: newTracks }]);
       setActivePlaylistId(plId);
@@ -793,13 +927,28 @@ export const useAudioPlayer = () => {
             const shouldUpdateIndex = pl.id === playingPlaylistId;
             const currentId = shouldUpdateIndex ? pl.tracks[currentTrackIndex]?.id : null;
             
-            const sorted = [...pl.tracks].sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: 'base' }));
+            const sorted = [...pl.tracks].sort((a, b) => {
+                const nameA = a.tags?.title || a.name;
+                const nameB = b.tags?.title || b.name;
+                return nameA.localeCompare(nameB, undefined, { numeric: true, sensitivity: 'base' });
+            });
             
+            const reordered = sorted.map((t, i) => ({ ...t, order: i }));
+            const updates = reordered.map(t => ({
+                  id: t.id,
+                  playlistId: t.playlistId,
+                  name: t.name,
+                  file: t.file,
+                  order: t.order,
+                  tags: t.tags
+            }));
+            saveTracksBulk(updates);
+
             if (currentId) {
-                const newIndex = sorted.findIndex(t => t.id === currentId);
+                const newIndex = reordered.findIndex(t => t.id === currentId);
                 if (newIndex !== -1) setCurrentTrackIndex(newIndex);
             }
-            return { ...pl, tracks: sorted };
+            return { ...pl, tracks: reordered };
         }
         return pl;
     }));
@@ -817,11 +966,22 @@ export const useAudioPlayer = () => {
                 [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
             }
             
+            const reordered = shuffled.map((t, i) => ({ ...t, order: i }));
+            const updates = reordered.map(t => ({
+                  id: t.id,
+                  playlistId: t.playlistId,
+                  name: t.name,
+                  file: t.file,
+                  order: t.order,
+                  tags: t.tags
+            }));
+            saveTracksBulk(updates);
+
             if (currentId) {
-                const newIndex = shuffled.findIndex(t => t.id === currentId);
+                const newIndex = reordered.findIndex(t => t.id === currentId);
                 if (newIndex !== -1) setCurrentTrackIndex(newIndex);
             }
-            return { ...pl, tracks: shuffled };
+            return { ...pl, tracks: reordered };
         }
         return pl;
     }));
@@ -842,6 +1002,7 @@ export const useAudioPlayer = () => {
                   if (trackIds.includes(t.id)) { URL.revokeObjectURL(t.url); return false; }
                   return true;
               });
+              
               if (pl.id === playingPlaylistId && currentTrackIndex > -1) {
                   const currentId = pl.tracks[currentTrackIndex]?.id;
                   if (currentId && !trackIds.includes(currentId)) {
@@ -865,14 +1026,26 @@ export const useAudioPlayer = () => {
               const itemsBeforeTarget = sourceIndices.filter(i => i < targetIndex).length;
               insertAt -= itemsBeforeTarget;
               tracks.splice(insertAt, 0, ...movedItems);
+              
+              const reordered = tracks.map((t, i) => ({ ...t, order: i }));
+              const updates = reordered.map(t => ({
+                  id: t.id,
+                  playlistId: t.playlistId,
+                  name: t.name,
+                  file: t.file,
+                  order: t.order,
+                  tags: t.tags
+              }));
+              saveTracksBulk(updates);
+
               if (pl.id === playingPlaylistId) {
                   const currentId = pl.tracks[currentTrackIndex]?.id;
                   if (currentId) {
-                      const newIndex = tracks.findIndex(t => t.id === currentId);
+                      const newIndex = reordered.findIndex(t => t.id === currentId);
                       setCurrentTrackIndex(newIndex);
                   }
               }
-              return { ...pl, tracks };
+              return { ...pl, tracks: reordered };
           }
           return pl;
       }));
@@ -882,9 +1055,19 @@ export const useAudioPlayer = () => {
       const sourcePl = playlists.find(p => p.id === sourcePlaylistId);
       const targetPl = playlists.find(p => p.id === targetPlaylistId);
       if (!sourcePl || !targetPl) return;
+      
       const movingTracks = sourcePl.tracks.filter(t => trackIds.includes(t.id));
-      const tracksToSave = movingTracks.map(t => ({ id: t.id, playlistId: targetPlaylistId, name: t.name, file: t.file }));
+      
+      let nextOrder = targetPl.tracks.length;
+      
+      const tracksToSave = movingTracks.map(t => {
+          const upd = { ...t, playlistId: targetPlaylistId, order: nextOrder };
+          nextOrder++;
+          return { id: upd.id, playlistId: upd.playlistId, name: upd.name, file: upd.file, order: upd.order, tags: upd.tags };
+      });
+      
       await saveTracksBulk(tracksToSave);
+      
       setPlaylists(prev => prev.map(pl => {
           if (pl.id === sourcePlaylistId) {
               const remaining = pl.tracks.filter(t => !trackIds.includes(t.id));
@@ -898,7 +1081,7 @@ export const useAudioPlayer = () => {
               }
               return { ...pl, tracks: remaining };
           }
-          if (pl.id === targetPlaylistId) { return { ...pl, tracks: [...pl.tracks, ...movingTracks] }; }
+          if (pl.id === targetPlaylistId) { return { ...pl, tracks: [...pl.tracks, ...movingTracks.map((t, i) => ({ ...t, order: targetPl.tracks.length + i }))] }; }
           return pl;
       }));
   }, [playlists, playingPlaylistId, currentTrackIndex, stop]);
@@ -910,11 +1093,20 @@ export const useAudioPlayer = () => {
       const plName = `DECK ${playlists.length + 1}`;
       const newPlaylist: Playlist = { id: plId, name: plName, order: playlists.length, tracks: [] };
       await savePlaylist(newPlaylist);
+      
       const movingTracks = sourcePl.tracks.filter(t => trackIds.includes(t.id));
-      const tracksToSave = movingTracks.map(t => ({ id: t.id, playlistId: plId, name: t.name, file: t.file }));
+      const tracksToSave = movingTracks.map((t, i) => ({ 
+          id: t.id, 
+          playlistId: plId, 
+          name: t.name, 
+          file: t.file,
+          order: i,
+          tags: t.tags
+      }));
+      
       await saveTracksBulk(tracksToSave);
       setPlaylists(prev => {
-          const newPlState = { ...newPlaylist, tracks: movingTracks };
+          const newPlState = { ...newPlaylist, tracks: movingTracks.map((t, i) => ({ ...t, order: i })) };
           return prev.map(pl => {
               if (pl.id === sourcePlaylistId) {
                   const remaining = pl.tracks.filter(t => !trackIds.includes(t.id));
@@ -932,7 +1124,6 @@ export const useAudioPlayer = () => {
       const newPl: Playlist = { id, name, order: playlists.length, tracks: [] };
       await savePlaylist(newPl);
       setPlaylists(prev => [...prev, newPl]);
-      // Immediately switch to the new playlist
       setActivePlaylistId(id);
   };
 
@@ -1037,6 +1228,8 @@ export const useAudioPlayer = () => {
     analyser,
     crossfadeDuration,
     setCrossfadeDuration,
+    smoothStart,
+    setSmoothStart,
     setVolume,
     setIsPlaying,
     setCurrentTime,
@@ -1068,6 +1261,7 @@ export const useAudioPlayer = () => {
     reorderTracks,
     moveTracksToPlaylist,
     connectAuxSource,
+    getAudioStream, // New Method
     updateAuxVolume,
     updateAuxMonitor
   };

@@ -16,9 +16,8 @@ const MediaRenderer: React.FC<MediaRendererProps> = ({ type, url, stream, bgColo
   // Ref for Image
   const imageRef = useRef<HTMLImageElement | null>(null);
   
-  // Refs for Seamless Video Looping (Double Buffering) for FILES
-  const videoRefs = useRef<[HTMLVideoElement, HTMLVideoElement] | null>(null);
-  const activeVideoIndex = useRef<number>(0);
+  // Ref for Single File Video (Native Loop)
+  const fileVideoRef = useRef<HTMLVideoElement | null>(null);
 
   // Ref for Live Stream
   const streamVideoRef = useRef<HTMLVideoElement | null>(null);
@@ -29,13 +28,11 @@ const MediaRenderer: React.FC<MediaRendererProps> = ({ type, url, stream, bgColo
   // --- 1. SETUP MEDIA SOURCES ---
   useEffect(() => {
     // CLEANUP PREVIOUS
-    if (videoRefs.current) {
-        videoRefs.current.forEach(v => {
-            v.pause();
-            v.removeAttribute('src');
-            v.load();
-        });
-        videoRefs.current = null;
+    if (fileVideoRef.current) {
+        fileVideoRef.current.pause();
+        fileVideoRef.current.removeAttribute('src');
+        fileVideoRef.current.load();
+        fileVideoRef.current = null;
     }
     if (streamVideoRef.current) {
         streamVideoRef.current.pause();
@@ -56,27 +53,19 @@ const MediaRenderer: React.FC<MediaRendererProps> = ({ type, url, stream, bgColo
         streamVideoRef.current = v;
 
     } else if (type === 'video' && url) {
-      // --- FILE VIDEO MODE (SEAMLESS LOOP) ---
-      const v1 = document.createElement('video');
-      const v2 = document.createElement('video');
-      
-      const setupVideo = (v: HTMLVideoElement) => {
-          v.src = url;
-          v.muted = true;
-          // We handle looping manually for seamlessness
-          v.loop = false; 
-          v.playsInline = true;
-          v.preload = 'auto';
-      };
+      // --- FILE VIDEO MODE (NATIVE LOOP) ---
+      const v = document.createElement('video');
+      v.src = url;
+      v.muted = true;
+      v.loop = true; // Native seamless loop
+      v.playsInline = true;
+      v.autoplay = true;
+      v.preload = 'auto'; // Important for buffer
 
-      setupVideo(v1);
-      setupVideo(v2);
-
-      // Start the first one immediately
-      v1.play().catch(e => console.warn("Video play failed", e));
+      // Optimization: Force hardware acceleration hints if possible
+      v.play().catch(e => console.warn("Video play failed", e));
       
-      videoRefs.current = [v1, v2];
-      activeVideoIndex.current = 0;
+      fileVideoRef.current = v;
 
     } else if (type === 'image' && url) {
       // --- IMAGE MODE ---
@@ -87,13 +76,11 @@ const MediaRenderer: React.FC<MediaRendererProps> = ({ type, url, stream, bgColo
     
     // Cleanup on unmount or prop change
     return () => {
-      if (videoRefs.current) {
-        videoRefs.current.forEach(v => {
-            v.pause();
-            v.removeAttribute('src');
-            v.load();
-        });
-        videoRefs.current = null;
+      if (fileVideoRef.current) {
+        fileVideoRef.current.pause();
+        fileVideoRef.current.removeAttribute('src');
+        fileVideoRef.current.load();
+        fileVideoRef.current = null;
       }
       if (streamVideoRef.current) {
           streamVideoRef.current.pause();
@@ -128,98 +115,97 @@ const MediaRenderer: React.FC<MediaRendererProps> = ({ type, url, stream, bgColo
       const w = canvas.width;
       const h = canvas.height;
 
-      // Clear previous frame to support transparency
-      ctx.clearRect(0, 0, w, h);
-
-      // Draw Background Color
-      ctx.fillStyle = bgColor;
-      ctx.fillRect(0, 0, w, h);
-
       // Prepare Content
-      ctx.save();
       const scaleEffect = Math.max(1, effects.pixelation);
+      const drawW = Math.ceil(w / scaleEffect);
+      const drawH = Math.ceil(h / scaleEffect);
       
-      if (type !== 'color' || stream) {
-          const drawW = Math.ceil(w / scaleEffect);
-          const drawH = Math.ceil(h / scaleEffect);
-          ctx.imageSmoothingEnabled = false;
+      ctx.imageSmoothingEnabled = false;
 
-          let source: CanvasImageSource | null = null;
-          let srcW = 0;
-          let srcH = 0;
+      // --- LOGIC SPLIT: VIDEO VS IMAGE/COLOR ---
+      
+      let videoSource: HTMLVideoElement | null = null;
+      if (stream && streamVideoRef.current) {
+          videoSource = streamVideoRef.current;
+      } else if (type === 'video' && fileVideoRef.current) {
+          videoSource = fileVideoRef.current;
+      }
 
-          // --- LIVE STREAM LOGIC ---
-          if (stream && streamVideoRef.current) {
-              const v = streamVideoRef.current;
-              if (v.readyState >= 2) {
-                  source = v;
-                  srcW = v.videoWidth;
-                  srcH = v.videoHeight;
-              }
-          }
-          // --- FILE VIDEO LOGIC ---
-          else if (type === 'video' && videoRefs.current) {
-              const videos = videoRefs.current;
-              const currentIndex = activeVideoIndex.current;
-              const nextIndex = (currentIndex + 1) % 2;
-              
-              const activeVid = videos[currentIndex];
-              const nextVid = videos[nextIndex];
+      if (videoSource) {
+          // --- VIDEO RENDERING (PERSISTENT FRAME) ---
+          // Fix for Loop Blinking: We DO NOT clear the canvas for video.
+          // If the video is looping and drops a frame, the previous frame remains on canvas, preventing the black flash.
+          
+          if (videoSource.readyState >= 2) {
+              const srcW = videoSource.videoWidth;
+              const srcH = videoSource.videoHeight;
 
-              if (activeVid.duration > 0 && activeVid.currentTime >= activeVid.duration - 0.25) {
-                  if (nextVid.readyState >= 2) {
-                      nextVid.play().catch(e => console.warn("Seamless swap failed", e));
-                      activeVideoIndex.current = nextIndex;
-                      activeVid.pause();
-                      activeVid.currentTime = 0;
+              if (srcW && srcH) {
+                  // "Cover" logic
+                  const srcRatio = srcW / srcH;
+                  const dstRatio = drawW / drawH;
+                  
+                  let renderX = 0, renderY = 0, renderW = drawW, renderH = drawH;
+
+                  if (dstRatio > srcRatio) {
+                      renderW = drawW;
+                      renderH = drawW / srcRatio;
+                      renderY = (drawH - renderH) / 2; 
                   } else {
-                      if (activeVid.currentTime >= activeVid.duration - 0.05) {
-                          activeVid.currentTime = 0;
-                          activeVid.play();
-                      }
+                      renderH = drawH;
+                      renderW = drawH * srcRatio;
+                      renderX = (drawW - renderW) / 2;
+                  }
+
+                  // Keep-alive: Ensure it's playing if it paused itself unexpectedly (browser optimization)
+                  if (videoSource.paused && !stream) videoSource.play().catch(() => {});
+
+                  ctx.drawImage(videoSource, renderX, renderY, renderW, renderH);
+
+                  if (scaleEffect > 1) {
+                      ctx.drawImage(canvas, 0, 0, drawW, drawH, 0, 0, w, h);
                   }
               }
-
-              const drawSource = videos[activeVideoIndex.current];
-              if (drawSource.readyState >= 2) {
-                  source = drawSource;
-                  srcW = drawSource.videoWidth;
-                  srcH = drawSource.videoHeight;
-              }
-          } 
-          // --- IMAGE LOGIC ---
-          else if (type === 'image' && imageRef.current && imageRef.current.complete) {
-              source = imageRef.current;
-              srcW = imageRef.current.naturalWidth;
-              srcH = imageRef.current.naturalHeight;
           }
+          // If readyState < 2, we do NOTHING. This leaves the old frame visible.
+      } else {
+          // --- IMAGE / COLOR RENDERING ---
+          // For static content, we clear and redraw to support transparency/bg color changes.
+          
+          ctx.clearRect(0, 0, w, h);
+          ctx.fillStyle = bgColor;
+          ctx.fillRect(0, 0, w, h);
 
-          // --- DRAWING TO CANVAS ---
-          if (source && srcW > 0 && srcH > 0) {
-              // "Cover" logic
-              const srcRatio = srcW / srcH;
-              const dstRatio = drawW / drawH;
-              
-              let renderX = 0, renderY = 0, renderW = drawW, renderH = drawH;
+          if (type === 'image' && imageRef.current && imageRef.current.complete) {
+              const img = imageRef.current;
+              const srcW = img.naturalWidth;
+              const srcH = img.naturalHeight;
 
-              if (dstRatio > srcRatio) {
-                  renderW = drawW;
-                  renderH = drawW / srcRatio;
-                  renderY = (drawH - renderH) / 2; 
-              } else {
-                  renderH = drawH;
-                  renderW = drawH * srcRatio;
-                  renderX = (drawW - renderW) / 2;
-              }
+              if (srcW && srcH) {
+                  // "Cover" logic
+                  const srcRatio = srcW / srcH;
+                  const dstRatio = drawW / drawH;
+                  
+                  let renderX = 0, renderY = 0, renderW = drawW, renderH = drawH;
 
-              ctx.drawImage(source, renderX, renderY, renderW, renderH);
+                  if (dstRatio > srcRatio) {
+                      renderW = drawW;
+                      renderH = drawW / srcRatio;
+                      renderY = (drawH - renderH) / 2; 
+                  } else {
+                      renderH = drawH;
+                      renderW = drawH * srcRatio;
+                      renderX = (drawW - renderW) / 2;
+                  }
 
-              if (scaleEffect > 1) {
-                  ctx.drawImage(canvas, 0, 0, drawW, drawH, 0, 0, w, h);
+                  ctx.drawImage(img, renderX, renderY, renderW, renderH);
+
+                  if (scaleEffect > 1) {
+                      ctx.drawImage(canvas, 0, 0, drawW, drawH, 0, 0, w, h);
+                  }
               }
           }
       }
-      ctx.restore();
     };
 
     animationRef.current = requestAnimationFrame(render);

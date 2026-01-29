@@ -1,13 +1,14 @@
 
 export const en = {
   system: "SYSTEM",
-  modules: "MODULES",
+  modules: "EFFECT MODULES",
   system_params: "SYSTEM PARAMETERS",
   color_schemes: "COLOR SCHEMES & STYLES",
   theme_select: "SELECT THEME",
   cursor_style: "CURSOR STYLE",
-  retro_cursor_style: "RETROSCREEN CURSOR", // NEW
+  retro_cursor_style: "RETROSCREEN CURSOR", 
   cursor_default: "HACKER (DEFAULT)",
+  cursor_music: "MUSIC FLOW (PARTICLES)",
   cursor_classic: "CLASSIC BLUE",
   cursor_warm: "CLASSIC WARM",
   cursor_white: "CLASSIC WHITE",
@@ -31,6 +32,7 @@ export const en = {
   holograms: "HOLOGRAMS",
   gemini_chat: "GEMINI AI LINK",
   light_leaks: "LIGHT LEAKS",
+  rain_effect: "RAIN",
   waveform_config: "WAVEFORM CONFIG",
   dvd_config: "DVD CONFIG",
   scanline_config: "SCANLINE CONFIG",
@@ -38,10 +40,12 @@ export const en = {
   glitch_config: "GLITCH CONFIG",
   debug_config: "SYSTEM LOGS",
   leaks_config: "LEAKS CONFIG",
+  rain_config: "RAIN CONFIG",
   signal_processor: "SIGNAL PROCESSOR",
   background: "BACKGROUND",
   cat_backgrounds: "BACKGROUNDS", 
   cat_sound_effects: "SOUND EFFECTS", 
+  cat_screen_effects: "SCREEN POST EFFECTS",
   load_img: "LOAD IMG/VIDEO",
   load_sfx_zip: "LOAD SFX (ZIP)",
   export_config: "EXPORT NRP CONFIG",
@@ -49,6 +53,7 @@ export const en = {
   crossfade_duration: "CROSSFADE (SEC)",
   sfx_volume: "GLOBAL SFX VOLUME",
   constant_power_hint: "Uses Constant Power curve for smooth transitions.",
+  smooth_start: "SMOOTH START",
   config_manager: "CONFIG PRESETS",
   file_management: "FILE MANAGEMENT",
   
@@ -96,7 +101,20 @@ export const en = {
   api_key_placeholder: "PASTE KEY HERE",
   start_session: "START SESSION",
   stop_session: "STOP SESSION",
+  vignette_effect: "VIGNETTE",
+  vignette_intensity: "DARKNESS",
+  vignette_roundness: "ROUNDNESS",
   
+  // Rain
+  rain_intensity: "DENSITY",
+  rain_speed: "FALL SPEED",
+  rain_size: "DROP SIZE",
+  rain_direction: "DIRECTION",
+  rain_wind: "WIND SPEED",
+  rain_gustiness: "WIND GUSTS",
+  rain_opacity: "DROP OPACITY", 
+  rain_wander: "WIND WANDER",
+
   // Hologram Categories
   cat_system: "SYSTEM",
   cat_interactive: "INTERACTIVE",
@@ -163,6 +181,7 @@ export const en = {
   style_ocean: "OCEAN (TEAL)",
   style_theme_blue: "ROYAL BLUE",
   style_theme_sync: "THEME SYNC",
+  style_neon_gradient: "NEON GRADIENT",
   
   pos_top: "TOP",
   pos_center: "CENTER",

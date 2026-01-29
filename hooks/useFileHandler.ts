@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useNotification } from '../contexts/NotificationContext';
 
 interface UseFileHandlerProps {
@@ -65,6 +65,107 @@ export const useFileHandler = ({ player, config, containerRef, handleZipUpload }
     await player.processAudioFiles(Array.from(fileList));
     addNotification(`${fileList.length} tracks added`, "success");
   };
+
+  // --- CORE FILE PROCESSOR ---
+  // Reusable logic for Drop and Paste
+  const processFiles = useCallback(async (allFiles: File[]) => {
+    if (allFiles.length === 0) return;
+
+    addNotification(`Scanning ${allFiles.length} files...`, "info");
+
+    // --- SMART DISTRIBUTION LOGIC ---
+
+    // 1. Configs (.NRP)
+    const nrpFiles = allFiles.filter(f => f.name.toLowerCase().endsWith('.nrp'));
+    if (nrpFiles.length > 0) {
+      // Import multiple presets into the list
+      const lastImportedId = await config.batchImportPresets(nrpFiles);
+      
+      // If we successfully imported presets, load the last one immediately
+      if (lastImportedId) {
+          const loaded = config.loadPreset(lastImportedId);
+          if (loaded) {
+              if (loaded.theme) config.setTheme(loaded.theme);
+              if (loaded.controlStyle) config.setControlStyle(loaded.controlStyle);
+          }
+      }
+      addNotification(`${nrpFiles.length} presets imported & saved`, "success");
+    }
+
+    // 2. Audio Files
+    const audioFiles = allFiles.filter(f => 
+        f.type.startsWith('audio/') || 
+        f.name.toLowerCase().endsWith('.ogg') || 
+        f.name.toLowerCase().endsWith('.mp3') || 
+        f.name.toLowerCase().endsWith('.wav') ||
+        f.name.toLowerCase().endsWith('.m4a')
+    );
+
+    // 3. Media Files (Images/Videos)
+    const mediaFiles = allFiles.filter(f => 
+        f.type.startsWith('image/') || 
+        f.type.startsWith('video/')
+    );
+
+    // 4. SFX Archives
+    const zipFiles = allFiles.filter(f => f.name.toLowerCase().endsWith('.zip'));
+
+    // --- ACTIONS ---
+
+    let actionCount = 0;
+
+    if (audioFiles.length > 0) {
+        await player.processAudioFiles(audioFiles);
+        addNotification(`${audioFiles.length} tracks added to playlist`, "success");
+        actionCount++;
+    }
+    
+    if (mediaFiles.length > 0) {
+        await config.handleBgUpload(mediaFiles);
+        addNotification(`${mediaFiles.length} backgrounds added`, "success");
+        actionCount++;
+    }
+    
+    if (zipFiles.length > 0) {
+        await handleZipUpload(zipFiles[0]);
+        actionCount++;
+    }
+
+    if (actionCount === 0 && nrpFiles.length === 0) {
+        addNotification("No compatible media files found", "warning");
+    }
+  }, [config, player, handleZipUpload, addNotification]);
+
+  // --- PASTE HANDLER ---
+  useEffect(() => {
+    const handlePaste = (e: ClipboardEvent) => {
+        // If user is focused on an input, we typically allow default paste,
+        // but if they paste a file (image/audio), we intercept it regardless of focus.
+        
+        const items = e.clipboardData?.items;
+        if (!items) return;
+
+        const files: File[] = [];
+        for (let i = 0; i < items.length; i++) {
+            // Check if item is a file
+            if (items[i].kind === 'file') {
+                const file = items[i].getAsFile();
+                if (file) files.push(file);
+            }
+        }
+
+        // If files are found, prevent default and process them
+        // Even if in an input, if the user pastes an image, we probably want to capture it 
+        // rather than pasting nothing or the filename.
+        if (files.length > 0) {
+            e.preventDefault();
+            processFiles(files);
+        }
+    };
+
+    window.addEventListener('paste', handlePaste);
+    return () => window.removeEventListener('paste', handlePaste);
+  }, [processFiles]);
 
   const onDragOver = (e: React.DragEvent) => {
     e.preventDefault();
@@ -133,71 +234,7 @@ export const useFileHandler = ({ player, config, containerRef, handleZipUpload }
         allFiles = Array.from(e.dataTransfer.files);
     }
 
-    if (allFiles.length === 0) return;
-
-    addNotification(`Scanning ${allFiles.length} files...`, "info");
-
-    // --- SMART DISTRIBUTION LOGIC ---
-
-    // 1. Configs (.NRP)
-    const nrpFiles = allFiles.filter(f => f.name.toLowerCase().endsWith('.nrp'));
-    if (nrpFiles.length > 0) {
-      // Import multiple presets into the list
-      const lastImportedId = await config.batchImportPresets(nrpFiles);
-      
-      // If we successfully imported presets, load the last one immediately
-      if (lastImportedId) {
-          const loaded = config.loadPreset(lastImportedId);
-          if (loaded) {
-              if (loaded.theme) config.setTheme(loaded.theme);
-              if (loaded.controlStyle) config.setControlStyle(loaded.controlStyle);
-          }
-      }
-      addNotification(`${nrpFiles.length} presets imported & saved`, "success");
-    }
-
-    // 2. Audio Files
-    const audioFiles = allFiles.filter(f => 
-        f.type.startsWith('audio/') || 
-        f.name.toLowerCase().endsWith('.ogg') || 
-        f.name.toLowerCase().endsWith('.mp3') || 
-        f.name.toLowerCase().endsWith('.wav') ||
-        f.name.toLowerCase().endsWith('.m4a')
-    );
-
-    // 3. Media Files (Images/Videos)
-    const mediaFiles = allFiles.filter(f => 
-        f.type.startsWith('image/') || 
-        f.type.startsWith('video/')
-    );
-
-    // 4. SFX Archives
-    const zipFiles = allFiles.filter(f => f.name.toLowerCase().endsWith('.zip'));
-
-    // --- ACTIONS ---
-
-    let actionCount = 0;
-
-    if (audioFiles.length > 0) {
-        await player.processAudioFiles(audioFiles);
-        addNotification(`${audioFiles.length} tracks added to playlist`, "success");
-        actionCount++;
-    }
-    
-    if (mediaFiles.length > 0) {
-        await config.handleBgUpload(mediaFiles);
-        addNotification(`${mediaFiles.length} backgrounds added`, "success");
-        actionCount++;
-    }
-    
-    if (zipFiles.length > 0) {
-        await handleZipUpload(zipFiles[0]);
-        actionCount++;
-    }
-
-    if (actionCount === 0 && nrpFiles.length === 0) {
-        addNotification("No compatible media files found", "warning");
-    }
+    await processFiles(allFiles);
   };
 
   return {

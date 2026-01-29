@@ -26,6 +26,10 @@ const SpectrumScene: React.FC<{ analyser: AnalyserNode | null; isPlaying: boolea
   const tipBarsRef = useRef<Float32Array | null>(null);
   const dataArrayRef = useRef<Uint8Array | null>(null);
 
+  // SMOOTHING REFS FOR CONFIG TRANSITIONS
+  const smoothVolRef = useRef<number>(1);
+  const smoothNormRef = useRef({ bass: 1, mid: 1, treb: 1 });
+
   // Helper Object for matrix calculations
   const dummy = useMemo(() => new THREE.Object3D(), []);
   const colorObj = useMemo(() => new THREE.Color(), []);
@@ -90,9 +94,28 @@ const SpectrumScene: React.FC<{ analyser: AnalyserNode | null; isPlaying: boolea
             else maxTreb = Math.max(maxTreb, dataArray[i]);
         }
     }
-    const bassScale = 255 / maxBass;
-    const midScale = 255 / maxMid;
-    const trebScale = 255 / maxTreb;
+
+    // --- SMOOTH CONFIG TRANSITIONS ---
+    // 1. VOLUME
+    const targetVolFactor = config.preventVolumeScaling ? 1.0 : volume;
+    smoothVolRef.current += (targetVolFactor - smoothVolRef.current) * 0.1;
+
+    // 2. NORMALIZE
+    let targetBassScale = 1;
+    let targetMidScale = 1;
+    let targetTrebScale = 1;
+
+    if (config.normalize) {
+        targetBassScale = 255 / Math.max(150, maxBass);
+        targetMidScale = 255 / Math.max(100, maxMid);
+        targetTrebScale = 255 / Math.max(80, maxTreb);
+    }
+
+    const normLerp = 0.05;
+    smoothNormRef.current.bass += (targetBassScale - smoothNormRef.current.bass) * normLerp;
+    smoothNormRef.current.mid += (targetMidScale - smoothNormRef.current.mid) * normLerp;
+    smoothNormRef.current.treb += (targetTrebScale - smoothNormRef.current.treb) * normLerp;
+
 
     // --- RENDER LOOP ---
     for (let i = 0; i < count; i++) {
@@ -116,13 +139,13 @@ const SpectrumScene: React.FC<{ analyser: AnalyserNode | null; isPlaying: boolea
              }
         }
 
-        if (!config.preventVolumeScaling) rawValue *= volume;
+        // Apply Volume (Smoothed)
+        rawValue *= smoothVolRef.current;
 
-        if (config.normalize) {
-            if (index < bassEnd) rawValue *= bassScale;
-            else if (index < midEnd) rawValue *= midScale;
-            else rawValue *= trebScale;
-        }
+        // Apply Normalization (Smoothed)
+        if (index < bassEnd) rawValue *= smoothNormRef.current.bass;
+        else if (index < midEnd) rawValue *= smoothNormRef.current.mid;
+        else rawValue *= smoothNormRef.current.treb;
 
         let ratio = rawValue / 255;
         ratio = Math.pow(ratio, 2.5);
@@ -162,6 +185,12 @@ const SpectrumScene: React.FC<{ analyser: AnalyserNode | null; isPlaying: boolea
             case 'ocean': hexColor = '#4B8CA8'; break;
             case 'theme-blue': hexColor = '#3b82f6'; break;
             case 'theme-sync': hexColor = colors.primary; break;
+            case 'neon-gradient':
+               // Height based gradient pink->blue
+               const r = Math.min(1, targetHeight / maxHeight);
+               colorObj.set('#ff00ff').lerp(new THREE.Color('#00f3ff'), r);
+               hexColor = ''; 
+               break;
             case 'matrix':
                const intensity = Math.min(1, (targetHeight / maxHeight) + 0.2);
                colorObj.setRGB(0, intensity, 0);

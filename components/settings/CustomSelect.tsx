@@ -18,6 +18,7 @@ interface CustomSelectProps {
 
 const CustomSelect: React.FC<CustomSelectProps> = ({ label, value, options, onChange }) => {
   const [isOpen, setIsOpen] = useState(false);
+  const [allowOverflow, setAllowOverflow] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -32,6 +33,17 @@ const CustomSelect: React.FC<CustomSelectProps> = ({ label, value, options, onCh
       document.removeEventListener('mousedown', handleClickOutside);
     };
   }, []);
+
+  // Handle overflow visibility after animation to prevent shadow clipping
+  useEffect(() => {
+    let timeout: ReturnType<typeof setTimeout>;
+    if (isOpen) {
+      timeout = setTimeout(() => setAllowOverflow(true), 300);
+    } else {
+      setAllowOverflow(false);
+    }
+    return () => clearTimeout(timeout);
+  }, [isOpen]);
 
   const selectedOption = options.find(opt => opt.value === value) || options[0];
 
@@ -70,7 +82,7 @@ const CustomSelect: React.FC<CustomSelectProps> = ({ label, value, options, onCh
       <div className="relative">
         <button
           onClick={() => setIsOpen(!isOpen)}
-          className={`w-full flex items-center justify-between bg-black border font-mono text-xs px-3 py-2 transition-all duration-200
+          className={`w-full flex items-center justify-between bg-black border font-mono text-xs px-3 py-2 transition-all duration-300
             ${isOpen 
               ? 'border-theme-secondary shadow-[0_0_10px_var(--color-secondary)] text-theme-secondary rounded-t' 
               : 'border-theme-border text-theme-text hover:border-theme-primary rounded'
@@ -81,33 +93,43 @@ const CustomSelect: React.FC<CustomSelectProps> = ({ label, value, options, onCh
             {renderIcon(selectedOption)}
             <span className="truncate">{selectedOption?.label}</span>
           </div>
-          <div className={`transition-transform duration-200 ${isOpen ? 'rotate-180 text-theme-secondary' : 'text-gray-500'}`}>
+          <div className={`transition-transform duration-300 ${isOpen ? 'rotate-180 text-theme-secondary' : 'text-gray-500'}`}>
              <ChevronDown size={14} />
           </div>
         </button>
 
-        {isOpen && (
-          <div className="absolute top-full left-0 w-full bg-black border-x border-b border-theme-secondary shadow-[0_0_15px_var(--color-secondary)] z-50 max-h-48 overflow-y-auto rounded-b custom-scrollbar">
-            {options.map((option) => (
-              <div
-                key={option.value}
-                onClick={() => {
-                  onChange(option.value);
-                  setIsOpen(false);
-                }}
-                className={`
-                  px-3 py-2 text-xs font-mono cursor-pointer transition-colors border-b border-gray-900 last:border-0 flex items-center gap-2
-                  ${option.value === value 
-                    ? 'bg-theme-primary text-black font-bold' 
-                    : 'text-theme-muted hover:bg-gray-900 hover:text-theme-primary'}
-                `}
-              >
-                {renderIcon(option, option.value === value)}
-                {option.label}
-              </div>
-            ))}
-          </div>
-        )}
+        <div 
+            className={`
+                grid transition-[grid-template-rows,opacity] duration-300 ease-[cubic-bezier(0.4,0,0.2,1)]
+                ${isOpen ? 'grid-rows-[1fr] opacity-100' : 'grid-rows-[0fr] opacity-0'}
+            `}
+        >
+            <div className={`${allowOverflow && isOpen ? 'overflow-visible' : 'overflow-hidden'}`}>
+                {/* Wrapper for shadow and border to avoid clipping by scrollbar container if separated */}
+                <div className="w-full bg-black border-x border-b border-theme-secondary shadow-[0_0_15px_var(--color-secondary)] rounded-b">
+                    <div className="max-h-48 overflow-y-auto custom-scrollbar">
+                        {options.map((option) => (
+                        <div
+                            key={option.value}
+                            onClick={() => {
+                            onChange(option.value);
+                            setIsOpen(false);
+                            }}
+                            className={`
+                            px-3 py-2 text-xs font-mono cursor-pointer transition-colors border-b border-gray-900 last:border-0 flex items-center gap-2
+                            ${option.value === value 
+                                ? 'bg-theme-primary text-black font-bold' 
+                                : 'text-theme-muted hover:bg-gray-900 hover:text-theme-primary'}
+                            `}
+                        >
+                            {renderIcon(option, option.value === value)}
+                            {option.label}
+                        </div>
+                        ))}
+                    </div>
+                </div>
+            </div>
+        </div>
       </div>
     </div>
   );

@@ -1,40 +1,15 @@
 
 import React, { useState, useRef } from 'react';
-import { List, ChevronDown, ChevronUp, Timer, Trash2, RefreshCw, Disc, Upload, Power } from 'lucide-react';
+import { List, ChevronDown, ChevronUp, Timer, Trash2, RefreshCw, Disc, Upload, Power, Shuffle } from 'lucide-react';
 import { BackgroundMedia, PatternConfig, BgTransitionType, BgAnimationType } from '../../types';
 import RangeControl from './RangeControl';
 import CustomSelect from './CustomSelect';
-import ToggleSwitch from './ToggleSwitch'; // Import ToggleSwitch
+import ToggleSwitch from './ToggleSwitch';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { Tooltip } from '../ui/Tooltip';
 import { useTheme } from '../../contexts/ThemeContext';
 
-interface BackgroundSettingsProps {
-  bgColor: string;
-  setBgColor: (color: string) => void;
-  bgPattern?: string;
-  setBgPattern?: (pattern: string) => void;
-  bgPatternConfig?: PatternConfig;
-  setBgPatternConfig?: (config: PatternConfig) => void;
-  bgMedia: { type: 'image' | 'video', url: string } | null;
-  bgList: BackgroundMedia[];
-  currentBgIndex: number;
-  onRemoveBg: (id: string) => void;
-  onMoveBg: (index: number, dir: 'up' | 'down') => void;
-  onSelectBg: (index: number) => void;
-  onDeselectBg?: () => void;
-  onClearBgMedia: () => void;
-  bgAutoplayInterval: number;
-  setBgAutoplayInterval: (val: number) => void;
-  bgTransition: BgTransitionType; 
-  setBgTransition: (t: BgTransitionType) => void;
-  bgAnimation: BgAnimationType; 
-  setBgAnimation: (a: BgAnimationType) => void; 
-  useAlbumArtAsBackground: boolean; 
-  setUseAlbumArtAsBackground: (v: boolean) => void;
-  onBgMediaUpload: (files: FileList) => void; // New prop for direct upload
-}
-
+// SHARED CONSTANTS
 const PALETTE_OPTIONS = [
   { value: 'theme-sync', label: 'THEME SYNC' },
   { value: '#0f172a', label: 'SLATE' },
@@ -68,21 +43,21 @@ const PATTERNS = [
   { id: 'matrix', label: 'CODE' },
 ];
 
-const BackgroundSettings: React.FC<BackgroundSettingsProps> = ({
-  bgColor, setBgColor, bgPattern, setBgPattern, bgPatternConfig, setBgPatternConfig,
-  bgMedia, bgList, currentBgIndex, onRemoveBg, onMoveBg, onSelectBg, onDeselectBg,
-  bgAutoplayInterval, setBgAutoplayInterval,
-  bgTransition, setBgTransition,
-  bgAnimation, setBgAnimation,
-  useAlbumArtAsBackground, setUseAlbumArtAsBackground,
-  onBgMediaUpload
+// --- MODULE 1: CONFIGURATION ---
+interface BgConfigModuleProps {
+  bgAnimation: BgAnimationType;
+  setBgAnimation: (a: BgAnimationType) => void;
+  bgTransition: BgTransitionType;
+  setBgTransition: (t: BgTransitionType) => void;
+}
+
+export const BgConfigModule: React.FC<BgConfigModuleProps> = ({
+  bgAnimation,
+  setBgAnimation,
+  bgTransition,
+  setBgTransition
 }) => {
   const { t } = useLanguage();
-  const { colors } = useTheme();
-  
-  // Set default to true so it shows immediately
-  const [showBgList, setShowBgList] = useState(true);
-  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const transitionOptions = [
       { value: 'glitch', label: t('trans_glitch') },
@@ -99,256 +74,321 @@ const BackgroundSettings: React.FC<BackgroundSettingsProps> = ({
       { value: 'chaos', label: t('anim_chaos') }
   ];
 
+  return (
+    <div className="pt-2 space-y-3">
+        <CustomSelect 
+            label={t('bg_animation')}
+            value={bgAnimation}
+            options={animationOptions}
+            onChange={(v) => setBgAnimation(v as BgAnimationType)}
+        />
+        <CustomSelect 
+            label={t('transition_type')}
+            value={bgTransition}
+            options={transitionOptions}
+            onChange={(v) => setBgTransition(v as BgTransitionType)}
+        />
+    </div>
+  );
+};
+
+// --- MODULE 2: RESOURCES ---
+interface BgResourceModuleProps {
+  bgMedia: { type: 'image' | 'video', url: string } | null;
+  bgList: BackgroundMedia[];
+  currentBgIndex: number;
+  onRemoveBg: (id: string) => void;
+  onMoveBg: (index: number, dir: 'up' | 'down') => void;
+  onSelectBg: (index: number) => void;
+  onClearBgMedia: () => void;
+  onShuffleBg: () => void;
+  onBgMediaUpload: (files: FileList) => void;
+  bgAutoplayInterval: number;
+  setBgAutoplayInterval: (val: number) => void;
+  useAlbumArtAsBackground: boolean;
+  setUseAlbumArtAsBackground: (v: boolean) => void;
+}
+
+export const BgResourceModule: React.FC<BgResourceModuleProps> = ({
+  bgList, currentBgIndex, onRemoveBg, onMoveBg, onSelectBg,
+  onClearBgMedia, onShuffleBg, onBgMediaUpload,
+  bgAutoplayInterval, setBgAutoplayInterval,
+  useAlbumArtAsBackground, setUseAlbumArtAsBackground
+}) => {
+  const { t } = useLanguage();
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  
+  // By default expanded in module view
+  const [showBgList, setShowBgList] = useState(true);
+
   const isTimerOn = bgAutoplayInterval > 0;
   
   const toggleTimer = () => {
       if (isTimerOn) {
           setBgAutoplayInterval(0);
       } else {
-          setBgAutoplayInterval(5); // Default to 5 minutes
+          setBgAutoplayInterval(5); 
       }
   };
 
   return (
-    <div className="pt-2 space-y-4">
-      
-      {/* 1. Animation Control */}
-      <CustomSelect 
-          label={t('bg_animation')}
-          value={bgAnimation}
-          options={animationOptions}
-          onChange={(v) => setBgAnimation(v as BgAnimationType)}
-      />
-
-      {/* 2. Transition Control */}
-      <CustomSelect 
-          label={t('transition_type')}
-          value={bgTransition}
-          options={transitionOptions}
-          onChange={(v) => setBgTransition(v as BgTransitionType)}
-      />
-
-      {/* 3. BG List Resource */}
-      <div className="rounded bg-theme-panel/40 overflow-hidden mb-2 transition-all duration-300 border border-theme-border hover:border-theme-primary hover:shadow-[0_0_5px_var(--color-primary)]">
-          <button 
-              onClick={() => setShowBgList(!showBgList)}
-              className="w-full flex items-center justify-between p-2 text-xs font-mono text-theme-muted hover:text-theme-text hover:bg-theme-panel transition-colors"
-          >
-              <div className="flex items-center gap-2">
-                  <List size={12} />
-                  <span>BG RESOURCES [{bgList.length}]</span>
-              </div>
-              <ChevronDown size={12} className={`transition-transform duration-300 ${showBgList ? 'rotate-180' : ''}`} />
-          </button>
-          
-          <div 
-            className={`grid transition-[grid-template-rows] duration-300 ease-in-out
-                ${showBgList ? 'grid-rows-[1fr]' : 'grid-rows-[0fr]'}
-            `}
-          >
-              <div className="overflow-hidden">
-                {/* Timer Control */}
-                <div className="flex items-center justify-between px-3 py-2 border-t border-b border-theme-border bg-theme-panel/50">
-                    <div className="flex items-center gap-2 text-theme-muted">
-                        <Timer size={12} />
-                        <span className="text-[10px] font-mono tracking-wider">{t('auto_timer')}</span>
-                    </div>
-                    <div className="flex items-center gap-3">
-                        <div className={`flex items-center gap-2 bg-black rounded border border-theme-border px-1 transition-opacity ${!isTimerOn ? 'opacity-50 pointer-events-none' : 'opacity-100'}`}>
-                            <button 
-                                onClick={() => setBgAutoplayInterval(Math.max(0, bgAutoplayInterval - 1))}
-                                className="p-0.5 hover:text-theme-primary transition-colors"
-                            >
-                                <ChevronDown size={14} />
-                            </button>
-                            <span className={`text-xs font-mono font-bold min-w-[20px] text-center ${bgAutoplayInterval > 0 ? 'text-theme-accent' : 'text-theme-muted'}`}>
-                                {String(bgAutoplayInterval).padStart(2, '0')}
-                            </span>
-                            <button 
-                                onClick={() => setBgAutoplayInterval(bgAutoplayInterval + 1)}
-                                className="p-0.5 hover:text-theme-primary transition-colors"
-                            >
-                                <ChevronUp size={14} />
-                            </button>
-                        </div>
-                        
-                        {/* Timer Toggle */}
-                        <button 
-                            onClick={toggleTimer}
-                            className={`p-1 rounded border transition-all ${isTimerOn ? 'text-green-500 border-green-500/50 bg-green-500/10' : 'text-theme-muted border-gray-700 bg-gray-800'}`}
-                            title={isTimerOn ? "TIMER ON" : "TIMER OFF"}
-                        >
-                            <Power size={14} />
-                        </button>
-                    </div>
+    <div className="pt-2 space-y-3">
+        <div className="rounded bg-theme-panel/40 overflow-hidden mb-2 transition-all duration-300 border border-theme-border hover:border-theme-primary hover:shadow-[0_0_5px_var(--color-primary)]">
+            <button 
+                onClick={() => setShowBgList(!showBgList)}
+                className="w-full flex items-center justify-between p-2 text-xs font-mono text-theme-muted hover:text-theme-text hover:bg-theme-panel transition-colors"
+            >
+                <div className="flex items-center gap-2">
+                    <List size={12} />
+                    <span>BG RESOURCES [{bgList.length}]</span>
                 </div>
+                <ChevronDown size={12} className={`transition-transform duration-300 ${showBgList ? 'rotate-180' : ''}`} />
+            </button>
+            
+            <div 
+              className={`grid transition-[grid-template-rows] duration-300 ease-in-out
+                  ${showBgList ? 'grid-rows-[1fr]' : 'grid-rows-[0fr]'}
+              `}
+            >
+                <div className="overflow-hidden">
+                  {/* Timer Control */}
+                  <div className="flex items-center justify-between px-3 py-2 border-t border-b border-theme-border bg-theme-panel/50">
+                      <div className="flex items-center gap-2 text-theme-muted">
+                          <Timer size={12} />
+                          <span className="text-[10px] font-mono tracking-wider">{t('auto_timer')}</span>
+                      </div>
+                      <div className="flex items-center gap-3">
+                          <div className={`flex items-center gap-2 bg-black rounded border border-theme-border px-1 transition-opacity ${!isTimerOn ? 'opacity-50 pointer-events-none' : 'opacity-100'}`}>
+                              <button 
+                                  onClick={() => setBgAutoplayInterval(Math.max(0, bgAutoplayInterval - 1))}
+                                  className="p-0.5 hover:text-theme-primary transition-colors"
+                              >
+                                  <ChevronDown size={14} />
+                              </button>
+                              <span className={`text-xs font-mono font-bold min-w-[20px] text-center ${bgAutoplayInterval > 0 ? 'text-theme-accent' : 'text-theme-muted'}`}>
+                                  {String(bgAutoplayInterval).padStart(2, '0')}
+                              </span>
+                              <button 
+                                  onClick={() => setBgAutoplayInterval(bgAutoplayInterval + 1)}
+                                  className="p-0.5 hover:text-theme-primary transition-colors"
+                              >
+                                  <ChevronUp size={14} />
+                              </button>
+                          </div>
+                          
+                          {/* Timer Toggle */}
+                          <Tooltip content={isTimerOn ? "DISABLE TIMER" : "ENABLE TIMER"} position="top">
+                              <button 
+                                  onClick={toggleTimer}
+                                  className={`p-1 rounded border transition-all ${isTimerOn ? 'text-green-500 border-green-500/50 bg-green-500/10' : 'text-theme-muted border-gray-700 bg-gray-800'}`}
+                              >
+                                  <Power size={14} />
+                              </button>
+                          </Tooltip>
+                      </div>
+                  </div>
 
-                {/* Load Button */}
-                <div className="p-2 border-b border-theme-border">
-                    <button 
-                        onClick={() => fileInputRef.current?.click()}
-                        className="w-full py-2 bg-theme-panel border border-theme-border rounded text-theme-muted hover:text-theme-text hover:border-theme-accent transition-all flex items-center justify-center gap-2 group text-xs font-mono"
-                    >
-                        <Upload size={14} className="text-theme-accent group-hover:scale-110 transition-transform" />
-                        <span>LOAD BG</span>
-                    </button>
+                  {/* Load, Shuffle, Clear Buttons */}
+                  <div className="p-2 border-b border-theme-border flex gap-2">
+                      <Tooltip content="ADD IMAGES OR VIDEO" position="top" className="flex-1">
+                          <button 
+                              onClick={() => fileInputRef.current?.click()}
+                              className="w-full py-2 bg-theme-panel border border-theme-border rounded text-theme-muted hover:text-theme-text hover:border-theme-accent transition-all flex items-center justify-center gap-2 group text-xs font-mono"
+                          >
+                              <Upload size={14} className="text-theme-accent group-hover:scale-110 transition-transform" />
+                              <span>LOAD BG</span>
+                          </button>
+                      </Tooltip>
+                      
+                      <Tooltip content="SHUFFLE BACKGROUNDS" position="top">
+                          <button 
+                              onClick={onShuffleBg}
+                              className="px-3 py-2 bg-theme-panel border border-theme-border rounded text-theme-muted hover:text-theme-secondary hover:border-theme-secondary transition-all flex items-center justify-center group"
+                          >
+                              <Shuffle size={14} className="group-hover:scale-110 transition-transform" />
+                          </button>
+                      </Tooltip>
+
+                      <Tooltip content="CLEAR RESOURCES" position="top">
+                          <button 
+                              onClick={onClearBgMedia}
+                              className="px-3 py-2 bg-theme-panel border border-theme-border rounded text-theme-muted hover:text-red-500 hover:border-red-500 transition-all flex items-center justify-center group"
+                          >
+                              <Trash2 size={14} className="group-hover:scale-110 transition-transform" />
+                          </button>
+                      </Tooltip>
+                  </div>
+
+                  {/* List Content */}
+                  <div className="p-2 space-y-1 overflow-y-auto max-h-48 custom-scrollbar">
+                      {bgList.length === 0 && (
+                          <div className="text-center py-4 text-theme-muted text-[10px] font-mono italic opacity-50">
+                              NO BACKGROUNDS LOADED
+                          </div>
+                      )}
+                      {bgList.map((bg, index) => (
+                          <div 
+                              key={bg.id} 
+                              className={`
+                                  flex items-center justify-between p-2 rounded text-xs font-mono border cursor-pointer group
+                                  ${index === currentBgIndex 
+                                      ? 'bg-theme-panel border-theme-primary text-theme-primary' 
+                                      : 'bg-transparent border-transparent text-theme-muted hover:bg-theme-panel/50 hover:text-theme-text'}
+                              `}
+                              onClick={() => onSelectBg(index)}
+                          >
+                              <div className="flex items-center gap-2 overflow-hidden">
+                                  <div className={`w-1.5 h-1.5 rounded-full ${index === currentBgIndex ? 'bg-theme-primary shadow-[0_0_5px_var(--color-primary)]' : 'bg-gray-600'}`}></div>
+                                  <span className="truncate max-w-[120px] font-mono">{bg.file.name}</span>
+                              </div>
+                              <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                  <button 
+                                      onClick={(e) => { e.stopPropagation(); onMoveBg(index, 'up'); }} 
+                                      disabled={index === 0}
+                                      className="p-1 hover:text-theme-accent disabled:opacity-30"
+                                  >
+                                      <ChevronUp size={12} />
+                                  </button>
+                                  <button 
+                                      onClick={(e) => { e.stopPropagation(); onMoveBg(index, 'down'); }} 
+                                      disabled={index === bgList.length - 1}
+                                      className="p-1 hover:text-theme-accent disabled:opacity-30"
+                                  >
+                                      <ChevronDown size={12} />
+                                  </button>
+                                  <button 
+                                      onClick={(e) => { e.stopPropagation(); onRemoveBg(bg.id); }}
+                                      className="p-1 text-theme-muted hover:text-red-500 transition-colors"
+                                  >
+                                      <Trash2 size={12} />
+                                  </button>
+                              </div>
+                          </div>
+                      ))}
+                  </div>
                 </div>
+            </div>
+        </div>
 
-                {/* List Content */}
-                <div className="p-2 space-y-1 overflow-y-auto max-h-48 custom-scrollbar">
-                    {bgList.length === 0 && (
-                        <div className="text-center py-4 text-theme-muted text-[10px] font-mono italic opacity-50">
-                            NO BACKGROUNDS LOADED
-                        </div>
-                    )}
-                    {bgList.map((bg, index) => (
-                        <div 
-                            key={bg.id} 
-                            className={`
-                                flex items-center justify-between p-2 rounded text-xs border cursor-pointer group
-                                ${index === currentBgIndex 
-                                    ? 'bg-theme-panel border-theme-primary text-theme-primary' 
-                                    : 'bg-transparent border-transparent text-theme-muted hover:bg-theme-panel/50 hover:text-theme-text'}
-                            `}
-                            onClick={() => onSelectBg(index)}
-                        >
-                            <div className="flex items-center gap-2 overflow-hidden">
-                                <div className={`w-1.5 h-1.5 rounded-full ${index === currentBgIndex ? 'bg-theme-primary shadow-[0_0_5px_var(--color-primary)]' : 'bg-gray-600'}`}></div>
-                                <span className="truncate max-w-[120px] font-mono">{bg.file.name}</span>
-                            </div>
-                            <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                                <button 
-                                    onClick={(e) => { e.stopPropagation(); onMoveBg(index, 'up'); }} 
-                                    disabled={index === 0}
-                                    className="p-1 hover:text-theme-accent disabled:opacity-30"
-                                >
-                                    <ChevronUp size={12} />
-                                </button>
-                                <button 
-                                    onClick={(e) => { e.stopPropagation(); onMoveBg(index, 'down'); }} 
-                                    disabled={index === bgList.length - 1}
-                                    className="p-1 hover:text-theme-accent disabled:opacity-30"
-                                >
-                                    <ChevronDown size={12} />
-                                </button>
-                                <button 
-                                    onClick={(e) => { e.stopPropagation(); onRemoveBg(bg.id); }}
-                                    className="p-1 text-theme-muted hover:text-red-500 transition-colors"
-                                >
-                                    <Trash2 size={12} />
-                                </button>
-                            </div>
-                        </div>
-                    ))}
-                </div>
-              </div>
-          </div>
-      </div>
+        <ToggleSwitch 
+            label={t('use_album_art')} 
+            icon={Disc} 
+            value={useAlbumArtAsBackground} 
+            onChange={setUseAlbumArtAsBackground} 
+            color="blue"
+        />
 
-      {/* 4. Colors */}
-      <div>
-          <label className="text-theme-text font-mono text-[10px] block mb-2 tracking-widest uppercase opacity-70">PALETTE</label>
-          <div className="grid grid-cols-6 gap-1.5 mb-3">
-              {PALETTE_OPTIONS.map((opt) => {
-                const isThemeSync = opt.value === 'theme-sync';
-                // Resolve display color: if theme-sync, use current theme bg, else use the value
-                const displayColor = isThemeSync ? colors.bg : opt.value;
-                const isActive = bgColor === opt.value;
-
-                return (
-                  <Tooltip key={opt.value} content={opt.label} position="top">
-                    <button 
-                        onClick={() => { 
-                          setBgColor(opt.value); 
-                          if (onDeselectBg) onDeselectBg(); 
-                        }} 
-                        className={`
-                          h-6 w-full rounded-sm border relative overflow-hidden group
-                          ${isActive && !bgMedia 
-                              ? 'border-theme-secondary shadow-[0_0_10px_var(--color-secondary)] scale-105 z-10' 
-                              : 'border-gray-700 hover:border-theme-primary'}
-                        `}
-                        style={{ backgroundColor: displayColor }} 
-                    >
-                        {isThemeSync && (
-                           <div className="absolute inset-0 flex items-center justify-center bg-black/20 group-hover:bg-transparent transition-colors">
-                              <RefreshCw size={10} className={`text-theme-primary ${isActive ? 'animate-spin-slow' : ''}`} />
-                           </div>
-                        )}
-                    </button>
-                  </Tooltip>
-                );
-              })}
-          </div>
-      </div>
-      
-      {/* 5. Patterns */}
-      <div>
-          <label className="text-theme-text font-mono text-[10px] block mb-2 tracking-widest uppercase opacity-70">OVERLAY PATTERN</label>
-          <div className="grid grid-cols-3 gap-1.5 mb-3">
-              {setBgPattern && PATTERNS.map(p => (
-              <button 
-                  key={p.id}
-                  onClick={() => setBgPattern(p.id)}
-                  className={`
-                      px-1 py-1 text-[9px] font-mono border rounded-sm transition-all
-                      ${bgPattern === p.id 
-                          ? 'border-theme-primary bg-theme-primary/20 text-theme-primary shadow-[0_0_5px_var(--color-primary)]' 
-                          : 'border-theme-border bg-black/20 text-theme-muted hover:border-theme-primary hover:text-theme-text'}
-                  `}
-              >
-                  {p.label}
-              </button>
-              ))}
-          </div>
-      </div>
-
-      {/* Pattern Intensity & Scale */}
-      {bgPattern !== 'none' && bgPatternConfig && setBgPatternConfig && (
-          <div className="space-y-3 pt-2 border-t border-theme-border/50">
-              <RangeControl 
-              label={t('intensity')} 
-              value={bgPatternConfig.intensity} 
-              min={0} max={1} step={0.05} 
-              onChange={(v) => setBgPatternConfig({ ...bgPatternConfig, intensity: v })} 
-              className="mb-0"
-              />
-              <RangeControl 
-              label={t('scale')} 
-              value={bgPatternConfig.scale} 
-              min={0.1} max={5.0} step={0.1} 
-              onChange={(v) => setBgPatternConfig({ ...bgPatternConfig, scale: v })} 
-              className="mb-0"
-              />
-          </div>
-      )}
-
-      {/* 6. Album Art Toggle */}
-      <div className="mt-2">
-          <ToggleSwitch 
-              label={t('use_album_art')} 
-              icon={Disc} 
-              value={useAlbumArtAsBackground} 
-              onChange={setUseAlbumArtAsBackground} 
-              color="blue"
-          />
-      </div>
-
-      <input 
-        type="file" 
-        ref={fileInputRef} 
-        onChange={e => {
-            if(e.target.files && e.target.files.length > 0) {
-                onBgMediaUpload(e.target.files);
-                e.target.value = '';
-            }
-        }} 
-        accept="image/*,video/*" 
-        multiple
-        className="hidden" 
-      />
+        <input 
+          type="file" 
+          ref={fileInputRef} 
+          onChange={e => {
+              if(e.target.files && e.target.files.length > 0) {
+                  onBgMediaUpload(e.target.files);
+                  e.target.value = '';
+              }
+          }} 
+          accept="image/*,video/*" 
+          multiple
+          className="hidden" 
+        />
     </div>
   );
 };
 
-export default BackgroundSettings;
+// --- MODULE 3: COLORS & PATTERNS ---
+interface BgColorModuleProps {
+  bgColor: string;
+  setBgColor: (color: string) => void;
+  bgPattern?: string;
+  setBgPattern?: (pattern: string) => void;
+  bgPatternConfig?: PatternConfig;
+  setBgPatternConfig?: (config: PatternConfig) => void;
+  bgMedia: { type: 'image' | 'video', url: string } | null;
+  onDeselectBg?: () => void;
+}
+
+export const BgColorModule: React.FC<BgColorModuleProps> = ({
+  bgColor, setBgColor, bgPattern, setBgPattern, bgPatternConfig, setBgPatternConfig, bgMedia, onDeselectBg
+}) => {
+  const { t } = useLanguage();
+  const { colors } = useTheme();
+
+  return (
+    <div className="pt-2 space-y-4">
+        {/* Colors */}
+        <div>
+            <div className="grid grid-cols-6 gap-1.5 mb-3">
+                {PALETTE_OPTIONS.map((opt) => {
+                  const isThemeSync = opt.value === 'theme-sync';
+                  const displayColor = isThemeSync ? colors.bg : opt.value;
+                  const isActive = bgColor === opt.value;
+
+                  return (
+                    <Tooltip key={opt.value} content={opt.label} position="top">
+                      <button 
+                          onClick={() => { 
+                            setBgColor(opt.value); 
+                            if (onDeselectBg) onDeselectBg(); 
+                          }} 
+                          className={`
+                            h-6 w-full rounded-sm border relative overflow-hidden group
+                            ${isActive && !bgMedia 
+                                ? 'border-theme-secondary shadow-[0_0_10px_var(--color-secondary)] scale-105 z-10' 
+                                : 'border-gray-700 hover:border-theme-primary'}
+                          `}
+                          style={{ backgroundColor: displayColor }} 
+                      >
+                          {isThemeSync && (
+                             <div className="absolute inset-0 flex items-center justify-center bg-black/20 group-hover:bg-transparent transition-colors">
+                                <RefreshCw size={10} className={`text-theme-primary ${isActive ? 'animate-spin-slow' : ''}`} />
+                             </div>
+                          )}
+                      </button>
+                    </Tooltip>
+                  );
+                })}
+            </div>
+        </div>
+        
+        {/* Patterns */}
+        <div>
+            <div className="grid grid-cols-3 gap-1.5 mb-3">
+                {setBgPattern && PATTERNS.map(p => (
+                <button 
+                    key={p.id}
+                    onClick={() => setBgPattern(p.id)}
+                    className={`
+                        px-1 py-1 text-[9px] font-mono border rounded-sm transition-all
+                        ${bgPattern === p.id 
+                            ? 'border-theme-primary bg-theme-primary/20 text-theme-primary shadow-[0_0_5px_var(--color-primary)]' 
+                            : 'border-theme-border bg-black/20 text-theme-muted hover:border-theme-primary hover:text-theme-text'}
+                    `}
+                >
+                    {p.label}
+                </button>
+                ))}
+            </div>
+        </div>
+
+        {/* Pattern Config */}
+        {bgPattern !== 'none' && bgPatternConfig && setBgPatternConfig && (
+            <div className="space-y-3 pt-2 border-t border-theme-border/50">
+                <RangeControl 
+                label={t('intensity')} 
+                value={bgPatternConfig.intensity} 
+                min={0} max={1} step={0.05} 
+                onChange={(v) => setBgPatternConfig({ ...bgPatternConfig, intensity: v })} 
+                className="mb-0"
+                />
+                <RangeControl 
+                label={t('scale')} 
+                value={bgPatternConfig.scale} 
+                min={0.1} max={5.0} step={0.1} 
+                onChange={(v) => setBgPatternConfig({ ...bgPatternConfig, scale: v })} 
+                className="mb-0"
+                />
+            </div>
+        )}
+    </div>
+  );
+};

@@ -5,6 +5,7 @@ import { getAllBackgrounds, saveBackground, clearBackgrounds, deleteBackground }
 import { 
   DEFAULT_VISUALIZER_CONFIG, 
   DEFAULT_REACTOR_CONFIG,
+  DEFAULT_SINE_WAVE_CONFIG,
   DEFAULT_DVD_CONFIG, 
   DEFAULT_EFFECTS_CONFIG, 
   DEFAULT_MARQUEE_CONFIG, 
@@ -15,6 +16,7 @@ import { DEFAULT_PRESETS, DEFAULT_SYSTEM_PRESET } from '../config/presets';
 const STORAGE_KEYS = {
   VISUALIZER: 'neon_visualizer_config',
   REACTOR: 'neon_reactor_config',
+  SINE_WAVE: 'neon_sine_wave_config', // NEW
   DVD: 'neon_dvd_config',
   EFFECTS: 'neon_effects_config',
   BG_COLOR: 'neon_bg_color',
@@ -22,6 +24,7 @@ const STORAGE_KEYS = {
   BG_PATTERN_CONFIG: 'neon_bg_pattern_config',
   SHOW_VISUALIZER: 'neon_show_visualizer',
   SHOW_VISUALIZER_3D: 'neon_show_visualizer_3d', 
+  SHOW_SINE_WAVE: 'neon_show_sine_wave', // NEW
   SHOW_DVD: 'neon_show_dvd',
   MARQUEE: 'neon_marquee_config',
   WATERMARK: 'neon_watermark_config',
@@ -32,7 +35,7 @@ const STORAGE_KEYS = {
   RETRO_CURSOR: 'neon_retro_cursor_style',
   API_KEY: 'neon_gemini_api_key',
   BG_TRANSITION: 'neon_bg_transition',
-  BG_ANIMATION: 'neon_bg_animation', // NEW KEY
+  BG_ANIMATION: 'neon_bg_animation', 
   ADVANCED_MODE: 'neon_advanced_mode',
   USE_ALBUM_ART: 'neon_use_album_art'
 };
@@ -72,11 +75,12 @@ export const useAppConfig = () => {
   const [apiKey, setApiKey] = useState(() => localStorage.getItem(STORAGE_KEYS.API_KEY) || '');
   const [showVisualizer, setShowVisualizer] = useState(() => getInitial(STORAGE_KEYS.SHOW_VISUALIZER, true));
   const [showVisualizer3D, setShowVisualizer3D] = useState(() => getInitial(STORAGE_KEYS.SHOW_VISUALIZER_3D, false)); 
+  const [showSineWave, setShowSineWave] = useState(() => getInitial(STORAGE_KEYS.SHOW_SINE_WAVE, false)); // NEW
   const [showDvd, setShowDvd] = useState(() => getInitial(STORAGE_KEYS.SHOW_DVD, true));
   const [cursorStyle, setCursorStyle] = useState<CursorStyle>(() => getInitial(STORAGE_KEYS.CURSOR, 'theme-sync'));
   const [retroScreenCursorStyle, setRetroScreenCursorStyle] = useState<CursorStyle>(() => getInitial(STORAGE_KEYS.RETRO_CURSOR, 'dos-terminal'));
   const [bgTransition, setBgTransition] = useState<BgTransitionType>(() => getInitial(STORAGE_KEYS.BG_TRANSITION, 'glitch'));
-  const [bgAnimation, setBgAnimation] = useState<BgAnimationType>(() => getInitial(STORAGE_KEYS.BG_ANIMATION, 'none')); // NEW STATE
+  const [bgAnimation, setBgAnimation] = useState<BgAnimationType>(() => getInitial(STORAGE_KEYS.BG_ANIMATION, 'none')); 
   const [isAdvancedMode, setAdvancedMode] = useState(() => getInitial(STORAGE_KEYS.ADVANCED_MODE, false));
   const [useAlbumArtAsBackground, setUseAlbumArtAsBackground] = useState(() => getInitial(STORAGE_KEYS.USE_ALBUM_ART, false));
   
@@ -86,6 +90,7 @@ export const useAppConfig = () => {
   // Independent Configs
   const [visualizerConfig, setVisualizerConfig] = useState<VisualizerConfig>(() => getInitial(STORAGE_KEYS.VISUALIZER, DEFAULT_VISUALIZER_CONFIG));
   const [reactorConfig, setReactorConfig] = useState<VisualizerConfig>(() => getInitial(STORAGE_KEYS.REACTOR, DEFAULT_REACTOR_CONFIG));
+  const [sineWaveConfig, setSineWaveConfig] = useState<VisualizerConfig>(() => getInitial(STORAGE_KEYS.SINE_WAVE, DEFAULT_SINE_WAVE_CONFIG)); // NEW
   
   const [dvdConfig, setDvdConfig] = useState<DvdConfig>(() => getInitial(STORAGE_KEYS.DVD, DEFAULT_DVD_CONFIG));
   const [effectsConfig, setEffectsConfig] = useState<EffectsConfig>(() => getInitial(STORAGE_KEYS.EFFECTS, DEFAULT_EFFECTS_CONFIG));
@@ -98,6 +103,9 @@ export const useAppConfig = () => {
   const [currentBgIndex, setCurrentBgIndex] = useState<number>(0);
   
   const [bgAutoplayInterval, setBgAutoplayInterval] = useState<number>(() => getInitial(STORAGE_KEYS.BG_AUTOPLAY, 5));
+  
+  // State to force timer reset
+  const [timerResetToken, setTimerResetToken] = useState(0);
 
   // Active Preset State
   const [activePresetId, setActivePresetId] = useState<string | null>(() => {
@@ -126,6 +134,7 @@ export const useAppConfig = () => {
   useEffect(() => {
     localStorage.setItem(STORAGE_KEYS.VISUALIZER, JSON.stringify(visualizerConfig));
     localStorage.setItem(STORAGE_KEYS.REACTOR, JSON.stringify(reactorConfig));
+    localStorage.setItem(STORAGE_KEYS.SINE_WAVE, JSON.stringify(sineWaveConfig)); // NEW
     localStorage.setItem(STORAGE_KEYS.DVD, JSON.stringify(dvdConfig));
     localStorage.setItem(STORAGE_KEYS.EFFECTS, JSON.stringify(effectsConfig));
     localStorage.setItem(STORAGE_KEYS.BG_COLOR, bgColor);
@@ -133,6 +142,7 @@ export const useAppConfig = () => {
     localStorage.setItem(STORAGE_KEYS.BG_PATTERN_CONFIG, JSON.stringify(bgPatternConfig));
     localStorage.setItem(STORAGE_KEYS.SHOW_VISUALIZER, JSON.stringify(showVisualizer));
     localStorage.setItem(STORAGE_KEYS.SHOW_VISUALIZER_3D, JSON.stringify(showVisualizer3D));
+    localStorage.setItem(STORAGE_KEYS.SHOW_SINE_WAVE, JSON.stringify(showSineWave)); // NEW
     localStorage.setItem(STORAGE_KEYS.SHOW_DVD, JSON.stringify(showDvd));
     localStorage.setItem(STORAGE_KEYS.MARQUEE, JSON.stringify(marqueeConfig));
     localStorage.setItem(STORAGE_KEYS.WATERMARK, JSON.stringify(watermarkConfig));
@@ -140,10 +150,10 @@ export const useAppConfig = () => {
     localStorage.setItem(STORAGE_KEYS.CURSOR, JSON.stringify(cursorStyle));
     localStorage.setItem(STORAGE_KEYS.RETRO_CURSOR, JSON.stringify(retroScreenCursorStyle));
     localStorage.setItem(STORAGE_KEYS.BG_TRANSITION, JSON.stringify(bgTransition));
-    localStorage.setItem(STORAGE_KEYS.BG_ANIMATION, JSON.stringify(bgAnimation)); // Save new state
+    localStorage.setItem(STORAGE_KEYS.BG_ANIMATION, JSON.stringify(bgAnimation)); 
     localStorage.setItem(STORAGE_KEYS.ADVANCED_MODE, JSON.stringify(isAdvancedMode));
     localStorage.setItem(STORAGE_KEYS.USE_ALBUM_ART, JSON.stringify(useAlbumArtAsBackground));
-  }, [visualizerConfig, reactorConfig, dvdConfig, effectsConfig, bgColor, bgPattern, bgPatternConfig, showVisualizer, showVisualizer3D, showDvd, marqueeConfig, watermarkConfig, bgAutoplayInterval, cursorStyle, retroScreenCursorStyle, bgTransition, bgAnimation, isAdvancedMode, useAlbumArtAsBackground]);
+  }, [visualizerConfig, reactorConfig, sineWaveConfig, dvdConfig, effectsConfig, bgColor, bgPattern, bgPatternConfig, showVisualizer, showVisualizer3D, showSineWave, showDvd, marqueeConfig, watermarkConfig, bgAutoplayInterval, cursorStyle, retroScreenCursorStyle, bgTransition, bgAnimation, isAdvancedMode, useAlbumArtAsBackground]);
 
   useEffect(() => {
     localStorage.setItem(STORAGE_KEYS.PRESETS, JSON.stringify(savedPresets));
@@ -226,11 +236,13 @@ export const useAppConfig = () => {
   const selectBg = (index: number) => {
       if (index >= 0 && index < bgList.length) {
         setCurrentBgIndex(index);
+        setTimerResetToken(prev => prev + 1); // Reset auto-timer
       }
   };
 
   const deselectBg = () => {
       setCurrentBgIndex(-1);
+      setTimerResetToken(prev => prev + 1); // Reset auto-timer
   };
 
   const handleClearBg = async () => {
@@ -240,14 +252,29 @@ export const useAppConfig = () => {
     setCurrentBgIndex(0);
   };
 
+  const shuffleBgList = () => {
+      setBgList(prev => {
+          const shuffled = [...prev];
+          for (let i = shuffled.length - 1; i > 0; i--) {
+              const j = Math.floor(Math.random() * (i + 1));
+              [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+          }
+          return shuffled;
+      });
+      setCurrentBgIndex(0); // Start from first item of new order
+      setTimerResetToken(prev => prev + 1); // Reset auto-timer
+  };
+
   const nextBg = useCallback(() => {
     if (bgList.length === 0) return;
     setCurrentBgIndex(prev => (prev + 1) % bgList.length);
+    setTimerResetToken(prev => prev + 1); // Reset auto-timer
   }, [bgList.length]);
 
   const prevBg = useCallback(() => {
     if (bgList.length === 0) return;
     setCurrentBgIndex(prev => (prev - 1 + bgList.length) % bgList.length);
+    setTimerResetToken(prev => prev + 1); // Reset auto-timer
   }, [bgList.length]);
 
   useEffect(() => {
@@ -257,7 +284,7 @@ export const useAppConfig = () => {
       nextBg();
     }, intervalMs);
     return () => clearInterval(intervalId);
-  }, [bgList.length, bgAutoplayInterval, nextBg]);
+  }, [bgList.length, bgAutoplayInterval, nextBg, timerResetToken]); // Add timerResetToken to dependency
 
   // --- PRESET MANAGEMENT ---
 
@@ -270,6 +297,7 @@ export const useAppConfig = () => {
       config: {
         visualizerConfig,
         reactorConfig, 
+        sineWaveConfig, // NEW
         dvdConfig,
         effectsConfig,
         marqueeConfig,
@@ -279,6 +307,7 @@ export const useAppConfig = () => {
         bgPatternConfig,
         showVisualizer,
         showVisualizer3D,
+        showSineWave, // NEW
         showDvd,
         bgAutoplayInterval,
         cursorStyle,
@@ -286,7 +315,7 @@ export const useAppConfig = () => {
         theme,
         controlStyle,
         bgTransition,
-        bgAnimation // Save new state
+        bgAnimation 
       }
     };
     setSavedPresets(prev => [...prev, newPreset]);
@@ -301,6 +330,7 @@ export const useAppConfig = () => {
                   config: {
                     visualizerConfig,
                     reactorConfig,
+                    sineWaveConfig, // NEW
                     dvdConfig,
                     effectsConfig,
                     marqueeConfig,
@@ -310,6 +340,7 @@ export const useAppConfig = () => {
                     bgPatternConfig,
                     showVisualizer,
                     showVisualizer3D,
+                    showSineWave, // NEW
                     showDvd,
                     bgAutoplayInterval,
                     cursorStyle,
@@ -317,7 +348,7 @@ export const useAppConfig = () => {
                     theme: currentTheme,
                     controlStyle: currentControlStyle,
                     bgTransition,
-                    bgAnimation // Save new state
+                    bgAnimation 
                   }
               };
           }
@@ -345,6 +376,7 @@ export const useAppConfig = () => {
     
     setVisualizerConfig(safeMerge(DEFAULT_VISUALIZER_CONFIG, config.visualizerConfig));
     setReactorConfig(safeMerge(DEFAULT_REACTOR_CONFIG, config.reactorConfig || DEFAULT_REACTOR_CONFIG));
+    setSineWaveConfig(safeMerge(DEFAULT_SINE_WAVE_CONFIG, config.sineWaveConfig || DEFAULT_SINE_WAVE_CONFIG)); // NEW
     setDvdConfig(safeMerge(DEFAULT_DVD_CONFIG, config.dvdConfig));
     setEffectsConfig(safeMerge(DEFAULT_EFFECTS_CONFIG, config.effectsConfig));
     setMarqueeConfig(safeMerge(DEFAULT_MARQUEE_CONFIG, config.marqueeConfig));
@@ -356,13 +388,14 @@ export const useAppConfig = () => {
     
     setShowVisualizer(config.showVisualizer ?? true);
     setShowVisualizer3D(config.showVisualizer3D ?? false); 
+    setShowSineWave(config.showSineWave ?? false); // NEW
     setShowDvd(config.showDvd ?? true);
     setBgAutoplayInterval(config.bgAutoplayInterval ?? 5);
     
     if (config.cursorStyle) setCursorStyle(config.cursorStyle);
     if (config.retroScreenCursorStyle) setRetroScreenCursorStyle(config.retroScreenCursorStyle);
     if (config.bgTransition) setBgTransition(config.bgTransition);
-    if (config.bgAnimation) setBgAnimation(config.bgAnimation); // Load new state
+    if (config.bgAnimation) setBgAnimation(config.bgAnimation); 
     
     return config;
   };
@@ -384,7 +417,7 @@ export const useAppConfig = () => {
 
   const exportConfig = (theme: ThemeType, controlStyle: ControlStyle) => {
     const config = {
-      visualizerConfig, reactorConfig, dvdConfig, effectsConfig, bgColor, bgPattern, bgPatternConfig, showVisualizer, showVisualizer3D, showDvd, marqueeConfig, watermarkConfig, bgAutoplayInterval, cursorStyle, retroScreenCursorStyle, theme, controlStyle, bgTransition, bgAnimation, version: '1.5'
+      visualizerConfig, reactorConfig, sineWaveConfig, dvdConfig, effectsConfig, bgColor, bgPattern, bgPatternConfig, showVisualizer, showVisualizer3D, showSineWave, showDvd, marqueeConfig, watermarkConfig, bgAutoplayInterval, cursorStyle, retroScreenCursorStyle, theme, controlStyle, bgTransition, bgAnimation, version: '1.6'
     };
     const blob = new Blob([JSON.stringify(config, null, 2)], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
@@ -406,6 +439,7 @@ export const useAppConfig = () => {
         // 1. Sanitize Data
         const visualizerSafe = safeMerge(DEFAULT_VISUALIZER_CONFIG, rawContent.visualizerConfig);
         const reactorSafe = safeMerge(DEFAULT_REACTOR_CONFIG, rawContent.reactorConfig || DEFAULT_REACTOR_CONFIG);
+        const sineWaveSafe = safeMerge(DEFAULT_SINE_WAVE_CONFIG, rawContent.sineWaveConfig || DEFAULT_SINE_WAVE_CONFIG); // NEW
         const dvdSafe = safeMerge(DEFAULT_DVD_CONFIG, rawContent.dvdConfig);
         const effectsSafe = safeMerge(DEFAULT_EFFECTS_CONFIG, rawContent.effectsConfig);
         const marqueeSafe = safeMerge(DEFAULT_MARQUEE_CONFIG, rawContent.marqueeConfig);
@@ -415,6 +449,7 @@ export const useAppConfig = () => {
         // 2. Apply States
         setVisualizerConfig(visualizerSafe);
         setReactorConfig(reactorSafe);
+        setSineWaveConfig(sineWaveSafe); // NEW
         setDvdConfig(dvdSafe);
         setEffectsConfig(effectsSafe);
         setMarqueeConfig(marqueeSafe);
@@ -426,13 +461,14 @@ export const useAppConfig = () => {
         
         if (typeof rawContent.showVisualizer === 'boolean') setShowVisualizer(rawContent.showVisualizer);
         if (typeof rawContent.showVisualizer3D === 'boolean') setShowVisualizer3D(rawContent.showVisualizer3D);
+        if (typeof rawContent.showSineWave === 'boolean') setShowSineWave(rawContent.showSineWave); // NEW
         if (typeof rawContent.showDvd === 'boolean') setShowDvd(rawContent.showDvd);
         if (typeof rawContent.bgAutoplayInterval === 'number') setBgAutoplayInterval(rawContent.bgAutoplayInterval);
         
         if (rawContent.cursorStyle) setCursorStyle(rawContent.cursorStyle);
         if (rawContent.retroScreenCursorStyle) setRetroScreenCursorStyle(rawContent.retroScreenCursorStyle);
         if (rawContent.bgTransition) setBgTransition(rawContent.bgTransition);
-        if (rawContent.bgAnimation) setBgAnimation(rawContent.bgAnimation); // Import new state
+        if (rawContent.bgAnimation) setBgAnimation(rawContent.bgAnimation);
         
         setActivePresetId(null);
 
@@ -441,6 +477,7 @@ export const useAppConfig = () => {
                 ...rawContent,
                 visualizerConfig: visualizerSafe,
                 reactorConfig: reactorSafe,
+                sineWaveConfig: sineWaveSafe,
                 effectsConfig: effectsSafe
             });
         }
@@ -465,6 +502,7 @@ export const useAppConfig = () => {
                   const config: AppPreset['config'] = {
                       visualizerConfig: safeMerge(DEFAULT_VISUALIZER_CONFIG, rawContent.visualizerConfig),
                       reactorConfig: safeMerge(DEFAULT_REACTOR_CONFIG, rawContent.reactorConfig || DEFAULT_REACTOR_CONFIG),
+                      sineWaveConfig: safeMerge(DEFAULT_SINE_WAVE_CONFIG, rawContent.sineWaveConfig || DEFAULT_SINE_WAVE_CONFIG), // NEW
                       dvdConfig: safeMerge(DEFAULT_DVD_CONFIG, rawContent.dvdConfig),
                       effectsConfig: safeMerge(DEFAULT_EFFECTS_CONFIG, rawContent.effectsConfig),
                       marqueeConfig: safeMerge(DEFAULT_MARQUEE_CONFIG, rawContent.marqueeConfig),
@@ -474,6 +512,7 @@ export const useAppConfig = () => {
                       bgPatternConfig: safeMerge({ intensity: 0.25, scale: 1.0 }, rawContent.bgPatternConfig),
                       showVisualizer: rawContent.showVisualizer ?? true,
                       showVisualizer3D: rawContent.showVisualizer3D ?? false,
+                      showSineWave: rawContent.showSineWave ?? false, // NEW
                       showDvd: rawContent.showDvd ?? true,
                       bgAutoplayInterval: rawContent.bgAutoplayInterval ?? 5,
                       cursorStyle: rawContent.cursorStyle || 'theme-sync',
@@ -481,7 +520,7 @@ export const useAppConfig = () => {
                       theme: rawContent.theme || 'neon-retro',
                       controlStyle: rawContent.controlStyle || 'default',
                       bgTransition: rawContent.bgTransition || 'glitch',
-                      bgAnimation: rawContent.bgAnimation || 'none' // Default to none
+                      bgAnimation: rawContent.bgAnimation || 'none'
                   };
 
                   const presetName = file.name.replace(/\.nrp$/i, '').replace(/_/g, ' ');
@@ -514,10 +553,12 @@ export const useAppConfig = () => {
     apiKey, setApiKey,
     showVisualizer, setShowVisualizer,
     showVisualizer3D, setShowVisualizer3D,
+    showSineWave, setShowSineWave, // NEW
     showDvd, setShowDvd,
     marqueeConfig, setMarqueeConfig,
     visualizerConfig, setVisualizerConfig,
     reactorConfig, setReactorConfig,
+    sineWaveConfig, setSineWaveConfig, // NEW
     dvdConfig, setDvdConfig,
     effectsConfig, setEffectsConfig,
     watermarkConfig, setWatermarkConfig,
@@ -531,8 +572,9 @@ export const useAppConfig = () => {
     handleBgUpload, handleClearBg,
     removeBg, moveBg, selectBg, deselectBg,
     nextBg, prevBg,
+    shuffleBgList, 
     bgCount: bgList.length,
-    exportConfig, importConfig, batchImportPresets, // Exposed
+    exportConfig, importConfig, batchImportPresets, 
     savedPresets,
     activePresetId,
     savePreset,
@@ -544,8 +586,8 @@ export const useAppConfig = () => {
     cursorStyle, setCursorStyle,
     retroScreenCursorStyle, setRetroScreenCursorStyle,
     bgTransition, setBgTransition,
-    bgAnimation, setBgAnimation, // Exposed New State
+    bgAnimation, setBgAnimation, 
     isAdvancedMode, setAdvancedMode,
-    useAlbumArtAsBackground, setUseAlbumArtAsBackground // Exposed New State
+    useAlbumArtAsBackground, setUseAlbumArtAsBackground 
   };
 };

@@ -162,6 +162,7 @@ const HologramHelp: React.FC<HologramHelpProps> = ({ onClose }) => {
           icon: Monitor,
           items: [
               { key: "H", desc: isRu ? "Справка (Закрыть)" : renderLabel("Help (Close)", "H") },
+              { key: "L", desc: isRu ? "Список треков (Вкл/Выкл)" : renderLabel("Playlist (Toggle)", "L") },
               { key: "P", desc: isRu ? "Плеер (Панель)" : renderLabel("Player Panel", "P") },
               { key: "Shift + S", desc: isRu ? "Настройки" : renderLabel("Settings", "S") },
               { key: "Shift + C", desc: isRu ? "Мини Плеер" : renderLabel("Compact Mode", "C") },

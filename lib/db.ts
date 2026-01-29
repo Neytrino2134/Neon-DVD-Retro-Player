@@ -2,14 +2,16 @@
 /**
  * Simple IndexedDB wrapper for storing File/Blob objects
  */
+import { TagMetadata } from '../types';
+
 const DB_NAME = 'NeonPlayerDB';
-const DB_VERSION = 4; // Incremented for Ambience
+const DB_VERSION = 5; // Incremented for Order and Tags
 const STORES = {
   TRACKS: 'tracks',
   PLAYLISTS: 'playlists',
   BACKGROUND: 'background',
   SFX: 'sfx',
-  AMBIENCE: 'ambience' // New store
+  AMBIENCE: 'ambience'
 };
 
 export const initDB = (): Promise<IDBDatabase> => {
@@ -23,11 +25,16 @@ export const initDB = (): Promise<IDBDatabase> => {
       if (!db.objectStoreNames.contains(STORES.TRACKS)) {
         const trackStore = db.createObjectStore(STORES.TRACKS, { keyPath: 'id' });
         trackStore.createIndex('playlistId', 'playlistId', { unique: false });
+        trackStore.createIndex('order', 'order', { unique: false }); // New index for sorting
       } else {
-        // Upgrade existing tracks store if needed
         const trackStore = transaction?.objectStore(STORES.TRACKS);
-        if (trackStore && !trackStore.indexNames.contains('playlistId')) {
-           trackStore.createIndex('playlistId', 'playlistId', { unique: false });
+        if (trackStore) {
+            if (!trackStore.indexNames.contains('playlistId')) {
+                trackStore.createIndex('playlistId', 'playlistId', { unique: false });
+            }
+            if (!trackStore.indexNames.contains('order')) {
+                trackStore.createIndex('order', 'order', { unique: false });
+            }
         }
       }
 
@@ -93,7 +100,6 @@ export const deletePlaylistAndTracks = async (playlistId: string) => {
         const index = trackStore.index('playlistId');
         const range = IDBKeyRange.only(playlistId);
         
-        // We need to collect keys first then delete, or use openCursor
         index.openCursor(range).onsuccess = (e) => {
             const cursor = (e.target as IDBRequest).result;
             if (cursor) {
@@ -109,7 +115,16 @@ export const deletePlaylistAndTracks = async (playlistId: string) => {
 
 // --- TRACK FUNCTIONS ---
 
-export const saveTrack = async (track: { id: string; playlistId: string; name: string; file: File }) => {
+export interface StoredTrack {
+    id: string; 
+    playlistId: string; 
+    name: string; 
+    file: File;
+    order: number;
+    tags?: TagMetadata;
+}
+
+export const saveTrack = async (track: StoredTrack) => {
   const db = await initDB();
   return new Promise<void>((resolve, reject) => {
     const transaction = db.transaction(STORES.TRACKS, 'readwrite');
@@ -120,7 +135,7 @@ export const saveTrack = async (track: { id: string; playlistId: string; name: s
   });
 };
 
-export const saveTracksBulk = async (tracks: { id: string; playlistId: string; name: string; file: File }[]) => {
+export const saveTracksBulk = async (tracks: StoredTrack[]) => {
     const db = await initDB();
     return new Promise<void>((resolve, reject) => {
       const transaction = db.transaction(STORES.TRACKS, 'readwrite');
@@ -135,26 +150,19 @@ export const saveTracksBulk = async (tracks: { id: string; playlistId: string; n
     });
 };
 
-export const getAllTracks = async (): Promise<{ id: string; playlistId: string; name: string; file: File }[]> => {
+export const getAllTracks = async (): Promise<StoredTrack[]> => {
   const db = await initDB();
   return new Promise((resolve, reject) => {
     const transaction = db.transaction(STORES.TRACKS, 'readonly');
     const store = transaction.objectStore(STORES.TRACKS);
     const request = store.getAll();
-    request.onsuccess = () => resolve(request.result);
+    request.onsuccess = () => {
+        const results: StoredTrack[] = request.result || [];
+        // Sort by order field if available, fallback to index
+        results.sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
+        resolve(results);
+    };
     request.onerror = () => reject(request.error);
-  });
-};
-
-// Clear ALL tracks (nuclear option, usually we want to clear per playlist)
-export const clearTracks = async () => {
-  const db = await initDB();
-  return new Promise<void>((resolve, reject) => {
-    const transaction = db.transaction([STORES.TRACKS, STORES.PLAYLISTS], 'readwrite');
-    transaction.objectStore(STORES.TRACKS).clear();
-    transaction.objectStore(STORES.PLAYLISTS).clear();
-    requestAnimationFrame(() => resolve());
-    transaction.onerror = () => reject(transaction.error);
   });
 };
 
@@ -201,7 +209,6 @@ export const saveBackground = async (media: { id: string; type: 'image' | 'video
   return new Promise<void>((resolve, reject) => {
     const transaction = db.transaction(STORES.BACKGROUND, 'readwrite');
     const store = transaction.objectStore(STORES.BACKGROUND);
-    // Note: We no longer clear here to allow multiple uploads
     const request = store.put(media);
     request.onsuccess = () => resolve();
     request.onerror = () => reject(request.error);
@@ -265,7 +272,7 @@ export const getAllSFX = async (): Promise<{ id: string; blob: Blob }[]> => {
   });
 };
 
-// --- AMBIENCE FUNCTIONS (NEW) ---
+// --- AMBIENCE FUNCTIONS ---
 
 export const saveAmbience = async (item: { id: string; name: string; file: File }) => {
   const db = await initDB();

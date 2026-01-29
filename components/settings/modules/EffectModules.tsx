@@ -5,7 +5,7 @@ import CustomSelect from '../CustomSelect';
 import ToggleSwitch from '../ToggleSwitch';
 import { useLanguage } from '../../../contexts/LanguageContext';
 import { DvdConfig, EffectsConfig } from '../../../types';
-import { Volume2, Power } from 'lucide-react';
+import { Volume2, Power, Play } from 'lucide-react';
 
 const FPS_OPTIONS = [
   { value: 60, label: '60 FPS (OFF)' },
@@ -20,9 +20,11 @@ interface MixerSettingsProps {
     setCrossfadeDuration: (v: number) => void;
     sfxVolume: number;
     setSfxVolume: (v: number) => void;
+    smoothStart: boolean;
+    setSmoothStart: (v: boolean) => void;
 }
 
-export const MixerSettings: React.FC<MixerSettingsProps> = ({ crossfadeDuration, setCrossfadeDuration, sfxVolume, setSfxVolume }) => {
+export const MixerSettings: React.FC<MixerSettingsProps> = ({ crossfadeDuration, setCrossfadeDuration, sfxVolume, setSfxVolume, smoothStart, setSmoothStart }) => {
     const { t } = useLanguage();
     return (
         <div className="pt-2 space-y-3">
@@ -41,6 +43,15 @@ export const MixerSettings: React.FC<MixerSettingsProps> = ({ crossfadeDuration,
             </div>
 
             <div className="p-3 bg-theme-panel/50 border border-theme-border rounded">
+                <div className="mb-4">
+                    <ToggleSwitch 
+                        label={t('smooth_start')} 
+                        icon={Play} 
+                        value={smoothStart} 
+                        onChange={setSmoothStart} 
+                        color="green"
+                    />
+                </div>
                 <RangeControl 
                     label={t('sfx_volume')} 
                     value={sfxVolume} 
@@ -143,7 +154,8 @@ export const GlitchSettings: React.FC<{ config: EffectsConfig['glitch'], update:
     );
 };
 
-export const SignalSettings: React.FC<{ config: EffectsConfig, update: (k: keyof EffectsConfig, v: any) => void }> = ({ config, update }) => {
+// New FPS Settings Component
+export const FpsSettings: React.FC<{ config: EffectsConfig, update: (k: keyof EffectsConfig, v: any) => void }> = ({ config, update }) => {
     const { t } = useLanguage();
     return (
         <div className="pt-2">
@@ -153,10 +165,38 @@ export const SignalSettings: React.FC<{ config: EffectsConfig, update: (k: keyof
               options={FPS_OPTIONS} 
               onChange={(v) => update('fps', v)} 
             />
+        </div>
+    );
+};
+
+// Updated SignalSettings (Removed FPS)
+export const SignalSettings: React.FC<{ config: EffectsConfig, update: (k: keyof EffectsConfig, v: any) => void }> = ({ config, update }) => {
+    const { t } = useLanguage();
+    return (
+        <div className="pt-2">
             <RangeControl label={t('pixelation')} value={config.pixelation} min={1} max={20} step={1} onChange={v => update('pixelation', v)} />
-            <RangeControl label={t('chromatic_aberration')} value={config.chromaticAberration ?? 0} min={0} max={20} step={0.5} onChange={v => update('chromaticAberration', v)} />
             <RangeControl label={t('static_noise')} value={config.noise} min={0} max={0.5} step={0.01} onChange={v => update('noise', v)} />
             <RangeControl label={t('vhs_jitter')} value={config.vhsJitter} min={0} max={10} step={0.5} onChange={v => update('vhsJitter', v)} />
+        </div>
+    );
+};
+
+export const ChromaticSettings: React.FC<{ config: EffectsConfig, update: (k: keyof EffectsConfig, v: any) => void }> = ({ config, update }) => {
+    const { t } = useLanguage();
+    return (
+        <div className="pt-2">
+            <RangeControl label={t('chromatic_aberration')} value={config.chromaticAberration ?? 0} min={0} max={20} step={0.5} onChange={v => update('chromaticAberration', v)} />
+        </div>
+    );
+};
+
+// Updated VignetteSettings (Removed Internal Toggle)
+export const VignetteSettings: React.FC<{ config: EffectsConfig['vignette'], update: (v: EffectsConfig['vignette']) => void }> = ({ config, update }) => {
+    const { t } = useLanguage();
+    return (
+        <div className="pt-2">
+           <RangeControl label={t('vignette_intensity')} value={config.intensity} min={0.1} max={1.0} step={0.05} onChange={v => update({ ...config, intensity: v })} />
+           <RangeControl label={t('vignette_roundness')} value={config.roundness} min={0.1} max={1.0} step={0.05} onChange={v => update({ ...config, roundness: v })} />
         </div>
     );
 };

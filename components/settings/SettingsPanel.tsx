@@ -1,6 +1,6 @@
 
 import React, { useState, useRef, useEffect } from 'react';
-import { Settings, Disc, Activity, Zap, Terminal, AlertTriangle, Tv, Type, Bug, Power, MessageSquare, AudioWaveform, HelpCircle, Save, ChevronDown, Home, Sun, Palette, MousePointer2, Sliders, Stamp, Bot, Image as ImageIcon, Files, CloudRain, Box, RadioReceiver, Lock, ChevronRight } from 'lucide-react';
+import { Settings, HelpCircle, Power, Home } from 'lucide-react';
 import { VisualizerConfig, EffectsConfig, DvdConfig, MarqueeConfig, PatternConfig, BackgroundMedia, AppPreset, CursorStyle, WatermarkConfig, ThemeType, ControlStyle, BgTransitionType, AmbienceFile, AmbienceConfig, BgAnimationType } from '../../types';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { useTheme } from '../../contexts/ThemeContext';
@@ -9,85 +9,27 @@ import { APP_VERSION } from '../../lib/version';
 import { Tooltip } from '../ui/Tooltip';
 import { TranslatedText } from '../ui/TranslatedText';
 
-// Components
-import VisualizerSettings from './VisualizerSettings';
-import BackgroundSettings from './BackgroundSettings';
+// Internal & Shared Components
+import SettingsSection from './SettingsSection';
 import HelpModal from './HelpModal';
-import ModuleWrapper from './ModuleWrapper';
-import MarqueeSettings from './modules/MarqueeSettings';
-import HologramSettings from './modules/HologramSettings';
-import GeminiSettings from './modules/GeminiSettings';
-import ConfigManager from './modules/ConfigManager';
-import FileManagement from './modules/FileManagement';
-import AmbienceSettings from './modules/AmbienceSettings'; 
-import { SystemAudioModule, ScreenVideoModule } from './modules/ScreenSettings'; 
-import { MixerSettings, DvdSettings, DebugSettings, ScanlineSettings, CyberSettings, GlitchSettings, SignalSettings, LightLeaksSettings } from './modules/EffectModules';
-import CustomSelect from './CustomSelect';
-import RangeControl from './RangeControl';
 
-// --- INTERNAL COMPONENT: SETTINGS SECTION ---
-interface SettingsSectionProps {
-  id: string;
-  title: React.ReactNode;
-  isOpen: boolean;
-  onToggle: (e: React.MouseEvent) => void;
-  stickyTop: string; // The pixel value for top (e.g. "0px", "36px")
-  sectionContent: React.ReactNode; // The content of THIS section
-  children?: React.ReactNode; // Nested next sections
-}
+// Section Modules
+import SystemSection from './sections/SystemSection';
+import BackgroundSection from './sections/BackgroundSection';
+import SoundSection from './sections/SoundSection';
+import WaveformSection from './sections/WaveformSection';
+import ModulesSection from './sections/ModulesSection';
+import PostProcessingSection from './sections/PostProcessingSection';
 
-const SettingsSection: React.FC<SettingsSectionProps> = ({ id, title, isOpen, onToggle, stickyTop, sectionContent, children }) => {
-  return (
-    <div className="relative">
-      {/* Sticky Header */}
-      <div 
-        id={`section-header-${id}`}
-        onClick={onToggle}
-        className={`
-            sticky z-30 cursor-pointer flex items-center justify-between px-3 py-2 transition-all duration-300 shadow-lg border-b backdrop-blur-sm
-            ${isOpen 
-                ? 'bg-theme-primary/10 border-theme-primary text-theme-primary shadow-[0_4px_15px_-10px_var(--color-primary)]' 
-                : 'bg-theme-bg border-theme-border text-theme-muted hover:bg-theme-panel hover:text-theme-text'
-            }
-        `}
-        style={{ top: stickyTop, height: '36px' }}
-      >
-        <h3 className={`text-xs font-mono font-bold tracking-widest opacity-90 uppercase flex items-center gap-2 ${isOpen ? 'text-theme-primary drop-shadow-[0_0_5px_rgba(var(--color-primary),0.5)]' : ''}`}>
-           {title}
-        </h3>
-        <div className={`transition-transform duration-500 ease-[cubic-bezier(0.34,1.56,0.64,1)] ${isOpen ? 'rotate-90 text-theme-primary' : 'rotate-0 text-theme-muted'}`}>
-           <ChevronRight size={14} />
-        </div>
-      </div>
-      
-      {/* Collapsible Content - SMOOTH GRID ANIMATION */}
-      <div 
-        className={`
-          grid transition-[grid-template-rows] duration-500 ease-[cubic-bezier(0.4,0,0.2,1)]
-          ${isOpen ? 'grid-rows-[1fr]' : 'grid-rows-[0fr]'}
-        `}
-      >
-         <div className="overflow-hidden">
-            {/* Inner Content - SLIDE & FADE ANIMATION */}
-            <div 
-              className={`
-                transition-all duration-500 ease-[cubic-bezier(0.4,0,0.2,1)] px-1
-                ${isOpen 
-                  ? 'opacity-100 translate-x-0 py-3' 
-                  : 'opacity-0 -translate-x-4 py-0 pointer-events-none'}
-              `}
-            >
-                <div className="space-y-3">
-                    {sectionContent}
-                </div>
-            </div>
-         </div>
-      </div>
-
-      {/* Nested Sections */}
-      {children}
-    </div>
-  );
+// Map of Main Section ID -> Array of Child Module IDs
+// Used for auto-collapsing children when switching tabs or clicking modules
+const SECTION_MODULES: Record<string, string[]> = {
+  sys: ['files', 'presets', 'themes', 'debug'],
+  bg: ['bg-settings', 'bg-resources', 'bg-colors', 'screen'],
+  sfx: ['mixer', 'ambience', 'sysaudio'],
+  waves: ['wave', 'reactor', 'sine'],
+  mod: ['marquee', 'dvd', 'leaks', 'rain', 'hologram', 'gemini', 'scan', 'cyber', 'glitch'],
+  post: ['fps', 'signal', 'chromatic', 'vignette']
 };
 
 interface SettingsPanelProps {
@@ -95,6 +37,8 @@ interface SettingsPanelProps {
   setShowVisualizer: (v: boolean) => void;
   showVisualizer3D?: boolean;
   setShowVisualizer3D?: (v: boolean) => void;
+  showSineWave?: boolean; 
+  setShowSineWave?: (v: boolean) => void;
   showDvd: boolean;
   setShowDvd: (v: boolean) => void;
   marqueeConfig: MarqueeConfig;
@@ -105,6 +49,8 @@ interface SettingsPanelProps {
   setVisualizerConfig: (config: VisualizerConfig) => void;
   reactorConfig?: VisualizerConfig; 
   setReactorConfig?: (config: VisualizerConfig) => void; 
+  sineWaveConfig?: VisualizerConfig; 
+  setSineWaveConfig?: (config: VisualizerConfig) => void; 
 
   dvdConfig: DvdConfig;
   setDvdConfig: (config: DvdConfig) => void;
@@ -136,6 +82,8 @@ interface SettingsPanelProps {
   onGoHome: () => void;
   crossfadeDuration: number;
   setCrossfadeDuration: (val: number) => void;
+  smoothStart: boolean;
+  setSmoothStart: (v: boolean) => void;
   
   // Presets
   savedPresets: AppPreset[];
@@ -155,8 +103,8 @@ interface SettingsPanelProps {
   // Cursor
   cursorStyle: CursorStyle;
   setCursorStyle: (s: CursorStyle) => void;
-  retroScreenCursorStyle: CursorStyle; // NEW
-  setRetroScreenCursorStyle: (s: CursorStyle) => void; // NEW
+  retroScreenCursorStyle: CursorStyle; 
+  setRetroScreenCursorStyle: (s: CursorStyle) => void; 
 
   // API
   apiKey: string;
@@ -203,15 +151,18 @@ interface SettingsPanelProps {
   // Stream Mode
   streamMode?: 'bg' | 'window';
   setStreamMode?: (m: 'bg' | 'window') => void;
+
+  // Shuffle BG
+  shuffleBgList?: () => void; 
 }
 
 const SettingsPanel: React.FC<SettingsPanelProps> = ({
-  showVisualizer, setShowVisualizer, showVisualizer3D, setShowVisualizer3D, showDvd, setShowDvd, marqueeConfig, setMarqueeConfig,
-  visualizerConfig, setVisualizerConfig, reactorConfig, setReactorConfig, dvdConfig, setDvdConfig,
+  showVisualizer, setShowVisualizer, showVisualizer3D, setShowVisualizer3D, showSineWave, setShowSineWave, showDvd, setShowDvd, marqueeConfig, setMarqueeConfig,
+  visualizerConfig, setVisualizerConfig, reactorConfig, setReactorConfig, sineWaveConfig, setSineWaveConfig, dvdConfig, setDvdConfig,
   effectsConfig, setEffectsConfig, watermarkConfig, setWatermarkConfig, bgColor, setBgColor, bgPattern = 'none', setBgPattern, bgPatternConfig, setBgPatternConfig,
   onBgMediaUpload, onAudioUpload, onSfxUpload, bgMedia, bgList, currentBgIndex, onRemoveBg, onMoveBg, onSelectBg, onDeselectBg, onClearBgMedia, onExportConfig,
   bgAutoplayInterval, setBgAutoplayInterval, onScheduleReload, onGoHome,
-  crossfadeDuration, setCrossfadeDuration,
+  crossfadeDuration, setCrossfadeDuration, smoothStart, setSmoothStart,
   savedPresets, activePresetId, savePreset, overwritePreset, loadPreset, deletePreset, renamePreset, onResetDefault,
   sfxMap, sfxVolume, setSfxVolume,
   cursorStyle, setCursorStyle, retroScreenCursorStyle, setRetroScreenCursorStyle, apiKey, setApiKey,
@@ -221,7 +172,8 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
   isVideoActive, toggleVideo, isAudioActive, toggleAudio,
   isAdvancedMode, setAdvancedMode,
   useAlbumArtAsBackground = false, setUseAlbumArtAsBackground = () => {},
-  streamMode, setStreamMode
+  streamMode, setStreamMode,
+  shuffleBgList
 }) => {
   // Module Expansion State
   const [expandedState, setExpandedState] = useState<Record<string, boolean>>({});
@@ -231,10 +183,11 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
       sys: true,
       bg: true,
       sfx: true,
-      mod: true
+      waves: true, 
+      mod: true,
+      post: true
   });
 
-  const [expandWatermark, setExpandWatermark] = useState(false);
   const [showHelp, setShowHelp] = useState(false);
   const { language, setLanguage, t } = useLanguage();
   const { currentTheme, setTheme, controlStyle, setControlStyle } = useTheme();
@@ -248,29 +201,63 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
   const startPageY = useRef(0); 
   const wasDragged = useRef(false); 
 
-  const toggleExpand = (id: string) => {
+  const toggleExpand = (id: string, isAdditive: boolean) => {
     if (wasDragged.current) return;
-    setExpandedState(prev => ({ ...prev, [id]: !prev[id] }));
+    
+    setExpandedState(prev => {
+        const isCurrentlyOpen = prev[id];
+        let newState = { ...prev };
+
+        if (isAdditive) {
+            // Shift click: Toggle target, leave others alone
+            newState[id] = !isCurrentlyOpen;
+        } else {
+            // Normal click: Accordion behavior within the section
+            
+            // 1. Identify which section this module belongs to
+            let groupIds: string[] = [];
+            for (const sectionKey in SECTION_MODULES) {
+                if (SECTION_MODULES[sectionKey].includes(id)) {
+                    groupIds = SECTION_MODULES[sectionKey];
+                    break;
+                }
+            }
+
+            // 2. Close all other modules in this group
+            groupIds.forEach(siblingId => {
+                if (siblingId !== id) {
+                    newState[siblingId] = false;
+                }
+            });
+
+            // 3. Toggle the target module
+            newState[id] = !isCurrentlyOpen;
+        }
+        
+        return newState;
+    });
   };
 
   const safeAction = (fn: () => void) => {
       if (!wasDragged.current) fn();
   };
 
+  // Helper Updaters
   const updateVisualizer = (k: keyof VisualizerConfig, v: any) => setVisualizerConfig({ ...visualizerConfig, [k]: v });
   const updateReactor = (k: keyof VisualizerConfig, v: any) => {
       if (setReactorConfig && reactorConfig) {
           setReactorConfig({ ...reactorConfig, [k]: v });
       }
   };
+  const updateSineWave = (k: keyof VisualizerConfig, v: any) => {
+      if (setSineWaveConfig && sineWaveConfig) {
+          setSineWaveConfig({ ...sineWaveConfig, [k]: v });
+      }
+  };
   const updateDvd = (k: keyof DvdConfig, v: any) => setDvdConfig({ ...dvdConfig, [k]: v });
   const updateEffect = (k: keyof EffectsConfig, v: any) => setEffectsConfig({ ...effectsConfig, [k]: v });
   const updateMarquee = (k: keyof MarqueeConfig, v: any) => setMarqueeConfig({ ...marqueeConfig, [k]: v });
-  const updateWatermark = (k: keyof WatermarkConfig, v: any) => {
-      if (setWatermarkConfig && watermarkConfig) {
-          setWatermarkConfig({ ...watermarkConfig, [k]: v });
-      }
-  };
+  const updateDebugConfig = (v: EffectsConfig['debugConsole']) => updateEffect('debugConsole', v);
 
   const handleOverwrite = (id: string) => {
       overwritePreset(id, currentTheme, controlStyle);
@@ -278,45 +265,49 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
   };
 
   // --- SECTION SCROLL LOGIC ---
-  const handleSectionToggle = (sectionId: string, index: number, e: React.MouseEvent) => {
+  const handleSectionToggle = (sectionId: string, index: number, isAdditive: boolean = false) => {
       if (wasDragged.current) return;
-
-      const isAdditive = e.shiftKey;
 
       setOpenSections(prev => {
           const isCurrentlyOpen = prev[sectionId];
-          
-          let newState: Record<string, boolean>;
+          let newState: Record<string, boolean> = { ...prev };
+          const sectionsClosing: string[] = [];
 
           if (isAdditive) {
-              // Additive Mode: Toggle only target, keep others
-              newState = { ...prev, [sectionId]: !isCurrentlyOpen };
+              newState[sectionId] = !isCurrentlyOpen;
+              if (isCurrentlyOpen) sectionsClosing.push(sectionId);
           } else {
-              // Focus Mode: Close all others, open target (FORCE OPEN)
-              // This creates standard accordion behavior where one is always open
-              // or clicking an open one does nothing but ensure it's the only one open
-              newState = {
-                  sys: false,
-                  bg: false,
-                  sfx: false,
-                  mod: false
-              };
+              Object.keys(prev).forEach(key => {
+                  if (key !== sectionId && prev[key]) {
+                      newState[key] = false;
+                      sectionsClosing.push(key);
+                  }
+              });
               newState[sectionId] = true;
+          }
+
+          if (sectionsClosing.length > 0) {
+              setExpandedState(prevExpanded => {
+                  const nextExpanded = { ...prevExpanded };
+                  sectionsClosing.forEach(closedSecId => {
+                      const modules = SECTION_MODULES[closedSecId];
+                      if (modules) {
+                          modules.forEach(modId => {
+                              nextExpanded[modId] = false;
+                          });
+                      }
+                  });
+                  return nextExpanded;
+              });
           }
           
           if (newState[sectionId]) {
               setTimeout(() => {
                   if (!scrollContainerRef.current) return;
-                  
                   const headerEl = document.getElementById(`section-header-${sectionId}`);
                   if (headerEl) {
-                      // Calculate the offset reserved for previous sticky headers
-                      // Each header is 36px tall.
                       const stickyOffset = index * 36;
-                      
-                      // Calculate exact scroll position: Element's position in list minus space for sticky headers
                       const targetScroll = headerEl.offsetTop - stickyOffset;
-                      
                       scrollContainerRef.current.scrollTo({
                           top: targetScroll,
                           behavior: 'smooth'
@@ -332,12 +323,7 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
   // --- DRAG TO SCROLL HANDLERS ---
   const handleMouseDown = (e: React.MouseEvent) => {
       const target = e.target as HTMLElement;
-      if (
-          target.tagName === 'INPUT' || 
-          target.tagName === 'BUTTON' || 
-          target.closest('button') || 
-          target.tagName === 'SELECT'
-      ) {
+      if (target.tagName === 'INPUT' || target.tagName === 'BUTTON' || target.closest('button') || target.tagName === 'SELECT') {
           return;
       }
 
@@ -375,8 +361,24 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
       window.removeEventListener('mouseup', handleGlobalMouseUp);
   };
 
+  // --- HOTKEYS ---
   useEffect(() => {
+      const handleKeyDown = (e: KeyboardEvent) => {
+          const target = e.target as HTMLElement;
+          if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.tagName === 'SELECT') return;
+          if (e.ctrlKey || e.altKey || e.metaKey) return;
+
+          if (e.key === '1') handleSectionToggle('sys', 0, false);
+          if (e.key === '2') handleSectionToggle('bg', 1, false);
+          if (e.key === '3') handleSectionToggle('sfx', 2, false);
+          if (e.key === '4') handleSectionToggle('waves', 3, false);
+          if (e.key === '5') handleSectionToggle('mod', 4, false);
+          if (e.key === '6') handleSectionToggle('post', 5, false);
+      };
+
+      window.addEventListener('keydown', handleKeyDown);
       return () => {
+          window.removeEventListener('keydown', handleKeyDown);
           window.removeEventListener('mousemove', handleGlobalMouseMove);
           window.removeEventListener('mouseup', handleGlobalMouseUp);
       };
@@ -385,6 +387,7 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
   const themeOptions = [
     { value: 'neon-retro', label: 'Default - Neon Retro', color: '#00f3ff' },
     { value: 'neon-blue', label: 'Neon Blue', color: '#3b82f6' },
+    { value: 'neon-pink', label: 'Neon Pink', color: '#ff00ff' }, 
     { value: 'warm-cozy', label: 'Warm & Cozy', color: '#fbbf24' },
     { value: 'neutral-gray', label: t('theme_neutral'), color: '#d4d4d4' },
     { value: 'neutral-ocean', label: t('theme_ocean'), color: '#4B8CA8' },
@@ -393,13 +396,14 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
   const cursorOptions = [
     { value: 'theme-sync', label: t('style_theme_sync'), color: 'theme' }, 
     { value: 'default', label: t('cursor_default'), color: '#00f3ff' },
+    { value: 'music-flow', label: t('cursor_music'), color: '#ff00ff' }, 
     { value: 'dos-terminal', label: t('cursor_dos'), color: '#00ff00' }, 
     { value: 'classic-blue', label: t('cursor_classic'), color: '#00f3ff' },
     { value: 'classic-warm', label: t('cursor_warm'), color: '#ff8c00' },
     { value: 'classic-white', label: t('cursor_white'), color: '#ffffff' },
     { value: 'classic-ocean', label: t('cursor_ocean'), color: '#4B8CA8' },
     { value: 'crosshair', label: t('cursor_crosshair'), color: '#ff3333' },
-    { value: 'rounded', label: t('cursor_rounded'), color: 'theme' }, // NEW
+    { value: 'rounded', label: t('cursor_rounded'), color: 'theme' },
     { value: 'system', label: t('cursor_system'), color: '#ffffff' }, 
   ];
 
@@ -408,15 +412,6 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
     { value: 'round', label: t('style_round'), shape: 'rounded' as const },
     { value: 'circle', label: t('style_circle'), shape: 'circle' as const },
   ];
-
-  const innerWrapperRadius = controlStyle === 'round' || controlStyle === 'circle' ? 'rounded-lg' : 'rounded';
-
-  const NumberedLabel = ({ num, k }: { num: string, k: any }) => (
-      <span className="flex items-center gap-2">
-          <span className="text-theme-muted opacity-50 font-normal">{num} //</span>
-          <TranslatedText k={k} />
-      </span>
-  );
 
   return (
     <div className="w-full h-full flex flex-col bg-theme-bg border-r-4 border-theme-panel shadow-inner overflow-hidden">
@@ -462,226 +457,104 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
         </div>
       </div>
 
-      {/* Main Content Area with Drag Scroll */}
+      {/* Main Content Area */}
       <div 
         ref={scrollContainerRef}
         onMouseDown={handleMouseDown}
         className="flex-1 overflow-y-auto px-4 pb-20 no-scrollbar select-none"
       >
-        {/* --- STACKED SECTIONS --- */}
         <SettingsSection 
             id="sys" 
-            title={<TranslatedText k="system_params" />} 
+            title={<><span className="text-theme-muted opacity-50 font-normal mr-2">1 //</span> <TranslatedText k="system_params" /></>} 
             isOpen={openSections['sys']} 
-            onToggle={(e) => handleSectionToggle('sys', 0, e)}
+            onToggle={(isAdditive) => handleSectionToggle('sys', 0, isAdditive)}
             stickyTop="0px"
-            sectionContent={
-                <>
-                    <ModuleWrapper id="files" label={<TranslatedText k="file_management" />} icon={Files} isEnabled={true} isAlwaysOn={true} isExpanded={expandedState['files']} onToggleExpand={() => toggleExpand('files')} onToggleEnable={() => {}}>
-                        <FileManagement onBgMediaUpload={onBgMediaUpload} onAudioUpload={onAudioUpload} onSfxUpload={onSfxUpload} onExportConfig={onExportConfig} sfxMap={sfxMap} />
-                    </ModuleWrapper>
-
-                    <ModuleWrapper id="presets" label={<TranslatedText k="config_manager" />} icon={Save} isEnabled={true} isAlwaysOn={true} isExpanded={expandedState['presets']} onToggleExpand={() => toggleExpand('presets')} onToggleEnable={() => {}}>
-                        <ConfigManager presets={savedPresets} activePresetId={activePresetId} onSave={savePreset} onOverwrite={handleOverwrite} onLoad={loadPreset} onDelete={deletePreset} onRename={renamePreset} onResetDefault={onResetDefault} />
-                    </ModuleWrapper>
-
-                    <ModuleWrapper id="themes" label={<TranslatedText k="color_schemes" />} icon={Palette} isEnabled={true} isAlwaysOn={true} isExpanded={expandedState['themes']} onToggleExpand={() => toggleExpand('themes')} onToggleEnable={() => {}}>
-                        <div className="pt-2 space-y-6">
-                            
-                            {/* UI STYLE */}
-                            <div>
-                                <div className="flex items-center gap-2 mb-1">
-                                    <Palette size={12} className="text-theme-muted" />
-                                    <span className="text-[10px] font-mono text-theme-muted tracking-widest uppercase">UI STYLE</span>
-                                </div>
-                                <div className="h-px bg-theme-border mb-3 opacity-50"></div>
-                                <CustomSelect label={<TranslatedText k="theme_select" />} value={currentTheme} options={themeOptions} onChange={(v) => setTheme(v as ThemeType)} />
-                            </div>
-
-                            {/* CURSOR STYLE */}
-                            <div>
-                                <div className="flex items-center gap-2 mb-1">
-                                    <MousePointer2 size={12} className="text-theme-muted" />
-                                    <span className="text-[10px] font-mono text-theme-muted tracking-widest uppercase"><TranslatedText k="cursor_style" /></span>
-                                </div>
-                                <div className="h-px bg-theme-border mb-3 opacity-50"></div>
-                                <div className="space-y-1">
-                                    <CustomSelect label={<TranslatedText k="cursor_style" />} value={cursorStyle} options={cursorOptions} onChange={(v) => setCursorStyle(v as CursorStyle)} />
-                                    <CustomSelect label={<TranslatedText k="retro_cursor_style" />} value={retroScreenCursorStyle} options={cursorOptions} onChange={(v) => setRetroScreenCursorStyle(v as CursorStyle)} />
-                                </div>
-                            </div>
-
-                            {/* CONTROLS STYLE */}
-                            <div>
-                                <div className="flex items-center gap-2 mb-1">
-                                    <Sliders size={12} className="text-theme-muted" />
-                                    <span className="text-[10px] font-mono text-theme-muted tracking-widest uppercase"><TranslatedText k="control_style" /></span>
-                                </div>
-                                <div className="h-px bg-theme-border mb-3 opacity-50"></div>
-                                <CustomSelect label={<TranslatedText k="control_style" />} value={controlStyle} options={controlStyleOptions} onChange={(v) => setControlStyle(v as ControlStyle)} />
-                            </div>
-                            
-                            {/* WATERMARK SETTINGS */}
-                            {watermarkConfig && (
-                                <div className={`mt-4 bg-theme-panel/40 border ${expandWatermark ? 'border-theme-primary' : 'border-theme-border'} ${innerWrapperRadius} overflow-hidden hover:border-theme-primary transition-colors relative`}>
-                                    {/* Header */}
-                                    <div 
-                                        className={`flex items-center justify-between p-3 cursor-pointer ${expandWatermark ? '' : ''}`} 
-                                        onClick={() => setExpandWatermark(!expandWatermark)}
-                                    >
-                                        <div className="flex items-center gap-3">
-                                            <div className="text-theme-muted opacity-80"><Stamp size={16} /></div>
-                                            <span className="font-mono text-[11px] tracking-widest text-theme-muted uppercase"><TranslatedText k="watermark_settings" /></span>
-                                        </div>
-                                        <div className="flex items-center gap-2">
-                                            {!isAdvancedMode && <Lock size={12} className="text-theme-muted opacity-50" />}
-                                            <ChevronDown size={14} className={`text-theme-primary opacity-70 transition-transform ${expandWatermark ? 'rotate-180' : ''}`} />
-                                        </div>
-                                    </div>
-                                    
-                                    {/* Content */}
-                                    <div className={`grid transition-[grid-template-rows,padding,opacity] duration-300 ease-in-out ${expandWatermark ? 'grid-rows-[1fr] opacity-100 p-3 pt-0' : 'grid-rows-[0fr] opacity-0 p-0'}`}>
-                                        <div className="overflow-hidden relative">
-                                            <div className="h-px w-full bg-theme-primary opacity-50 mb-3 mt-1"></div>
-                                            <div className="pl-4 space-y-3 border-l-2 border-theme-primary ml-2">
-                                                <RangeControl label={<TranslatedText k="scale" />} value={watermarkConfig.scale} min={0.5} max={2.0} step={0.1} onChange={(v) => updateWatermark('scale', v)} className="mb-0" />
-                                                <RangeControl label={<TranslatedText k="opacity" />} value={watermarkConfig.opacity} min={0} max={1.0} step={0.1} onChange={(v) => updateWatermark('opacity', v)} className="mb-0" />
-                                                <RangeControl label={<TranslatedText k="flash_intensity" />} value={watermarkConfig.flashIntensity} min={0} max={1.0} step={0.1} onChange={(v) => updateWatermark('flashIntensity', v)} className="mb-0" />
-                                            </div>
-                                            {!isAdvancedMode && (
-                                                <div className="absolute inset-0 bg-black/60 backdrop-blur-[2px] z-10 flex items-center justify-center flex-col gap-2 rounded">
-                                                    <Lock size={20} className="text-theme-muted" />
-                                                    <span className="text-[9px] font-mono text-theme-muted uppercase tracking-wider">LOCKED</span>
-                                                </div>
-                                            )}
-                                        </div>
-                                    </div>
-                                </div>
-                            )}
-                        </div>
-                    </ModuleWrapper>
-
-                    <ModuleWrapper id="debug" label={<TranslatedText k="debug_console" />} icon={Bug} isEnabled={true} isAlwaysOn={true} isExpanded={expandedState['debug']} onToggleExpand={() => toggleExpand('debug')} onToggleEnable={() => {}}>
-                        <DebugSettings config={effectsConfig.debugConsole} update={(v) => updateEffect('debugConsole', v)} />
-                    </ModuleWrapper>
-                </>
-            }
         >
-            <SettingsSection 
-                id="bg" 
-                title={<TranslatedText k="cat_backgrounds" />} 
-                isOpen={openSections['bg']} 
-                onToggle={(e) => handleSectionToggle('bg', 1, e)}
-                stickyTop="36px"
-                sectionContent={
-                    <>
-                        <ModuleWrapper id="bg" label={<TranslatedText k="background" />} icon={ImageIcon} isEnabled={true} isAlwaysOn={true} isExpanded={expandedState['bg']} onToggleExpand={() => toggleExpand('bg')} onToggleEnable={() => {}}>
-                            <BackgroundSettings 
-                                bgColor={bgColor} 
-                                setBgColor={setBgColor} 
-                                bgPattern={bgPattern} 
-                                setBgPattern={setBgPattern} 
-                                bgPatternConfig={bgPatternConfig} 
-                                setBgPatternConfig={setBgPatternConfig} 
-                                bgMedia={bgMedia} 
-                                bgList={bgList} 
-                                currentBgIndex={currentBgIndex} 
-                                onRemoveBg={onRemoveBg} 
-                                onMoveBg={onMoveBg} 
-                                onSelectBg={onSelectBg} 
-                                onDeselectBg={onDeselectBg} 
-                                onClearBgMedia={onClearBgMedia} 
-                                bgAutoplayInterval={bgAutoplayInterval} 
-                                setBgAutoplayInterval={setBgAutoplayInterval} 
-                                bgTransition={bgTransition} 
-                                setBgTransition={setBgTransition}
-                                bgAnimation={bgAnimation}
-                                setBgAnimation={setBgAnimation}
-                                useAlbumArtAsBackground={useAlbumArtAsBackground}
-                                setUseAlbumArtAsBackground={setUseAlbumArtAsBackground}
-                                onBgMediaUpload={onBgMediaUpload}
-                            />
-                            <div className="mt-4 pt-4 border-t border-theme-border">
-                                <label className="text-theme-text font-mono text-[10px] block mb-2 tracking-widest uppercase opacity-70">SCREEN SHARE</label>
-                                <ScreenVideoModule isVideoActive={isVideoActive} toggleVideo={toggleVideo} streamMode={streamMode} setStreamMode={setStreamMode} />
-                            </div>
-                        </ModuleWrapper>
-                    </>
-                }
-            >
-                <SettingsSection 
-                    id="sfx" 
-                    title={<TranslatedText k="cat_sound_effects" />} 
-                    isOpen={openSections['sfx']} 
-                    onToggle={(e) => handleSectionToggle('sfx', 2, e)}
-                    stickyTop="72px"
-                    sectionContent={
-                        <>
-                            <ModuleWrapper id="mixer" label={<TranslatedText k="mixer_deck" />} icon={AudioWaveform} isEnabled={true} isAlwaysOn={true} isExpanded={expandedState['mixer']} onToggleExpand={() => toggleExpand('mixer')} onToggleEnable={() => {}}>
-                                <MixerSettings crossfadeDuration={crossfadeDuration} setCrossfadeDuration={setCrossfadeDuration} sfxVolume={sfxVolume} setSfxVolume={setSfxVolume} />
-                            </ModuleWrapper>
+            <SystemSection 
+                expandedState={expandedState} toggleExpand={toggleExpand}
+                onBgMediaUpload={onBgMediaUpload} onAudioUpload={onAudioUpload} onSfxUpload={onSfxUpload} onExportConfig={onExportConfig} sfxMap={sfxMap}
+                savedPresets={savedPresets} activePresetId={activePresetId} savePreset={savePreset} overwritePreset={handleOverwrite} loadPreset={loadPreset} deletePreset={deletePreset} renamePreset={renamePreset} onResetDefault={onResetDefault}
+                currentTheme={currentTheme} setTheme={setTheme} cursorStyle={cursorStyle} setCursorStyle={setCursorStyle} retroScreenCursorStyle={retroScreenCursorStyle} setRetroScreenCursorStyle={setRetroScreenCursorStyle} controlStyle={controlStyle} setControlStyle={setControlStyle}
+                watermarkConfig={watermarkConfig} setWatermarkConfig={setWatermarkConfig}
+                debugConfig={effectsConfig.debugConsole} updateDebugConfig={updateDebugConfig}
+                themeOptions={themeOptions} cursorOptions={cursorOptions} controlStyleOptions={controlStyleOptions}
+                isAdvancedMode={isAdvancedMode}
+            />
+        </SettingsSection>
 
-                            <ModuleWrapper id="ambience" label={<TranslatedText k="ambience" />} icon={CloudRain} isEnabled={true} isExpanded={expandedState['ambience']} onToggleExpand={() => toggleExpand('ambience')} isAlwaysOn={true} onToggleEnable={() => {}}>
-                                <AmbienceSettings files={ambienceFiles} config={ambienceConfig} onUpload={onAmbienceUpload} onDelete={onAmbienceDelete} onSetActive={onAmbienceSetActive} onTogglePlay={onAmbienceTogglePlay} onVolumeChange={onAmbienceVolume} />
-                            </ModuleWrapper>
+        <SettingsSection 
+            id="bg" 
+            title={<><span className="text-theme-muted opacity-50 font-normal mr-2">2 //</span> <TranslatedText k="cat_backgrounds" /></>} 
+            isOpen={openSections['bg']} 
+            onToggle={(isAdditive) => handleSectionToggle('bg', 1, isAdditive)}
+            stickyTop="36px"
+        >
+            <BackgroundSection 
+                expandedState={expandedState} toggleExpand={toggleExpand}
+                bgAnimation={bgAnimation} setBgAnimation={setBgAnimation} bgTransition={bgTransition} setBgTransition={setBgTransition}
+                bgMedia={bgMedia} bgList={bgList} currentBgIndex={currentBgIndex} onRemoveBg={onRemoveBg} onMoveBg={onMoveBg} onSelectBg={onSelectBg} onClearBgMedia={onClearBgMedia} shuffleBgList={shuffleBgList} onBgMediaUpload={onBgMediaUpload}
+                bgAutoplayInterval={bgAutoplayInterval} setBgAutoplayInterval={setBgAutoplayInterval} useAlbumArtAsBackground={useAlbumArtAsBackground} setUseAlbumArtAsBackground={setUseAlbumArtAsBackground}
+                bgColor={bgColor} setBgColor={setBgColor} bgPattern={bgPattern} setBgPattern={setBgPattern} bgPatternConfig={bgPatternConfig} setBgPatternConfig={setBgPatternConfig} onDeselectBg={onDeselectBg}
+                isVideoActive={isVideoActive} toggleVideo={toggleVideo} streamMode={streamMode} setStreamMode={setStreamMode}
+            />
+        </SettingsSection>
 
-                            <ModuleWrapper id="sysaudio" label={<TranslatedText k="sys_audio_input" />} icon={RadioReceiver} isEnabled={true} isExpanded={expandedState['sysaudio']} isAlwaysOn={true} onToggleExpand={() => toggleExpand('sysaudio')} onToggleEnable={() => {}}>
-                                <SystemAudioModule 
-                                    isAudioActive={isAudioActive} 
-                                    toggleAudio={toggleAudio} 
-                                />
-                            </ModuleWrapper>
-                        </>
-                    }
-                >
-                    <SettingsSection 
-                        id="mod" 
-                        title={<TranslatedText k="modules" />} 
-                        isOpen={openSections['mod']} 
-                        onToggle={(e) => handleSectionToggle('mod', 3, e)}
-                        stickyTop="108px"
-                        sectionContent={
-                            <div id="tutorial-modules" className="space-y-3">
-                                <ModuleWrapper id="wave" label={<NumberedLabel num="01" k="waveform" />} icon={Activity} isEnabled={showVisualizer} isExpanded={expandedState['wave']} onToggleExpand={() => toggleExpand('wave')} onToggleEnable={() => safeAction(() => setShowVisualizer(!showVisualizer))}>
-                                    <VisualizerSettings config={visualizerConfig} update={updateVisualizer} mode="waveform" />
-                                </ModuleWrapper>
-                                <ModuleWrapper id="marquee" label={<NumberedLabel num="02" k="top_marquee" />} icon={Type} isEnabled={marqueeConfig.enabled} isExpanded={expandedState['marquee']} onToggleExpand={() => toggleExpand('marquee')} onToggleEnable={() => safeAction(() => updateMarquee('enabled', !marqueeConfig.enabled))}>
-                                    <MarqueeSettings config={marqueeConfig} update={updateMarquee} />
-                                </ModuleWrapper>
-                                <ModuleWrapper id="dvd" label={<NumberedLabel num="03" k="dvd_saver" />} icon={Disc} isEnabled={showDvd} isExpanded={expandedState['dvd']} onToggleExpand={() => toggleExpand('dvd')} onToggleEnable={() => safeAction(() => setShowDvd(!showDvd))}>
-                                    <DvdSettings config={dvdConfig} update={updateDvd} />
-                                </ModuleWrapper>
-                                <ModuleWrapper id="leaks" label={<NumberedLabel num="04" k="light_leaks" />} icon={Sun} isEnabled={effectsConfig.lightLeaks.enabled} isExpanded={expandedState['leaks']} onToggleExpand={() => toggleExpand('leaks')} onToggleEnable={() => safeAction(() => updateEffect('lightLeaks', { ...effectsConfig.lightLeaks, enabled: !effectsConfig.lightLeaks.enabled }))}>
-                                    <LightLeaksSettings config={effectsConfig.lightLeaks} update={(v) => updateEffect('lightLeaks', v)} />
-                                </ModuleWrapper>
-                                <ModuleWrapper id="hologram" label={<NumberedLabel num="05" k="holograms" />} icon={MessageSquare} isEnabled={effectsConfig.holograms.enabled} isExpanded={expandedState['hologram']} onToggleExpand={() => toggleExpand('hologram')} onToggleEnable={() => safeAction(() => updateEffect('holograms', { ...effectsConfig.holograms, enabled: !effectsConfig.holograms.enabled }))}>
-                                    <HologramSettings config={effectsConfig.holograms} update={(v) => updateEffect('holograms', v)} />
-                                </ModuleWrapper>
-                                <ModuleWrapper id="gemini" label={<NumberedLabel num="06" k="gemini_chat" />} icon={Bot} isEnabled={effectsConfig.geminiChat.enabled} isExpanded={expandedState['gemini']} onToggleExpand={() => toggleExpand('gemini')} onToggleEnable={() => safeAction(() => updateEffect('geminiChat', { ...effectsConfig.geminiChat, enabled: !effectsConfig.geminiChat.enabled }))}>
-                                    <GeminiSettings config={effectsConfig.geminiChat} update={(v) => updateEffect('geminiChat', v)} apiKey={apiKey} setApiKey={setApiKey} />
-                                </ModuleWrapper>
-                                <ModuleWrapper id="scan" label={<NumberedLabel num="07" k="scanlines" />} icon={Tv} isEnabled={effectsConfig.scanlineEnabled} isExpanded={expandedState['scan']} onToggleExpand={() => toggleExpand('scan')} onToggleEnable={() => safeAction(() => updateEffect('scanlineEnabled', !effectsConfig.scanlineEnabled))}>
-                                    <ScanlineSettings config={effectsConfig} update={updateEffect} />
-                                </ModuleWrapper>
-                                <ModuleWrapper id="cyber" label={<NumberedLabel num="08" k="cyber_hack" />} icon={Terminal} isEnabled={effectsConfig.cyberHack.enabled} isExpanded={expandedState['cyber']} onToggleExpand={() => toggleExpand('cyber')} onToggleEnable={() => safeAction(() => updateEffect('cyberHack', { ...effectsConfig.cyberHack, enabled: !effectsConfig.cyberHack.enabled }))}>
-                                    <CyberSettings config={effectsConfig.cyberHack} update={(v) => updateEffect('cyberHack', v)} />
-                                </ModuleWrapper>
-                                <ModuleWrapper id="glitch" label={<NumberedLabel num="09" k="digital_glitch" />} icon={AlertTriangle} isEnabled={effectsConfig.glitch.enabled} isExpanded={expandedState['glitch']} onToggleExpand={() => toggleExpand('glitch')} onToggleEnable={() => safeAction(() => updateEffect('glitch', { ...effectsConfig.glitch, enabled: !effectsConfig.glitch.enabled }))}>
-                                    <GlitchSettings config={effectsConfig.glitch} update={(v) => updateEffect('glitch', v)} />
-                                </ModuleWrapper>
-                                {setShowVisualizer3D && reactorConfig && (
-                                <ModuleWrapper id="reactor" label={<span className="flex items-center gap-2"><span className="text-theme-muted opacity-50 font-normal">10 //</span> 3D REACTOR</span>} icon={Box} isEnabled={showVisualizer3D || false} isExpanded={expandedState['reactor']} onToggleExpand={() => toggleExpand('reactor')} onToggleEnable={() => safeAction(() => setShowVisualizer3D(!showVisualizer3D))}>
-                                    <VisualizerSettings config={reactorConfig} update={updateReactor} mode="reactor" />
-                                </ModuleWrapper>
-                                )}
-                                <ModuleWrapper id="signal" label={<NumberedLabel num="11" k="signal_processor" />} icon={Zap} isEnabled={true} isAlwaysOn={true} isExpanded={expandedState['signal']} onToggleExpand={() => toggleExpand('signal')} onToggleEnable={() => {}}>
-                                    <SignalSettings config={effectsConfig} update={updateEffect} />
-                                </ModuleWrapper>
-                            </div>
-                        }
-                    />
-                </SettingsSection>
-            </SettingsSection>
+        <SettingsSection 
+            id="sfx" 
+            title={<><span className="text-theme-muted opacity-50 font-normal mr-2">3 //</span> <TranslatedText k="cat_sound_effects" /></>} 
+            isOpen={openSections['sfx']} 
+            onToggle={(isAdditive) => handleSectionToggle('sfx', 2, isAdditive)}
+            stickyTop="72px"
+        >
+            <SoundSection 
+                expandedState={expandedState} toggleExpand={toggleExpand}
+                crossfadeDuration={crossfadeDuration} setCrossfadeDuration={setCrossfadeDuration} sfxVolume={sfxVolume} setSfxVolume={setSfxVolume} smoothStart={smoothStart} setSmoothStart={setSmoothStart}
+                ambienceFiles={ambienceFiles} ambienceConfig={ambienceConfig} onAmbienceUpload={onAmbienceUpload} onAmbienceDelete={onAmbienceDelete} onAmbienceSetActive={onAmbienceSetActive} onAmbienceTogglePlay={onAmbienceTogglePlay} onAmbienceVolume={onAmbienceVolume}
+                isAudioActive={isAudioActive} toggleAudio={toggleAudio}
+            />
+        </SettingsSection>
+
+        <SettingsSection 
+            id="waves" 
+            title={<><span className="text-theme-muted opacity-50 font-normal mr-2">4 //</span> WAVEFORMS</>} 
+            isOpen={openSections['waves']} 
+            onToggle={(isAdditive) => handleSectionToggle('waves', 3, isAdditive)}
+            stickyTop="108px"
+        >
+            <WaveformSection 
+                expandedState={expandedState} toggleExpand={toggleExpand} safeAction={safeAction}
+                showVisualizer={showVisualizer} setShowVisualizer={setShowVisualizer} visualizerConfig={visualizerConfig} updateVisualizer={updateVisualizer}
+                showVisualizer3D={showVisualizer3D} setShowVisualizer3D={setShowVisualizer3D} reactorConfig={reactorConfig} updateReactor={updateReactor}
+                showSineWave={showSineWave} setShowSineWave={setShowSineWave} sineWaveConfig={sineWaveConfig} updateSineWave={updateSineWave}
+            />
+        </SettingsSection>
+
+        <SettingsSection 
+            id="mod" 
+            title={<><span className="text-theme-muted opacity-50 font-normal mr-2">5 //</span> <TranslatedText k="modules" /></>} 
+            isOpen={openSections['mod']} 
+            onToggle={(isAdditive) => handleSectionToggle('mod', 4, isAdditive)}
+            stickyTop="144px"
+        >
+            <ModulesSection 
+                expandedState={expandedState} toggleExpand={toggleExpand} safeAction={safeAction}
+                marqueeConfig={marqueeConfig} updateMarquee={updateMarquee}
+                showDvd={showDvd} setShowDvd={setShowDvd} dvdConfig={dvdConfig} updateDvd={updateDvd}
+                effectsConfig={effectsConfig} updateEffect={updateEffect} apiKey={apiKey} setApiKey={setApiKey}
+            />
+        </SettingsSection>
+
+        <SettingsSection 
+            id="post" 
+            title={<><span className="text-theme-muted opacity-50 font-normal mr-2">6 //</span> <TranslatedText k="cat_screen_effects" /></>} 
+            isOpen={openSections['post']} 
+            onToggle={(isAdditive) => handleSectionToggle('post', 5, isAdditive)}
+            stickyTop="180px"
+        >
+            <PostProcessingSection 
+                expandedState={expandedState} toggleExpand={toggleExpand} safeAction={safeAction}
+                effectsConfig={effectsConfig} updateEffect={updateEffect}
+            />
         </SettingsSection>
       </div>
       

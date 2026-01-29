@@ -3,6 +3,7 @@ import { AppPreset } from '../types';
 import { 
   DEFAULT_VISUALIZER_CONFIG, 
   DEFAULT_REACTOR_CONFIG, 
+  DEFAULT_SINE_WAVE_CONFIG,
   DEFAULT_DVD_CONFIG, 
   DEFAULT_EFFECTS_CONFIG, 
   DEFAULT_MARQUEE_CONFIG, 
@@ -18,6 +19,7 @@ export const DEFAULT_SYSTEM_PRESET: AppPreset = {
   config: {
     visualizerConfig: DEFAULT_VISUALIZER_CONFIG,
     reactorConfig: DEFAULT_REACTOR_CONFIG,
+    sineWaveConfig: DEFAULT_SINE_WAVE_CONFIG,
     dvdConfig: DEFAULT_DVD_CONFIG,
     effectsConfig: DEFAULT_EFFECTS_CONFIG,
     marqueeConfig: DEFAULT_MARQUEE_CONFIG,
@@ -27,6 +29,7 @@ export const DEFAULT_SYSTEM_PRESET: AppPreset = {
     bgPatternConfig: { intensity: 0.25, scale: 1.0 },
     showVisualizer: true,
     showVisualizer3D: false, // Default OFF
+    showSineWave: false, // Default OFF
     showDvd: true,
     bgAutoplayInterval: 5,
     cursorStyle: 'theme-sync',
@@ -68,6 +71,7 @@ export const OCEAN_BLUE_PRESET: AppPreset = {
       barGravity: 5
     },
     reactorConfig: DEFAULT_REACTOR_CONFIG,
+    sineWaveConfig: { ...DEFAULT_SINE_WAVE_CONFIG, style: 'ocean' },
     dvdConfig: {
       size: 150,
       speed: 2,
@@ -77,8 +81,10 @@ export const OCEAN_BLUE_PRESET: AppPreset = {
     },
     effectsConfig: {
       fps: 60,
+      signalEnabled: true,
       pixelation: 1,
       noise: 0,
+      chromaticEnabled: true,
       chromaticAberration: 0,
       vhsJitter: 0,
       scanlineEnabled: true,
@@ -140,6 +146,22 @@ export const OCEAN_BLUE_PRESET: AppPreset = {
         intensity: 0.5,
         speed: 0.5,
         number: 6
+      },
+      rain: {
+        enabled: false,
+        intensity: 0.5,
+        speed: 1.0,
+        size: 1.0,
+        direction: 0,
+        wind: 0,
+        gustiness: 0.5,
+        opacity: 0.5,
+        wander: 0.1
+      },
+      vignette: {
+        enabled: true,
+        intensity: 0.6,
+        roundness: 0.5
       }
     },
     bgColor: "#0f172a",
@@ -150,6 +172,7 @@ export const OCEAN_BLUE_PRESET: AppPreset = {
     },
     showVisualizer: true,
     showVisualizer3D: false, // Default OFF
+    showSineWave: false,
     showDvd: true,
     marqueeConfig: {
       enabled: true,

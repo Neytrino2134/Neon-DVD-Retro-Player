@@ -556,7 +556,7 @@ const StartupOverlay: React.FC<StartupOverlayProps> = ({ onComplete, onFadeOut, 
                         style={{ opacity: collapsePhase === 'idle' ? 1 : 0 }}
                      >
                         {/* REPLACED STATIC GRID WITH RUNNING WAVES ANIMATION */}
-                        <div className="absolute inset-0 pointer-events-none z-0 overflow-hidden opacity-20">
+                        <div className="absolute left-0 right-0 top-[35%] -translate-y-1/2 h-40 pointer-events-none z-0 overflow-hidden opacity-20">
                             <svg viewBox="0 0 300 100" preserveAspectRatio="none" className="w-full h-full">
                                 <path 
                                     ref={wavePath3Ref} 

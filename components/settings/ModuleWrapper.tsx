@@ -10,7 +10,7 @@ interface ModuleWrapperProps {
   isEnabled: boolean;
   isExpanded: boolean;
   isAlwaysOn?: boolean;
-  onToggleExpand: () => void;
+  onToggleExpand: (e: React.MouseEvent) => void;
   onToggleEnable: () => void;
   children: React.ReactNode;
 }
@@ -124,6 +124,17 @@ const ModuleWrapper: React.FC<ModuleWrapperProps> = ({
                   <svg {...commonProps} viewBox="0 0 300 80" preserveAspectRatio="xMidYMid slice">
                       <path d="M100 40 Q110 20 140 25 Q160 10 190 30 Q210 20 220 40 Q230 50 210 60 L120 60 Q90 60 100 40" fill="none" stroke="currentColor" strokeWidth="2" />
                       <path d="M120 65 L115 75 M140 65 L135 75 M160 65 L155 75 M180 65 L175 75" stroke="currentColor" strokeWidth="2" opacity="0.5" />
+                  </svg>
+              );
+          case 'rain': // Rain Effect
+              return (
+                  <svg {...commonProps} viewBox="0 0 300 80" preserveAspectRatio="xMidYMid slice">
+                      <line x1="50" y1="10" x2="40" y2="30" stroke="currentColor" strokeWidth="1" opacity="0.6"/>
+                      <line x1="80" y1="20" x2="70" y2="40" stroke="currentColor" strokeWidth="1" opacity="0.8"/>
+                      <line x1="150" y1="5" x2="140" y2="35" stroke="currentColor" strokeWidth="1" opacity="0.5"/>
+                      <line x1="200" y1="30" x2="190" y2="50" stroke="currentColor" strokeWidth="1" opacity="0.7"/>
+                      <line x1="250" y1="10" x2="240" y2="40" stroke="currentColor" strokeWidth="1" opacity="0.6"/>
+                      <line x1="120" y1="40" x2="110" y2="60" stroke="currentColor" strokeWidth="1" opacity="0.4"/>
                   </svg>
               );
           case 'debug': // Console/Code
@@ -244,6 +255,30 @@ const ModuleWrapper: React.FC<ModuleWrapperProps> = ({
                       <path fill="none" stroke="currentColor" strokeWidth="2" d="M0 40 Q 15 70, 30 40 T 60 40 T 90 40 T 120 40 T 150 40 T 180 40" />
                   </svg>
               );
+          case 'chromatic': // Chromatic: RGB Layers
+              return (
+                  <svg {...commonProps} viewBox="0 0 300 80" preserveAspectRatio="xMidYMid slice">
+                      <rect x="50" y="20" width="40" height="40" stroke="currentColor" strokeWidth="2" fill="none" opacity="0.5" />
+                      <rect x="55" y="20" width="40" height="40" stroke="currentColor" strokeWidth="2" fill="none" opacity="0.7" />
+                      <rect x="60" y="20" width="40" height="40" stroke="currentColor" strokeWidth="2" fill="none" opacity="0.9" />
+                      
+                      <rect x="200" y="30" width="60" height="10" fill="currentColor" opacity="0.4" />
+                      <rect x="205" y="30" width="60" height="10" fill="currentColor" opacity="0.6" />
+                  </svg>
+              );
+          case 'vignette': // Vignette: Radial
+              return (
+                  <svg {...commonProps} viewBox="0 0 300 80" preserveAspectRatio="xMidYMid slice">
+                      <defs>
+                          <radialGradient id="grad-vignette" cx="50%" cy="50%" r="50%">
+                              <stop offset="0%" stopColor="transparent" />
+                              <stop offset="100%" stopColor="currentColor" stopOpacity="0.8" />
+                          </radialGradient>
+                      </defs>
+                      <rect width="100%" height="100%" fill="url(#grad-vignette)" />
+                      <circle cx="150" cy="40" r="30" stroke="currentColor" strokeWidth="1" fill="none" opacity="0.3" />
+                  </svg>
+              );
           default: // Fallback Grid
               return (
                   <svg {...commonProps} viewBox="0 0 300 80" preserveAspectRatio="xMidYMid slice">
@@ -265,8 +300,8 @@ const ModuleWrapper: React.FC<ModuleWrapperProps> = ({
       {/* Header Area - Increased Height */}
       <div 
         className="relative h-20 p-3 flex flex-col justify-between cursor-pointer select-none"
-        onClick={() => {
-             if (isEnabled) onToggleExpand();
+        onClick={(e) => {
+             if (isEnabled) onToggleExpand(e);
              else if (!isAlwaysOn) onToggleEnable(); 
         }}
       >

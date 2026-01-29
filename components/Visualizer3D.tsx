@@ -36,6 +36,7 @@ const Scene: React.FC<{ analyser: AnalyserNode | null; isPlaying: boolean; confi
           case 'ocean': return '#4B8CA8';
           case 'theme-blue': return '#3b82f6';
           case 'theme-sync': return colors.primary;
+          case 'neon-gradient': return '#ff00ff'; // Fallback to pink as gradient isn't easily mapped to single color 3D object
           case 'gray': return '#d4d4d4';
           case 'matrix': return '#00ff00';
           case 'inferno': return '#ff3333';

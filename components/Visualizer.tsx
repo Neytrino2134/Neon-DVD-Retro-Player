@@ -22,6 +22,10 @@ const Visualizer: React.FC<VisualizerProps> = ({ analyser, isPlaying, config, fp
   // Храним высоту "верхушек" (tips)
   const tipBarsRef = useRef<Float32Array | null>(null);
 
+  // SMOOTHING REFS FOR CONFIG TRANSITIONS
+  const smoothVolRef = useRef<number>(1);
+  const smoothNormRef = useRef({ bass: 1, mid: 1, treb: 1 });
+
   // Store theme colors in ref to access in animate loop
   const themeColorsRef = useRef(colors);
   useEffect(() => {
@@ -126,9 +130,29 @@ const Visualizer: React.FC<VisualizerProps> = ({ analyser, isPlaying, config, fp
             maxBass = 150; maxMid = 100; maxTreb = 80;
         }
 
-        const bassScale = 255 / Math.max(150, maxBass); 
-        const midScale = 255 / Math.max(100, maxMid);    
-        const trebScale = 255 / Math.max(80, maxTreb);
+        // --- SMOOTH CONFIG TRANSITIONS ---
+        
+        // 1. VOLUME SMOOTHING
+        // Target is 1.0 if ignoring volume, else actual volume
+        const targetVolFactor = config.preventVolumeScaling ? 1.0 : volume;
+        smoothVolRef.current += (targetVolFactor - smoothVolRef.current) * 0.1; // 10% per frame
+
+        // 2. NORMALIZE SMOOTHING
+        let targetBassScale = 1;
+        let targetMidScale = 1;
+        let targetTrebScale = 1;
+
+        if (config.normalize) {
+            targetBassScale = 255 / Math.max(150, maxBass); 
+            targetMidScale = 255 / Math.max(100, maxMid);    
+            targetTrebScale = 255 / Math.max(80, maxTreb);
+        }
+
+        const normLerp = 0.05; // 5% per frame (slower for normalization stability)
+        smoothNormRef.current.bass += (targetBassScale - smoothNormRef.current.bass) * normLerp;
+        smoothNormRef.current.mid += (targetMidScale - smoothNormRef.current.mid) * normLerp;
+        smoothNormRef.current.treb += (targetTrebScale - smoothNormRef.current.treb) * normLerp;
+
 
         const barCount = config.barCount;
         
@@ -168,22 +192,14 @@ const Visualizer: React.FC<VisualizerProps> = ({ analyser, isPlaying, config, fp
                 }
             }
 
-            // --- VOLUME COMPENSATION LOGIC ---
-            // If preventVolumeScaling is FALSE (default), we want visualizer to follow Master Volume.
-            // Since our Analyser is now Pre-Fader (always 100% signal), we manually simulate volume drop.
-            if (!config.preventVolumeScaling) {
-                rawValue *= volume;
-            }
-            // If preventVolumeScaling is TRUE (Ignore Volume), we do nothing, 
-            // taking the full 100% signal from Pre-Fader analyser.
+            // --- APPLY VOLUME SCALING (SMOOTHED) ---
+            rawValue *= smoothVolRef.current;
 
-            // Применение нормализации (Auto-Gain)
+            // --- APPLY NORMALIZATION (SMOOTHED) ---
             let scaledValue = rawValue;
-            if (config.normalize) {
-                if (index < bassEnd) scaledValue *= bassScale;
-                else if (index < midEnd) scaledValue *= midScale;
-                else scaledValue *= trebScale;
-            }
+            if (index < bassEnd) scaledValue *= smoothNormRef.current.bass;
+            else if (index < midEnd) scaledValue *= smoothNormRef.current.mid;
+            else scaledValue *= smoothNormRef.current.treb;
             
             // --- DYNAMIC RANGE EXPANSION (FIX FOR "COMPRESSED" LOOK) ---
             // 1. Нормализуем значение от 0 до 1
@@ -248,32 +264,6 @@ const Visualizer: React.FC<VisualizerProps> = ({ analyser, isPlaying, config, fp
             // Если высота 0, не рисуем этот бар
             if (barHeight < 0.5 && (!config.showTips || tipBars[i] < 0.5)) continue;
 
-             // Color Logic
-            let color = '#fff';
-            switch (config.style) {
-              case 'blue': color = '#00f3ff'; break;
-              case 'pink': color = '#ff00ff'; break;
-              case 'warm': color = '#fbbf24'; break; // Amber
-              case 'gray': color = '#d4d4d4'; break; // Neutral Gray
-              case 'ocean': color = '#4B8CA8'; break; // Ocean Teal
-              case 'theme-blue': color = '#3b82f6'; break; // Royal Blue
-              case 'theme-sync': color = themeColorsRef.current.primary; break; // NEW: Theme Sync
-              case 'matrix':
-                 // Dynamic green brightness
-                 const intensity = Math.min(255, (barHeight / HEIGHT) * 255 + 50);
-                 color = `rgb(0, ${intensity}, 0)`;
-                 break;
-              case 'inferno':
-                 const hue = (barHeight / HEIGHT) * 60; 
-                 color = `hsl(${hue}, 100%, 50%)`;
-                 break;
-              case 'retro':
-              default:
-                const colorIndex = i % NEON_COLORS.length;
-                color = NEON_COLORS[colorIndex];
-                break;
-            }
-
             // --- DRAWING POSITION ---
             let barWidth = 0;
             let startX = 0;
@@ -297,6 +287,56 @@ const Visualizer: React.FC<VisualizerProps> = ({ analyser, isPlaying, config, fp
             };
             y = getY(barHeight);
 
+             // Color Logic
+            let color: string | CanvasGradient = '#fff';
+            switch (config.style) {
+              case 'blue': color = '#00f3ff'; break;
+              case 'pink': color = '#ff00ff'; break;
+              case 'warm': color = '#fbbf24'; break; // Amber
+              case 'gray': color = '#d4d4d4'; break; // Neutral Gray
+              case 'ocean': color = '#4B8CA8'; break; // Ocean Teal
+              case 'theme-blue': color = '#3b82f6'; break; // Royal Blue
+              case 'theme-sync': color = themeColorsRef.current.primary; break; // NEW: Theme Sync
+              case 'neon-gradient':
+                 // Per-bar gradient relative to height
+                 if (config.position === 'center') {
+                     // Blue (Top) -> Pink (Center) -> Blue (Bottom)
+                     const gradient = ctx.createLinearGradient(0, y, 0, y + barHeight);
+                     gradient.addColorStop(0, '#00f3ff');
+                     gradient.addColorStop(0.5, '#ff00ff');
+                     gradient.addColorStop(1, '#00f3ff');
+                     color = gradient;
+                 } else if (config.position === 'top') {
+                     // Pink (Base/Top) -> Blue (Tip/Bottom)
+                     const gradient = ctx.createLinearGradient(0, 0, 0, barHeight);
+                     gradient.addColorStop(0, '#ff00ff');
+                     gradient.addColorStop(1, '#00f3ff');
+                     color = gradient;
+                 } else {
+                     // Bottom (Default)
+                     // Pink (Base/Bottom) -> Blue (Tip/Top)
+                     const gradient = ctx.createLinearGradient(0, HEIGHT, 0, HEIGHT - barHeight);
+                     gradient.addColorStop(0, '#ff00ff');
+                     gradient.addColorStop(1, '#00f3ff');
+                     color = gradient;
+                 }
+                 break;
+              case 'matrix':
+                 // Dynamic green brightness
+                 const intensity = Math.min(255, (barHeight / HEIGHT) * 255 + 50);
+                 color = `rgb(0, ${intensity}, 0)`;
+                 break;
+              case 'inferno':
+                 const hue = (barHeight / HEIGHT) * 60; 
+                 color = `hsl(${hue}, 100%, 50%)`;
+                 break;
+              case 'retro':
+              default:
+                const colorIndex = i % NEON_COLORS.length;
+                color = NEON_COLORS[colorIndex];
+                break;
+            }
+
             const gap = config.barGap;
             const drawWidth = Math.max(0.5, barWidth - gap);
 
@@ -319,7 +359,12 @@ const Visualizer: React.FC<VisualizerProps> = ({ analyser, isPlaying, config, fp
                             ctx.fillStyle = '#ffffff'; // White for highlight
                             ctx.globalAlpha = 1.0;
                             ctx.shadowBlur = 5;
-                            ctx.shadowColor = color; // Glow with the base color
+                            // shadowColor needs a string, if gradient used, fallback to white or primary
+                            if (typeof color === 'string') {
+                                ctx.shadowColor = color;
+                            } else {
+                                ctx.shadowColor = '#ffffff';
+                            }
                         } else {
                             ctx.fillStyle = color;
                             ctx.globalAlpha = config.fillOpacity;

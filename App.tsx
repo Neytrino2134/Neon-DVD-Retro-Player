@@ -3,6 +3,7 @@ import { useState, useRef, useEffect } from 'react';
 import { LanguageProvider } from './contexts/LanguageContext';
 import { NotificationProvider, useNotification } from './contexts/NotificationContext';
 import { ThemeProvider, useTheme } from './contexts/ThemeContext';
+import { Settings } from 'lucide-react';
 
 // Components - Layout & UI
 import TitleBar from './components/TitleBar'; 
@@ -13,6 +14,7 @@ import TutorialOverlay from './components/TutorialOverlay';
 import ContextMenu from './components/ContextMenu';
 import CustomCursor from './components/CustomCursor';
 import StreamWindow from './components/ui/StreamWindow'; // NEW
+import RecordingSettingsModal from './components/modals/RecordingSettingsModal'; // NEW
 
 // Components - Main Modules
 import SettingsPanel from './components/settings/SettingsPanel';
@@ -31,18 +33,28 @@ import { useAmbience } from './hooks/useAmbience';
 import { useScreenCapture } from './hooks/useScreenCapture'; 
 import { useAppHotkeys } from './hooks/useAppHotkeys'; 
 import { useMusicEngine } from './hooks/useMusicEngine';
+import { useRecorder } from './hooks/useRecorder'; // NEW
 
 // NEW Modular Hooks
 import { useViewLayout } from './hooks/useViewLayout';
 import { useSystemCycle } from './hooks/useSystemCycle';
 import { useFileHandler } from './hooks/useFileHandler';
-import { AudioTrack, TagMetadata } from './types';
+import { AudioTrack, TagMetadata, RecorderConfig } from './types';
 
 function AppContent() {
   // --- UI LOCAL STATE ---
   const [isEditorMode, setIsEditorMode] = useState(false);
   const [isTagEditorMode, setIsTagEditorMode] = useState(false);
   const [devSkip, setDevSkip] = useState(false);
+  const [showRecModal, setShowRecModal] = useState(false); // NEW
+  
+  // --- RECORDING STATE ---
+  const [recorderConfig, setRecorderConfig] = useState<RecorderConfig>({
+      resolution: '1080p',
+      fps: 60,
+      videoBitrate: 8000000,
+      audioBitrate: 192000
+  });
   
   // --- SCREEN CAPTURE STATE ---
   const [screenVideo, setScreenVideo] = useState<MediaStream | null>(null);
@@ -68,7 +80,6 @@ function AppContent() {
   // 1. System Lifecycle (Boot, Reboot, Tutorial)
   const system = useSystemCycle({ 
       player, 
-      setViewMode: (m) => view.setViewMode(m), 
       setDevSkip, 
       setIsEditorMode: (v) => { setIsEditorMode(v); if(v) setIsTagEditorMode(false); }, 
       stopAllSFX 
@@ -84,6 +95,9 @@ function AppContent() {
       containerRef: appContainerRef,
       handleZipUpload
   });
+
+  // 4. Recording Hook
+  const recorder = useRecorder(player.getAudioStream);
 
   // --- INTEGRATION EFFECTS ---
 
@@ -138,6 +152,7 @@ function AppContent() {
       const defaults = config.resetDefaultPreset();
       config.setVisualizerConfig(defaults.visualizerConfig);
       if (defaults.reactorConfig && config.setReactorConfig) config.setReactorConfig(defaults.reactorConfig);
+      if (defaults.sineWaveConfig && config.setSineWaveConfig) config.setSineWaveConfig(defaults.sineWaveConfig);
       config.setDvdConfig(defaults.dvdConfig);
       config.setEffectsConfig(defaults.effectsConfig);
       config.setMarqueeConfig(defaults.marqueeConfig);
@@ -147,6 +162,7 @@ function AppContent() {
       config.setBgPatternConfig(defaults.bgPatternConfig);
       config.setShowVisualizer(defaults.showVisualizer);
       if (config.setShowVisualizer3D && defaults.showVisualizer3D !== undefined) config.setShowVisualizer3D(defaults.showVisualizer3D);
+      if (config.setShowSineWave && defaults.showSineWave !== undefined) config.setShowSineWave(defaults.showSineWave);
       config.setShowDvd(defaults.showDvd);
       config.setBgAutoplayInterval(defaults.bgAutoplayInterval);
       if (defaults.cursorStyle) config.setCursorStyle(defaults.cursorStyle);
@@ -200,6 +216,18 @@ function AppContent() {
           <StreamWindow 
               stream={screenVideo} 
               onClose={screenCapture.toggleVideoCapture} 
+          />
+      )}
+
+      {/* Recording Settings Modal */}
+      {showRecModal && (
+          <RecordingSettingsModal 
+              currentConfig={recorderConfig}
+              onClose={() => setShowRecModal(false)}
+              onSave={(newConfig) => {
+                  setRecorderConfig(newConfig);
+                  addNotification("Recording config saved", "success");
+              }}
           />
       )}
 
@@ -300,10 +328,12 @@ function AppContent() {
                  <SettingsPanel 
                    showVisualizer={config.showVisualizer} setShowVisualizer={config.setShowVisualizer}
                    showVisualizer3D={config.showVisualizer3D} setShowVisualizer3D={config.setShowVisualizer3D}
+                   showSineWave={config.showSineWave} setShowSineWave={config.setShowSineWave}
                    showDvd={config.showDvd} setShowDvd={config.setShowDvd}
                    marqueeConfig={config.marqueeConfig} setMarqueeConfig={config.setMarqueeConfig}
                    visualizerConfig={config.visualizerConfig} setVisualizerConfig={config.setVisualizerConfig}
                    reactorConfig={config.reactorConfig} setReactorConfig={config.setReactorConfig} 
+                   sineWaveConfig={config.sineWaveConfig} setSineWaveConfig={config.setSineWaveConfig}
                    dvdConfig={config.dvdConfig} setDvdConfig={config.setDvdConfig}
                    effectsConfig={config.effectsConfig} setEffectsConfig={config.setEffectsConfig}
                    watermarkConfig={config.watermarkConfig} setWatermarkConfig={config.setWatermarkConfig}
@@ -327,6 +357,8 @@ function AppContent() {
                    onAudioUpload={fileHandler.handleFilesSelected}
                    crossfadeDuration={player.crossfadeDuration}
                    setCrossfadeDuration={player.setCrossfadeDuration}
+                   smoothStart={player.smoothStart}
+                   setSmoothStart={player.setSmoothStart}
                    savedPresets={config.savedPresets}
                    activePresetId={config.activePresetId}
                    savePreset={(n: string) => { config.savePreset(n, currentTheme, controlStyle); addNotification(`Preset "${n}" saved`, "success"); }}
@@ -379,6 +411,7 @@ function AppContent() {
                    setUseAlbumArtAsBackground={config.setUseAlbumArtAsBackground}
                    streamMode={streamMode} // NEW
                    setStreamMode={setStreamMode} // NEW
+                   shuffleBgList={config.shuffleBgList}
                  />
              )}
              
@@ -389,6 +422,16 @@ function AppContent() {
                             EXPANSION
                         </span>
                         <div className="flex gap-2">
+                            {/* Recording Config Button */}
+                            <button
+                                onClick={() => setShowRecModal(true)}
+                                className="px-3 py-1.5 bg-gray-900 border border-gray-700 rounded text-[10px] font-mono text-gray-400 hover:text-white hover:border-theme-primary hover:bg-gray-800 transition-all flex items-center gap-2 group shadow-sm"
+                                title="Recording Settings"
+                            >
+                                <Settings size={12} className="group-hover:text-theme-primary transition-colors" />
+                                <span>Rec Setup</span>
+                            </button>
+
                             <button
                                 onClick={handleToggleTagEditor}
                                 className="px-3 py-1.5 bg-gray-900 border border-gray-700 rounded text-[10px] font-mono text-gray-400 hover:text-white hover:border-gray-500 hover:bg-gray-800 transition-all flex items-center gap-2 group shadow-sm"
@@ -454,6 +497,8 @@ function AppContent() {
                   setVisualizerConfig={config.setVisualizerConfig} 
                   showVisualizer={config.showVisualizer}
                   showVisualizer3D={config.showVisualizer3D} 
+                  sineWaveConfig={config.sineWaveConfig} // Pass Sine Wave
+                  showSineWave={config.showSineWave} // Pass Sine Wave Toggle
                   dvdConfig={config.dvdConfig}
                   showDvd={config.showDvd}
                   effectsConfig={config.effectsConfig}
@@ -478,6 +523,11 @@ function AppContent() {
                   bgAnimation={config.bgAnimation} 
                   isSystemAudioActive={screenCapture.isAudioActive}
                   streamMode={streamMode} // NEW
+                  
+                  // Recorder Props
+                  isRecording={recorder.isRecording}
+                  onStartRecording={() => recorder.startRecording(recorderConfig)}
+                  onStopRecording={recorder.stopRecording}
                 />
             )}
         </div>

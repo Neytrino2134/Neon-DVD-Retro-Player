@@ -43,6 +43,19 @@ const THEMES: Record<ThemeType, ThemeColors> = {
     toggleKnob: '#ffffff',
     toggleBg: '#3b82f6',
   },
+  'neon-pink': {
+    primary: '#ff00ff', // Pink (High Contrast)
+    secondary: '#00f3ff', // Blue
+    accent: '#bc13fe', // Purple
+    bg: '#030712', // Dark Bluish Black (Same as Retro for contrast)
+    panel: '#111827', // Dark Gray Blue Panel
+    text: '#ffdbf9', // Light Pink Text
+    muted: '#9ca3af', // Cool Gray Muted
+    border: '#374151', // Standard Dark Border (lets pink pop)
+    scrollThumb: '#ff00ff',
+    toggleKnob: '#ffffff',
+    toggleBg: '#ff00ff',
+  },
   'warm-cozy': {
     primary: '#fbbf24', // Amber-400
     secondary: '#d97706', // Amber-600

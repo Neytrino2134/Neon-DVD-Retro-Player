@@ -4,13 +4,12 @@ import { useNotification } from '../contexts/NotificationContext';
 
 interface UseSystemCycleProps {
   player: any;
-  setViewMode: (mode: any) => void;
   setDevSkip: (v: boolean) => void;
   setIsEditorMode: (v: boolean) => void;
   stopAllSFX: () => void;
 }
 
-export const useSystemCycle = ({ player, setViewMode, setDevSkip, setIsEditorMode, stopAllSFX }: UseSystemCycleProps) => {
+export const useSystemCycle = ({ player, setDevSkip, setIsEditorMode, stopAllSFX }: UseSystemCycleProps) => {
   const { addNotification } = useNotification();
   
   const [rebootPhase, setRebootPhase] = useState<'idle' | 'waiting' | 'active'>('idle');
@@ -42,10 +41,10 @@ export const useSystemCycle = ({ player, setViewMode, setDevSkip, setIsEditorMod
       player.stop();
       setIntroState(0);
       setStartupKey(prev => prev + 1); 
-      setViewMode('default'); 
+      // Removed setViewMode('default') to preserve the current view state (e.g. Cinema Mode)
       setDevSkip(false); 
       setIsEditorMode(false); 
-  }, [introState, rebootPhase, player, setViewMode, setDevSkip, setIsEditorMode]);
+  }, [introState, rebootPhase, player, setDevSkip, setIsEditorMode]);
 
   const handleBootComplete = useCallback(() => {
       const tutorialDone = localStorage.getItem('neon_tutorial_complete');

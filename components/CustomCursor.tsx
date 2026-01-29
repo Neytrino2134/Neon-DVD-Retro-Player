@@ -13,6 +13,9 @@ const GLITCH_COLORS = [
 // Tech/Glitch symbols
 const SYMBOLS = ['0', '1', 'X', '+', '<', '>', '_', '█', '▓', '▒', 'ERR', 'NaN', '0x'];
 
+// Music Symbols
+const MUSIC_SYMBOLS = ['♪', '♫', '♩', '♬', '♭', '♯', '𝄞'];
+
 // SVG PATHS DEFINITIONS
 // New Hand Cursor Path (Finger)
 const HAND_PATH_D = "M10 11V8.99c0-.88.59-1.64 1.44-1.86h.05A1.99 1.99 0 0 1 14 9.05V12v-2c0-.88.6-1.65 1.46-1.87h.05A1.98 1.98 0 0 1 18 10.06V13v-1.94a2 2 0 0 1 1.51-1.94h0A2 2 0 0 1 22 11.06V14c0 .6-.08 1.27-.21 1.97a7.96 7.96 0 0 1-7.55 6.48 54.98 54.98 0 0 1-4.48 0 7.96 7.96 0 0 1-7.55-6.48C2.08 15.27 2 14.59 2 14v-1.49c0-1.11.9-2.01 2.01-2.01h0a2 2 0 0 1 2.01 2.03l-.01.97v-10c0-1.1.9-2 2-2h0a2 2 0 0 1 2 2V11Z";
@@ -48,7 +51,10 @@ interface Particle {
   char: string;
   size: number;
   isBlock: boolean;
-  updateTimer: number; 
+  updateTimer: number;
+  // Extra props for smooth music flow
+  rotation?: number; 
+  rotationSpeed?: number;
 }
 
 interface CustomCursorProps {
@@ -73,6 +79,7 @@ const CustomCursor: React.FC<CustomCursorProps> = ({ style = 'default', retroScr
   // Refs for Canvas particle state
   const particlesRef = useRef<Particle[]>([]);
   const frameRef = useRef(0);
+  const lastMousePos = useRef({ x: 0, y: 0 });
 
   // --- 1. GLOBAL INPUT TRACKER ---
   useEffect(() => {
@@ -156,7 +163,7 @@ const CustomCursor: React.FC<CustomCursorProps> = ({ style = 'default', retroScr
     return () => document.body.classList.remove('force-system-cursor');
   }, [style]);
 
-  // --- 3. CANVAS RESIZE (For Default Style) ---
+  // --- 3. CANVAS RESIZE (For Default & Music Style) ---
   useEffect(() => {
       const canvas = canvasRef.current;
       if (!canvas) return;
@@ -181,7 +188,10 @@ const CustomCursor: React.FC<CustomCursorProps> = ({ style = 'default', retroScr
           const shouldHide = forceSystemCursor || isOut;
 
           // DETERMINE ACTIVE STYLE
-          const activeStyle = (isScreenHover) ? retroScreenStyle : style;
+          // Special Logic: If Music Flow is active, we force it to stay active even on screen 
+          // (to keep particles) but we will swap the pointer icon inside the block.
+          let activeStyle = (isScreenHover) ? retroScreenStyle : style;
+          if (style === 'music-flow') activeStyle = 'music-flow';
 
           if (activeStyle === 'system') {
               // Hide everything if active style is system
@@ -192,8 +202,116 @@ const CustomCursor: React.FC<CustomCursorProps> = ({ style = 'default', retroScr
               return;
           }
 
-          // --- CANVAS (DEFAULT) MODE ---
-          if (activeStyle === 'default' && ctx && canvas) {
+          // --- MUSIC FLOW MODE ---
+          if (activeStyle === 'music-flow' && ctx && canvas) {
+              // Ensure other cursors are managed (music flow uses SVG cursor + canvas particles)
+              if (dosCursorRef.current) dosCursorRef.current.style.opacity = '0';
+              if (cursorRef.current) {
+                  const scale = isClicked ? 0.9 : 1;
+                  cursorRef.current.style.transform = `translate(${x}px, ${y}px) scale(${scale})`;
+                  cursorRef.current.style.opacity = shouldHide ? '0' : '1';
+                  
+                  // Icon Switch Logic for Music Flow
+                  let showArrow = !shouldHide;
+                  let showHand = isHovering && !shouldHide;
+                  let showCrosshair = isScreenHover && !shouldHide;
+
+                  if (isScreenHover) {
+                      showArrow = false;
+                      showHand = false; // Force crosshair even if hovering interactive on screen
+                  } else if (isHovering) {
+                      showArrow = false;
+                  }
+
+                  if (isAppDragging) {
+                      showArrow = false;
+                      showHand = false;
+                      showCrosshair = false;
+                  }
+
+                  // Apply Opacity
+                  if (arrowRef.current) arrowRef.current.style.opacity = showArrow ? '1' : '0';
+                  if (handRef.current) handRef.current.style.opacity = showHand ? '1' : '0';
+                  
+                  // Apply specific style for the Music Flow Crosshair
+                  if (crosshairRef.current) {
+                      crosshairRef.current.style.opacity = showCrosshair ? '0.5' : '0'; // Small transparent crosshair
+                      crosshairRef.current.style.transform = `translate(-12px, -12px) scale(${showCrosshair ? 0.6 : 1})`; // Small scale
+                  }
+
+                  // Hide others
+                  if (grabRef.current) grabRef.current.style.opacity = isAppDragging ? '1' : '0';
+                  if (roundedRef.current) roundedRef.current.style.opacity = '0';
+              }
+
+              const particles = particlesRef.current;
+              frameRef.current++;
+              ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+              if (!shouldHide && x > 0) {
+                  // Calculate movement delta to prevent clumping when still
+                  const dx = x - lastMousePos.current.x;
+                  const dy = y - lastMousePos.current.y;
+                  const dist = Math.sqrt(dx*dx + dy*dy);
+                  lastMousePos.current = { x, y };
+
+                  // Spawn particles based on movement or random chance
+                  const spawnChance = isClicked ? 0.8 : (dist > 2 ? 0.6 : 0.05);
+                  
+                  if (Math.random() < spawnChance) {
+                      const count = isClicked ? 3 : 1;
+                      for(let i=0; i<count; i++) {
+                          const char = MUSIC_SYMBOLS[Math.floor(Math.random() * MUSIC_SYMBOLS.length)];
+                          // Pick from theme colors or white
+                          const colorChoice = Math.random();
+                          let color = '#fff';
+                          if (colorChoice < 0.4) color = colorMapRef.current.global.primary;
+                          else if (colorChoice < 0.7) color = colorMapRef.current.global.secondary;
+
+                          particles.push({
+                              x: x + (Math.random() - 0.5) * 10,
+                              y: y + (Math.random() - 0.5) * 10,
+                              vx: (Math.random() - 0.5) * 1.5 - (dx * 0.05), // Drift opposite to movement
+                              vy: (Math.random() - 0.5) * 1.5 - 0.5, // Slight upward drift preference
+                              life: 1.0,
+                              decay: Math.random() * 0.01 + 0.005, // Slower decay for smooth flow
+                              color: color,
+                              char: char,
+                              size: Math.floor(Math.random() * 12) + 10,
+                              isBlock: false,
+                              updateTimer: 0,
+                              rotation: Math.random() * Math.PI * 2,
+                              rotationSpeed: (Math.random() - 0.5) * 0.1
+                          });
+                      }
+                  }
+              }
+
+              // Update & Draw Music Particles
+              for (let i = particles.length - 1; i >= 0; i--) {
+                  const p = particles[i];
+                  p.x += p.vx;
+                  p.y += p.vy;
+                  p.life -= p.decay;
+                  if (p.rotation !== undefined && p.rotationSpeed !== undefined) {
+                      p.rotation += p.rotationSpeed;
+                  }
+
+                  if (p.life <= 0) { particles.splice(i, 1); continue; }
+
+                  ctx.save();
+                  ctx.globalAlpha = p.life;
+                  ctx.fillStyle = p.color;
+                  ctx.translate(p.x, p.y);
+                  if (p.rotation !== undefined) ctx.rotate(p.rotation);
+                  ctx.font = `${p.size}px "Courier New", monospace`;
+                  ctx.fillText(p.char, -p.size/2, p.size/2);
+                  ctx.restore();
+              }
+          }
+
+          // --- CANVAS (DEFAULT / GLITCH) MODE ---
+          else if (activeStyle === 'default' && ctx && canvas) {
               // Ensure other cursors hidden
               if (cursorRef.current) cursorRef.current.style.opacity = '0';
               if (dosCursorRef.current) dosCursorRef.current.style.opacity = '0';
@@ -325,7 +443,14 @@ const CustomCursor: React.FC<CustomCursorProps> = ({ style = 'default', retroScr
               } else if (activeStyle === 'rounded') {
                   showRounded = true;
               } else {
+                  // For normal modes, arrow is shown by default if not hovering/dragging
                   showArrow = true;
+              }
+
+              // Ensure crosshair scale is reset if we are not in music-flow special mode
+              if (crosshairRef.current) {
+                  crosshairRef.current.style.transform = `translate(-12px, -12px) scale(1)`; 
+                  // Opacity handled below
               }
 
               if (arrowRef.current) arrowRef.current.style.opacity = showArrow ? '1' : '0';
@@ -345,7 +470,7 @@ const CustomCursor: React.FC<CustomCursorProps> = ({ style = 'default', retroScr
   // --- Determine Colors for SVG Mode ---
   
   const getColorsForStyle = (s: string) => {
-      if (s === 'theme-sync') return { primary: colors.primary, secondary: colors.secondary };
+      if (s === 'theme-sync' || s === 'music-flow') return { primary: colors.primary, secondary: colors.secondary };
       if (s === 'classic-blue') return { primary: '#00f3ff', secondary: '#4d79ff' };
       if (s === 'classic-warm') return { primary: '#ffd700', secondary: '#ff8c00' };
       if (s === 'classic-ocean') return { primary: '#70C6D6', secondary: '#4B8CA8' };

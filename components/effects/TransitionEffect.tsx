@@ -28,12 +28,12 @@ const TransitionEffect: React.FC<TransitionEffectProps> = ({ phase, mode = 'glit
       const h = canvas.height;
 
       // --- CONFIGURATION ---
-      // We limit the number of blocks drawn per frame to ensure a gradual effect
-      // rather than an instant fill.
-      let rectsPerFrame = 2; 
+      // Reduced rectsPerFrame for 'out' phase to extend build-up duration (slower fill)
+      let rectsPerFrame = 1; 
       
-      // Reveal (IN) can be slightly more aggressive to clean up quickly
-      if (phase === 'in') rectsPerFrame = 5;
+      // Reveal (IN) keeps higher count to ensure clean sweep, but slightly reduced for longer tail
+      // Reduced from 8 to 3 to match the extended 1200ms duration
+      if (phase === 'in') rectsPerFrame = 3;
 
       for (let i = 0; i < rectsPerFrame; i++) {
         // Random dimensions

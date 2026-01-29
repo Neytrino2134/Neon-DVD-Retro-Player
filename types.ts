@@ -7,6 +7,7 @@ export interface AudioTrack {
   file: File;
   artworkUrl?: string; // NEW: Album art blob URL
   tags?: TagMetadata; // NEW: ID3 Tags
+  order?: number; // Added order property for sorting
 }
 
 export interface TagMetadata {
@@ -45,6 +46,14 @@ export interface AmbienceConfig {
   activeId: string | null;
   isPlaying: boolean;
   volume: number;
+}
+
+// NEW: Recorder Configuration
+export interface RecorderConfig {
+  resolution: '1080p' | '720p' | '4k';
+  fps: 30 | 60;
+  videoBitrate: number; // bps
+  audioBitrate: number; // bps
 }
 
 // NEW: System Audio Configuration
@@ -91,12 +100,12 @@ export const NEON_COLORS = [
   '#ff3333', // Red
 ];
 
-export type VisualizerStyle = 'retro' | 'blue' | 'pink' | 'matrix' | 'inferno' | 'warm' | 'gray' | 'ocean' | 'theme-blue' | 'theme-sync';
+export type VisualizerStyle = 'retro' | 'blue' | 'pink' | 'matrix' | 'inferno' | 'warm' | 'gray' | 'ocean' | 'theme-blue' | 'theme-sync' | 'neon-gradient';
 export type VisualizerPosition = 'center' | 'top' | 'bottom';
 export type TipColor = 'white' | 'blue' | 'pink' | 'green' | 'purple' | 'yellow' | 'red';
-export type CursorStyle = 'default' | 'classic-blue' | 'classic-warm' | 'classic-white' | 'classic-ocean' | 'theme-sync' | 'dos-terminal' | 'system' | 'crosshair' | 'rounded';
+export type CursorStyle = 'default' | 'music-flow' | 'classic-blue' | 'classic-warm' | 'classic-white' | 'classic-ocean' | 'theme-sync' | 'dos-terminal' | 'system' | 'crosshair' | 'rounded';
 
-export type ThemeType = 'neon-retro' | 'neon-blue' | 'warm-cozy' | 'neutral-gray' | 'neutral-ocean';
+export type ThemeType = 'neon-retro' | 'neon-blue' | 'neon-pink' | 'warm-cozy' | 'neutral-gray' | 'neutral-ocean';
 export type ControlStyle = 'default' | 'round' | 'circle';
 export type BgTransitionType = 'glitch' | 'leaks' | 'none';
 export type BgAnimationType = 'none' | 'zoom' | 'sway' | 'handheld' | 'cinematic' | 'chaos'; // NEW
@@ -128,6 +137,7 @@ export interface VisualizerConfig {
   segmentGap: number; 
   highlightLastBrick: boolean; // NEW: Highlight the top-most brick
   barGravity: number; // NEW: Gravity/Decay for the bars themselves
+  threeDMode?: 'reactor' | 'spectrum'; // NEW: Specific for 3D Visualizer
 }
 
 export interface DvdConfig {
@@ -168,10 +178,24 @@ export interface GeminiChatConfig {
   categories: Record<HologramCategory, boolean>;
 }
 
+export interface RainConfig {
+  enabled: boolean;
+  intensity: number; // 0.1 to 1.0 (Density)
+  speed: number; // Fall speed
+  size: number; // Length/thickness scale
+  direction: number; // Angle in degrees (-45 to 45)
+  wind: number; // Base horizontal wind speed
+  gustiness: number; // Random wind variation
+  opacity: number; // NEW: Rain opacity
+  wander: number; // NEW: Direction randomness
+}
+
 export interface EffectsConfig {
   fps: number;
+  signalEnabled: boolean; // NEW: Master toggle for signal processor
   pixelation: number;
   noise: number;
+  chromaticEnabled: boolean; // NEW: Master toggle for chromatic aberration
   chromaticAberration: number;
   vhsJitter: number;
   scanlineEnabled: boolean;
@@ -214,6 +238,12 @@ export interface EffectsConfig {
     speed: number; // Movement speed
     number: number; // Amount of blobs
   };
+  rain: RainConfig; // NEW: Rain Effect
+  vignette: {
+    enabled: boolean;
+    intensity: number; // Opacity 0-1
+    roundness: number; // 0-1 (Size of center hole)
+  };
 }
 
 export interface CrossfadeConfig {
@@ -233,6 +263,7 @@ export interface AppPreset {
   config: {
     visualizerConfig: VisualizerConfig;
     reactorConfig?: VisualizerConfig; // NEW: Independent 3D Reactor config
+    sineWaveConfig?: VisualizerConfig; // NEW: Sine Wave config
     dvdConfig: DvdConfig;
     effectsConfig: EffectsConfig;
     marqueeConfig: MarqueeConfig;
@@ -242,6 +273,7 @@ export interface AppPreset {
     bgPatternConfig: PatternConfig;
     showVisualizer: boolean;
     showVisualizer3D?: boolean; // NEW: Independent toggle
+    showSineWave?: boolean; // NEW: Sine Wave Toggle
     showDvd: boolean;
     bgAutoplayInterval: number;
     cursorStyle?: CursorStyle;

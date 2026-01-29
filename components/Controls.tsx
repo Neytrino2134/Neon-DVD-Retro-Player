@@ -372,7 +372,8 @@ const Controls: React.FC<ControlsProps> = ({
         </div>
 
         {/* Track List - Fills remaining space */}
-        <div className={`flex-1 min-h-0 overflow-hidden bg-theme-bg/40 shadow-inner border-t border-white/5
+        {/* CHANGED: border-theme-primary/60 to border-theme-border to remove white line effect */}
+        <div className={`flex-1 min-w-0 overflow-hidden bg-theme-bg/40 shadow-inner border-t border-theme-border
             ${isMini ? 'mx-0 mb-0 rounded-none border-x-0 border-b-0' : 'mx-4 mb-4 rounded-b-lg rounded-tr-lg'}
         `}>
             <TrackList 

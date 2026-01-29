@@ -13,7 +13,17 @@ export const DEFAULT_REACTOR_CONFIG: VisualizerConfig = {
   style: 'theme-sync', position: 'center', barCount: 64, sensitivity: 1.2, fillOpacity: 0.8,
   strokeEnabled: true, strokeOpacity: 0.5, showTips: false, normalize: false, preventVolumeScaling: false, minFrequency: 0, maxFrequency: 80, 
   barGap: 0, mirror: false, segmented: false, segmentHeight: 0, segmentGap: 0,
-  tipHeight: 0, tipSpeed: 0, highlightLastBrick: false, tipColor: 'white', tipGlow: false, barGravity: 5
+  tipHeight: 0, tipSpeed: 0, highlightLastBrick: false, tipColor: 'white', tipGlow: false, barGravity: 5,
+  threeDMode: 'reactor'
+};
+
+// Independent Config for Sine Wave
+export const DEFAULT_SINE_WAVE_CONFIG: VisualizerConfig = {
+  style: 'theme-sync', position: 'center', barCount: 128, sensitivity: 2.0, fillOpacity: 0.2,
+  strokeEnabled: true, strokeOpacity: 0.8, showTips: false, normalize: false, preventVolumeScaling: false, minFrequency: 0, maxFrequency: 100,
+  barGap: 0, mirror: false, segmented: false, segmentHeight: 0, segmentGap: 0,
+  tipHeight: 0, tipSpeed: 10, // Used for horizontal scroll speed
+  highlightLastBrick: false, tipColor: 'white', tipGlow: false, barGravity: 5
 };
 
 export const DEFAULT_DVD_CONFIG: DvdConfig = { 
@@ -21,7 +31,14 @@ export const DEFAULT_DVD_CONFIG: DvdConfig = {
 };
 
 export const DEFAULT_EFFECTS_CONFIG: EffectsConfig = {
-  fps: 60, pixelation: 1, noise: 0, chromaticAberration: 0, vhsJitter: 0, scanlineEnabled: true, scanlineIntensity: 0.2, scanlineThickness: 4,
+  fps: 60, 
+  signalEnabled: true,
+  pixelation: 1, 
+  noise: 0, 
+  chromaticEnabled: true,
+  chromaticAberration: 0, 
+  vhsJitter: 0, 
+  scanlineEnabled: true, scanlineIntensity: 0.2, scanlineThickness: 4,
   glitch: { enabled: false, intensity: 0.5, speed: 0.2, opacity: 1.0, variant: 'v1' },
   cyberHack: { enabled: false, speed: 5, opacity: 0.7, density: 0.5, scale: 1.0, backgroundOpacity: 0.4 },
   debugConsole: { enabled: false, opacity: 0.9, scale: 1.0 },
@@ -33,7 +50,9 @@ export const DEFAULT_EFFECTS_CONFIG: EffectsConfig = {
     enabled: false, opacity: 0.9, scale: 1.0, width: 350, typingSpeed: 1.0,
     categories: { system: false, interactive: true, music: true, motivational: true, philosophy: true, space: true }
   },
-  lightLeaks: { enabled: false, intensity: 0.5, speed: 0.5, number: 6 }
+  lightLeaks: { enabled: false, intensity: 0.5, speed: 0.5, number: 6 },
+  rain: { enabled: false, intensity: 0.5, speed: 1.0, size: 1.0, direction: 0, wind: 0, gustiness: 0.5, opacity: 0.5, wander: 0.1 },
+  vignette: { enabled: false, intensity: 0.5, roundness: 0.7 }
 };
 
 export const DEFAULT_MARQUEE_CONFIG: MarqueeConfig = {

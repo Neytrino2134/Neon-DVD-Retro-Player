@@ -30,6 +30,7 @@ const VisualizerSettings: React.FC<VisualizerSettingsProps> = ({ config, update,
 
   const styleOptions = [
     { value: 'theme-sync', label: t('style_theme_sync') },
+    { value: 'neon-gradient', label: t('style_neon_gradient') },
     { value: 'retro', label: t('style_retro') },
     { value: 'blue', label: t('style_blue') },
     { value: 'pink', label: t('style_pink') },
@@ -49,6 +50,11 @@ const VisualizerSettings: React.FC<VisualizerSettingsProps> = ({ config, update,
     { value: 'purple', label: t('color_purple') },
     { value: 'yellow', label: t('color_yellow') },
     { value: 'red', label: t('color_red') },
+  ];
+
+  const threeDModeOptions = [
+      { value: 'reactor', label: 'REACTOR CORE (ORB)' },
+      { value: 'spectrum', label: '3D SPECTRUM (BARS)' }
   ];
 
   // Dynamic Radius for Custom Toggles
@@ -101,6 +107,18 @@ const VisualizerSettings: React.FC<VisualizerSettingsProps> = ({ config, update,
             onChange={(v: any) => update('style', v)} 
          />
       </div>
+
+      {/* REACTOR 3D MODE SELECTOR */}
+      {mode === 'reactor' && (
+          <div className="section-block mb-4">
+             <CustomSelect 
+                label="3D MODE" 
+                value={config.threeDMode || 'reactor'} 
+                options={threeDModeOptions} 
+                onChange={(v: any) => update('threeDMode', v)} 
+             />
+          </div>
+      )}
 
       {/* Toggles Section - WAVEFORM ONLY */}
       {mode === 'waveform' && (
@@ -248,6 +266,10 @@ const VisualizerSettings: React.FC<VisualizerSettingsProps> = ({ config, update,
       {mode === 'reactor' && (
           <div className="space-y-3">
               <ToggleSwitch label={t('ignore_volume')} icon={Maximize} value={config.preventVolumeScaling || false} onChange={(v: boolean) => update('preventVolumeScaling', v)} />
+              {/* Only show mirror for Spectrum mode */}
+              {config.threeDMode === 'spectrum' && (
+                  <ToggleSwitch label={t('mirror')} icon={Split} value={config.mirror} onChange={(v: boolean) => update('mirror', v)} />
+              )}
           </div>
       )}
 
@@ -255,8 +277,8 @@ const VisualizerSettings: React.FC<VisualizerSettingsProps> = ({ config, update,
       <div className="pt-2 space-y-2">
         <label className="text-theme-text font-mono text-xs block mb-2 tracking-widest uppercase opacity-70 border-b border-theme-border pb-2">{t('fine_tuning')}</label>
         
-        {/* BAR QUANTITY - Waveform Only */}
-        {mode === 'waveform' && (
+        {/* BAR QUANTITY - Waveform OR 3D Spectrum */}
+        {(mode === 'waveform' || (mode === 'reactor' && config.threeDMode === 'spectrum')) && (
         <div className={`bg-theme-panel/40 ${wrapperRadius} overflow-hidden transition-all duration-300 border border-theme-border hover:border-theme-primary hover:shadow-[0_0_5px_var(--color-primary)]`}>
             <div 
                 className="flex items-center justify-between p-3 cursor-pointer select-none bg-black/20 border-b border-theme-border"
@@ -309,7 +331,7 @@ const VisualizerSettings: React.FC<VisualizerSettingsProps> = ({ config, update,
                             onChange={(v: number) => update('sensitivity', v)} 
                             className="mb-0"
                         />
-                        {mode === 'waveform' && (
+                        {(mode === 'waveform' || (mode === 'reactor' && config.threeDMode === 'spectrum')) && (
                         <RangeControl 
                             label={t('bar_gravity')} 
                             value={config.barGravity ?? 5} 

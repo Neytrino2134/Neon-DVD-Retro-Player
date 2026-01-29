@@ -1,6 +1,6 @@
 
 import React, { useRef, useState, useEffect } from 'react';
-import { FolderOpen, Lock, Unlock, ArrowDownAZ, Shuffle, Trash2, Upload, Music, Activity } from 'lucide-react';
+import { FolderOpen, Lock, Unlock, ArrowDownAZ, Shuffle, Trash2, Upload, Music, Activity, Disc, Hash, Mic2 } from 'lucide-react';
 import { Tooltip } from '../ui/Tooltip';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { AudioTrack, VisualizerConfig } from '../../types';
@@ -22,7 +22,6 @@ interface TrackListProps {
   // Actions
   onTrackSelect: (index: number) => void;
   onFilesSelected: (files: FileList) => void;
-  // Insert files at specific index
   onFilesInserted?: (files: File[], index: number) => void;
   onClearPlaylist: () => void;
   onSort: () => void;
@@ -37,6 +36,78 @@ interface TrackListProps {
   draggedTrackIds: string[];
   dragSourcePlaylistId: string | null;
 }
+
+// --- FILE SYSTEM API HELPERS ---
+// Needed to read folder contents recursively
+interface FileSystemEntry {
+    isFile: boolean;
+    isDirectory: boolean;
+    name: string;
+    fullPath: string;
+    file: (callback: (file: File) => void) => void;
+    createReader: () => FileSystemDirectoryReader;
+}
+
+interface FileSystemDirectoryReader {
+    readEntries: (success: (entries: FileSystemEntry[]) => void, error?: (err: any) => void) => void;
+}
+
+const scanEntry = async (entry: FileSystemEntry): Promise<File[]> => {
+    if (entry.isFile) {
+        return new Promise((resolve) => {
+            entry.file((file) => {
+                resolve([file]);
+            });
+        });
+    } else if (entry.isDirectory) {
+        const dirReader = entry.createReader();
+        const entries: FileSystemEntry[] = [];
+        
+        // readEntries needs to be looped because it might not return all files in one call
+        const readBatch = async (): Promise<void> => {
+            const batch = await new Promise<FileSystemEntry[]>((resolve, reject) => {
+                dirReader.readEntries(resolve, reject);
+            });
+            
+            if (batch.length > 0) {
+                entries.push(...batch);
+                await readBatch(); // Keep reading until empty
+            }
+        };
+
+        await readBatch();
+        
+        const results = await Promise.all(entries.map(e => scanEntry(e)));
+        return results.flat();
+    }
+    return [];
+};
+
+const extractFilesFromDrop = async (dataTransfer: DataTransfer): Promise<File[]> => {
+    const items = dataTransfer.items;
+    let allFiles: File[] = [];
+
+    if (items && items.length > 0) {
+        const promises: Promise<File[]>[] = [];
+        for (let i = 0; i < items.length; i++) {
+            const item = items[i];
+            // webkitGetAsEntry is standard in modern browsers for Drag and Drop
+            const entry = item.webkitGetAsEntry ? item.webkitGetAsEntry() : null;
+            if (entry) {
+                promises.push(scanEntry(entry as unknown as FileSystemEntry));
+            } else if (item.kind === 'file') {
+                const f = item.getAsFile();
+                if (f) promises.push(Promise.resolve([f]));
+            }
+        }
+        const results = await Promise.all(promises);
+        allFiles = results.flat();
+    } else {
+        // Fallback for browsers that don't support items/entries (very old)
+        allFiles = Array.from(dataTransfer.files);
+    }
+    return allFiles;
+};
 
 export const TrackList: React.FC<TrackListProps> = ({
   tracks, activePlaylistId, playingPlaylistId, currentTrackIndex,
@@ -55,26 +126,26 @@ export const TrackList: React.FC<TrackListProps> = ({
   const [lastSelectedTrackIndex, setLastSelectedTrackIndex] = useState<number>(-1);
   const [isListDragOver, setIsListDragOver] = useState(false);
   
-  // New state for insertion line
-  // index: where to insert (before which track index)
-  // position: 'top' or 'bottom' relative to the item being hovered
   const [dropIndicator, setDropIndicator] = useState<{ index: number, position: 'top' | 'bottom' } | null>(null);
-
-  // Drag counter to safely handle enter/leave on children
-  const dragCounterRef = useRef(0);
-  
-  // Ref to track hover state for hotkeys
+  const dragLeaveTimeoutRef = useRef<number | null>(null);
   const listHoverRef = useRef(false);
 
-  // Clear selection if switching tabs
   useEffect(() => {
       setSelectedTrackIds(new Set());
       setLastSelectedTrackIndex(-1);
-      // Reset drag state on tab switch to prevent stuck overlay
-      dragCounterRef.current = 0;
       setIsListDragOver(false);
       setDropIndicator(null);
+      if (dragLeaveTimeoutRef.current) {
+          window.clearTimeout(dragLeaveTimeoutRef.current);
+          dragLeaveTimeoutRef.current = null;
+      }
   }, [activePlaylistId]);
+
+  useEffect(() => {
+      return () => {
+          if (dragLeaveTimeoutRef.current) window.clearTimeout(dragLeaveTimeoutRef.current);
+      };
+  }, []);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files.length > 0) {
@@ -130,16 +201,12 @@ export const TrackList: React.FC<TrackListProps> = ({
 
   useEffect(() => {
       const handleKeyDown = (e: KeyboardEvent) => {
-          // DELETE Selected
           if (e.key === 'Delete' && selectedTrackIds.size > 0 && !isLocked) {
               handleDeleteSelected();
           }
-
-          // CTRL + A (Select All)
-          // Only triggers if the mouse is currently hovering over the tracklist
           if ((e.ctrlKey || e.metaKey) && (e.code === 'KeyA')) {
               if (listHoverRef.current && !isLocked && tracks.length > 0) {
-                  e.preventDefault(); // Prevent browser text selection
+                  e.preventDefault(); 
                   const allIds = new Set(tracks.map(t => t.id));
                   setSelectedTrackIds(allIds);
               }
@@ -148,6 +215,14 @@ export const TrackList: React.FC<TrackListProps> = ({
       window.addEventListener('keydown', handleKeyDown);
       return () => window.removeEventListener('keydown', handleKeyDown);
   }, [selectedTrackIds, isLocked, activePlaylistId, tracks]);
+
+  const keepDragAlive = () => {
+      if (dragLeaveTimeoutRef.current) {
+          window.clearTimeout(dragLeaveTimeoutRef.current);
+          dragLeaveTimeoutRef.current = null;
+      }
+      if (!isListDragOver) setIsListDragOver(true);
+  };
 
   // Drag Handlers
   const handleTrackDragStart = (e: React.DragEvent, _index: number, trackId: string) => {
@@ -168,18 +243,16 @@ export const TrackList: React.FC<TrackListProps> = ({
 
   const handleTrackDragOver = (e: React.DragEvent, index: number) => {
       e.preventDefault(); 
-      e.stopPropagation(); // Stop bubbling to list container to avoid double handling
-      
+      e.stopPropagation(); 
+      keepDragAlive();
       if (isLocked) return;
 
-      // Set proper drop effect
       if (draggedTrackIds.length > 0) {
           e.dataTransfer.dropEffect = 'move';
       } else {
           e.dataTransfer.dropEffect = 'copy';
       }
 
-      // Calculate if we are in the top or bottom half of the item
       const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
       const midPoint = rect.top + rect.height / 2;
       
@@ -190,40 +263,39 @@ export const TrackList: React.FC<TrackListProps> = ({
       }
   };
 
-  const handleTrackDragLeave = () => {
-      setDropIndicator(null);
-  };
-
-  const handleTrackDrop = (e: React.DragEvent, index: number) => {
+  const handleTrackDragLeave = (e: React.DragEvent) => {
       e.preventDefault();
       e.stopPropagation();
-      
-      // Calculate final target index based on drop position
-      // If we dropped on "top" of item 5, we insert at 5.
-      // If we dropped on "bottom" of item 5, we insert at 6.
+  };
+
+  const handleTrackDrop = async (e: React.DragEvent, index: number) => {
+      e.preventDefault();
+      e.stopPropagation();
       const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
       const midPoint = rect.top + rect.height / 2;
       const targetIndex = e.clientY < midPoint ? index : index + 1;
 
-      // Reset UI states
       setDropIndicator(null);
-      dragCounterRef.current = 0;
+      if (dragLeaveTimeoutRef.current) window.clearTimeout(dragLeaveTimeoutRef.current);
       setIsListDragOver(false);
 
       if (isLocked) return;
 
-      // 1. Handle File Drop (Insertion)
-      if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
-          if (onFilesInserted) {
-              onFilesInserted(Array.from(e.dataTransfer.files), targetIndex);
-          } else {
-              // Fallback to append if insert not supported
-              onFilesSelected(e.dataTransfer.files);
+      // Handle External Files (Folders or Files)
+      if (e.dataTransfer.types.includes('Files')) {
+          const files = await extractFilesFromDrop(e.dataTransfer);
+          if (files.length > 0) {
+              if (onFilesInserted) {
+                  onFilesInserted(files, targetIndex);
+              } else {
+                  // Fallback to appending if insert not supported
+                  onFilesSelected(files as unknown as FileList);
+              }
           }
           return;
       }
 
-      // 2. Handle Reorder (Internal Drag)
+      // Handle Internal Reorder
       if (draggedTrackIds.length > 0) {
           if (dragSourcePlaylistId && dragSourcePlaylistId !== activePlaylistId) {
               moveTracksToPlaylist(dragSourcePlaylistId, draggedTrackIds, activePlaylistId);
@@ -246,9 +318,8 @@ export const TrackList: React.FC<TrackListProps> = ({
       e.preventDefault();
       e.stopPropagation(); 
       if (!isLocked) {
-          dragCounterRef.current += 1;
           if (e.dataTransfer.types.includes('Files') || draggedTrackIds.length > 0) {
-              setIsListDragOver(true);
+              keepDragAlive();
           }
       }
   };
@@ -256,47 +327,43 @@ export const TrackList: React.FC<TrackListProps> = ({
   const handleListDragOver = (e: React.DragEvent) => {
       e.preventDefault();
       e.stopPropagation(); 
-      
-      if (draggedTrackIds.length > 0) {
-          e.dataTransfer.dropEffect = 'move';
-      }
-
-      // If we are dragging over the list but NOT over a specific track (e.g. empty space at bottom),
-      // clear the track-specific indicator
+      if (draggedTrackIds.length > 0) e.dataTransfer.dropEffect = 'move';
       setDropIndicator(null); 
-
-      if (!isLocked && dragCounterRef.current > 0 && !isListDragOver) {
-          setIsListDragOver(true);
-      }
+      if (!isLocked) keepDragAlive();
   };
 
   const handleListDragLeave = (e: React.DragEvent) => {
       e.preventDefault();
       e.stopPropagation();
-      dragCounterRef.current -= 1;
-      if (dragCounterRef.current <= 0) {
-          dragCounterRef.current = 0; 
+      dragLeaveTimeoutRef.current = window.setTimeout(() => {
           setIsListDragOver(false);
           setDropIndicator(null);
-      }
+      }, 50);
   };
 
-  const handleListDrop = (e: React.DragEvent) => {
+  const handleListDrop = async (e: React.DragEvent) => {
       e.preventDefault();
       e.stopPropagation();
-      
-      dragCounterRef.current = 0;
+      if (dragLeaveTimeoutRef.current) window.clearTimeout(dragLeaveTimeoutRef.current);
       setIsListDragOver(false);
       setDropIndicator(null);
-
       if (isLocked) return;
 
-      // Drop on empty space = Append to end
-      if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
-          onFilesSelected(e.dataTransfer.files);
+      // Handle External Files (Folders or Files)
+      if (e.dataTransfer.types.includes('Files')) {
+          const files = await extractFilesFromDrop(e.dataTransfer);
+          if (files.length > 0) {
+              if (onFilesInserted) {
+                  // Append to end of list
+                  onFilesInserted(files, tracks.length);
+              } else {
+                  onFilesSelected(files as unknown as FileList);
+              }
+          }
           return;
       }
 
+      // Handle Internal Reorder
       if (draggedTrackIds.length > 0) {
           if (dragSourcePlaylistId && dragSourcePlaylistId !== activePlaylistId) {
               moveTracksToPlaylist(dragSourcePlaylistId, draggedTrackIds, activePlaylistId);
@@ -344,8 +411,8 @@ export const TrackList: React.FC<TrackListProps> = ({
             style={{ display: 'none' }} 
         />
 
-        {/* Global List Overlay (Only shows when hovering empty space OR if list is empty) */}
-        {isListDragOver && !isLocked && !dropIndicator && tracks.length === 0 && (
+        {/* Global List Overlay */}
+        {isListDragOver && !dropIndicator && tracks.length === 0 && (
             <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm m-2 rounded-lg pointer-events-none animate-pulse">
                 <div className="flex flex-col items-center gap-4 text-theme-primary font-mono drop-shadow-[0_0_10px_var(--color-primary)]">
                 <Upload size={48} />
@@ -355,7 +422,7 @@ export const TrackList: React.FC<TrackListProps> = ({
         )}
 
         {/* List Header */}
-        <div className="flex items-center justify-between p-3 bg-black/20 shrink-0 relative z-20">
+        <div className="flex items-center justify-between p-3 bg-black/20 shrink-0 relative z-20 border-b border-theme-border">
             <div className="flex items-center gap-2">
                 <h3 className="text-theme-text font-mono opacity-50 text-xs font-bold tracking-widest mr-1">TRACKS [{tracks.length}]</h3>
                 
@@ -368,7 +435,6 @@ export const TrackList: React.FC<TrackListProps> = ({
                     </button>
                 </Tooltip>
 
-                {/* Playlist Visualizer Toggle */}
                 {analyser && visualizerConfig && (
                     <Tooltip content="BG VISUALIZER" position="top">
                         <button 
@@ -380,13 +446,13 @@ export const TrackList: React.FC<TrackListProps> = ({
                     </Tooltip>
                 )}
             </div>
-            {/* Toolbar */}
+            
             <div className="flex items-center gap-2">
                 <Tooltip content="LOAD FILES" position="top">
                     <button
                         onClick={() => !isLocked && fileInputRef.current?.click()}
                         disabled={isLocked}
-                        className={`p-1.5 rounded transition-colors ${isLocked ? 'opacity-30 cursor-not-allowed' : 'text-theme-muted hover:text-theme-accent hover:bg-white/5'}`}
+                        className={`p-1.5 rounded transition-colors ${isLocked ? 'opacity-30 cursor-not-allowed' : 'text-theme-muted hover:text-theme-accent hover:bg-theme-accent/10'}`}
                     >
                         <FolderOpen size={14} />
                     </button>
@@ -394,20 +460,14 @@ export const TrackList: React.FC<TrackListProps> = ({
                 
                 {tracks.length > 0 && !isLocked && (
                     <>
-                        <div className="w-px h-3 bg-white/10 mx-1"></div>
+                        <div className="w-px h-3 bg-theme-border mx-1"></div>
                         <Tooltip content={t('sort_az')} position="top">
-                            <button 
-                                onClick={onSort} 
-                                className="text-theme-muted hover:text-theme-primary transition-colors p-1.5 hover:bg-white/5 rounded"
-                            >
+                            <button onClick={onSort} className="text-theme-muted hover:text-theme-primary transition-colors p-1.5 hover:bg-theme-primary/10 rounded">
                                 <ArrowDownAZ size={14} />
                             </button>
                         </Tooltip>
                         <Tooltip content={t('shuffle')} position="top">
-                            <button 
-                                onClick={onShuffle} 
-                                className="text-theme-muted hover:text-theme-secondary transition-colors p-1.5 hover:bg-white/5 rounded"
-                            >
+                            <button onClick={onShuffle} className="text-theme-muted hover:text-theme-secondary transition-colors p-1.5 hover:bg-theme-secondary/10 rounded">
                                 <Shuffle size={14} />
                             </button>
                         </Tooltip>
@@ -415,11 +475,7 @@ export const TrackList: React.FC<TrackListProps> = ({
                             <button 
                                 type="button"
                                 onClick={(e) => {
-                                    if (e.shiftKey) {
-                                        onClearPlaylist();
-                                    } else {
-                                        setShowClearConfirm(true);
-                                    }
+                                    if (e.shiftKey) { onClearPlaylist(); } else { setShowClearConfirm(true); }
                                 }} 
                                 className="text-theme-muted hover:text-red-500 transition-colors ml-1 p-1.5 hover:bg-red-500/10 rounded"
                             >
@@ -430,20 +486,23 @@ export const TrackList: React.FC<TrackListProps> = ({
                 )}
             </div>
         </div>
+
+        {/* --- GRID HEADER --- */}
+        {tracks.length > 0 && (
+            <div className="flex items-center px-2 py-1 text-[9px] font-mono text-theme-muted uppercase bg-theme-panel/30 border-b border-theme-border select-none">
+                <div className="w-8 text-center"><Hash size={10} className="inline"/></div>
+                <div className="w-8 text-center"><Disc size={10} className="inline"/></div>
+                <div className="flex-1 px-2"><Music size={10} className="inline mr-1"/> TITLE / ARTIST</div>
+                <div className="w-24 hidden md:block"><Mic2 size={10} className="inline mr-1"/> ALBUM</div>
+            </div>
+        )}
         
         {/* Track List Items Container */}
-        <div className="flex-1 overflow-y-auto pr-1 space-y-0.5 p-1 flex flex-col min-h-0 relative z-10 transition-colors duration-300 w-full relative">
+        <div className="flex-1 overflow-y-auto pr-1 p-1 flex flex-col min-h-0 relative z-10 transition-colors duration-300 w-full relative">
             
-            {/* Background Visualizer Layer */}
             {showBgVisualizer && analyser && visualizerConfig && (
                 <div className="absolute inset-0 pointer-events-none opacity-30 z-0 overflow-hidden mix-blend-screen">
-                    <Visualizer 
-                        analyser={analyser} 
-                        isPlaying={isPlaying} 
-                        config={visualizerConfig} 
-                        fps={60} 
-                        volume={volume} 
-                    />
+                    <Visualizer analyser={analyser} isPlaying={isPlaying} config={visualizerConfig} fps={60} volume={volume} />
                 </div>
             )}
 
@@ -453,76 +512,93 @@ export const TrackList: React.FC<TrackListProps> = ({
                 const isLineAbove = dropIndicator?.index === index && dropIndicator.position === 'top';
                 const isLineBelow = dropIndicator?.index === index && dropIndicator.position === 'bottom';
                 
+                // --- METADATA EXTRACTION ---
+                const title = track.tags?.title || track.name;
+                const artist = track.tags?.artist || "Unknown Artist";
+                const album = track.tags?.album || "-";
+                
                 return (
                 <div
-                key={track.id}
-                draggable={!isLocked}
-                onDragStart={(e) => handleTrackDragStart(e, index, track.id)}
-                onDragOver={(e) => handleTrackDragOver(e, index)}
-                onDragLeave={handleTrackDragLeave}
-                onDrop={(e) => handleTrackDrop(e, index)}
-                onClick={(e) => handleTrackClick(e, index, track.id)}
-                onDoubleClick={() => handleTrackDoubleClick(index)}
-                className={`
-                    group flex items-center gap-3 px-3 py-2.5 rounded transition-all cursor-pointer relative overflow-visible shrink-0 z-10
-                    ${isPlayingTrack 
-                    ? '' 
-                    : isSelected 
-                        ? 'bg-white/10 text-white' 
-                        : 'text-theme-muted hover:bg-white/5 hover:text-theme-text'}
-                `}
-                style={isPlayingTrack ? {
-                    backgroundColor: 'color-mix(in srgb, var(--color-primary), transparent 85%)',
-                    color: 'var(--color-primary)'
-                } : undefined}
+                    key={track.id}
+                    className="relative pb-0.5" 
+                    draggable={!isLocked}
+                    onDragStart={(e) => handleTrackDragStart(e, index, track.id)}
+                    onDragOver={(e) => handleTrackDragOver(e, index)}
+                    onDragLeave={handleTrackDragLeave}
+                    onDrop={(e) => handleTrackDrop(e, index)}
+                    onClick={(e) => handleTrackClick(e, index, track.id)}
+                    onDoubleClick={() => handleTrackDoubleClick(index)}
                 >
-                {/* Active Indicator Bar */}
-                {isPlayingTrack && (
-                    <div className="absolute left-0 top-0 bottom-0 w-1 bg-theme-primary shadow-[0_0_10px_var(--color-primary)]"></div>
-                )}
-
-                {/* Drop Indicator Lines */}
-                {isLineAbove && (
-                    <div className="absolute top-0 left-0 right-0 h-0.5 bg-theme-accent shadow-[0_0_10px_var(--color-accent)] z-50 pointer-events-none"></div>
-                )}
-                {isLineBelow && (
-                    <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-theme-accent shadow-[0_0_10px_var(--color-accent)] z-50 pointer-events-none"></div>
-                )}
-
-                <div className={`
-                    ${isPlayingTrack ? 'animate-pulse' : 'opacity-30 group-hover:opacity-100'}
-                `}>
-                    <Music size={14} />
-                </div>
-                <div className="flex-1 min-w-0">
-                    <span className={`
-                        block text-xs font-mono truncate w-full select-none
-                        ${isPlayingTrack ? 'font-bold' : ''}
-                    `}>
-                        {track.name}
-                    </span>
-                </div>
-                
-                {!isLocked && (
-                    <button 
-                        onClick={(e) => handleDeleteTrack(e, track.id)}
-                        className="opacity-0 group-hover:opacity-100 text-theme-muted hover:text-red-500 transition-opacity p-1 cursor-pointer"
-                        title="Delete Track"
+                    <div 
+                        className={`
+                            group flex items-center px-2 py-1.5 rounded transition-all cursor-pointer relative overflow-visible shrink-0 z-10
+                            ${isPlayingTrack 
+                            ? 'bg-theme-primary/10 border-l-2 border-theme-primary' 
+                            : isSelected 
+                                ? 'bg-theme-primary/20 text-white' 
+                                : 'text-theme-muted hover:bg-theme-primary/5 hover:text-theme-text'}
+                        `}
                     >
-                        <Trash2 size={12} />
-                    </button>
-                )}
+                        {/* Drop Indicator Lines */}
+                        {isLineAbove && (
+                            <div className="absolute -top-0.5 left-0 right-0 h-0.5 bg-theme-accent shadow-[0_0_10px_var(--color-accent)] z-50 pointer-events-none"></div>
+                        )}
+                        {isLineBelow && (
+                            <div className="absolute -bottom-0.5 left-0 right-0 h-0.5 bg-theme-accent shadow-[0_0_10px_var(--color-accent)] z-50 pointer-events-none"></div>
+                        )}
+
+                        {/* COLUMN 1: NUMBER */}
+                        <div className={`w-8 text-center text-[10px] font-mono shrink-0 ${isPlayingTrack ? 'text-theme-primary font-bold' : 'opacity-50'}`}>
+                            {isPlayingTrack ? <Activity size={10} className="inline animate-pulse"/> : String(index + 1).padStart(2, '0')}
+                        </div>
+
+                        {/* COLUMN 2: ARTWORK */}
+                        <div className="w-8 h-8 rounded overflow-hidden bg-black/50 shrink-0 border border-theme-border mr-3 flex items-center justify-center">
+                            {track.artworkUrl ? (
+                                <img src={track.artworkUrl} alt="" className="w-full h-full object-cover" />
+                            ) : (
+                                <Disc size={12} className="opacity-20" />
+                            )}
+                        </div>
+
+                        {/* COLUMN 3: TITLE & ARTIST */}
+                        <div className="flex-1 min-w-0 flex flex-col justify-center">
+                            <span className={`block text-xs font-mono truncate w-full select-none ${isPlayingTrack ? 'text-theme-primary font-bold' : 'text-theme-text'}`}>
+                                {title}
+                            </span>
+                            <span className="block text-[9px] font-mono truncate w-full select-none opacity-50">
+                                {artist}
+                            </span>
+                        </div>
+
+                        {/* COLUMN 4: ALBUM (MD+) */}
+                        <div className="w-24 hidden md:block text-[9px] font-mono opacity-40 truncate px-2">
+                            {album}
+                        </div>
+                        
+                        {/* DELETE ACTION */}
+                        {!isLocked && (
+                            <button 
+                                onClick={(e) => handleDeleteTrack(e, track.id)}
+                                className="opacity-0 group-hover:opacity-100 text-theme-muted hover:text-red-500 transition-opacity p-1 cursor-pointer ml-2"
+                                title="Delete Track"
+                            >
+                                <Trash2 size={12} />
+                            </button>
+                        )}
+                    </div>
                 </div>
             )})}
             
-            {/* Filler for empty space */}
-            {tracks.length > 0 && (
-                    <div className="flex-1 min-h-[20px]"></div>
+            {isListDragOver && !dropIndicator && tracks.length > 0 && !isLocked && (
+                <div className="h-0.5 bg-theme-accent shadow-[0_0_10px_var(--color-accent)] w-full shrink-0 relative z-50 pointer-events-none"></div>
             )}
 
+            {tracks.length > 0 && <div className="flex-1 min-h-[20px]"></div>}
+
             {tracks.length === 0 && !isListDragOver && (
-                <div className={`flex-1 flex items-center justify-center text-center m-2 rounded-lg bg-white/5 text-theme-muted opacity-30 font-mono text-xs italic transition-all select-none z-10`}>
-                {isLocked ? "List Locked" : "Drop files here..."}
+                <div className={`flex-1 flex items-center justify-center text-center m-2 rounded-lg bg-theme-primary/5 text-theme-muted opacity-30 font-mono text-xs italic transition-all select-none z-10`}>
+                {isLocked ? "List Locked" : "Drop files or folders here..."}
                 </div>
             )}
         </div>

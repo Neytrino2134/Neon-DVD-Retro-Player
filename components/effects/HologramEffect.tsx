@@ -310,36 +310,39 @@ const HologramEffect: React.FC<HologramEffectProps> = ({ effects }) => {
     >
         {/* Hologram Box Container */}
         <div 
-            className="relative overflow-hidden transition-none backdrop-blur-sm"
+            className="relative overflow-hidden transition-none backdrop-blur-md"
             style={{
                 width: `${renderMessage.currentWidth}px`,
                 height: `${renderMessage.currentHeight}px`,
                 borderTopLeftRadius: '12px',
                 borderBottomRightRadius: '12px',
-                // Inline styles for dynamic coloring using color-mix for transparency
-                backgroundColor: `color-mix(in srgb, ${baseColor}, transparent 90%)`,
+                // Updated: More opaque background (80% black/tint) for better readability and glass effect
+                backgroundColor: `color-mix(in srgb, ${baseColor}, rgba(0,0,0,0.4) 85%)`,
                 border: `1px solid color-mix(in srgb, ${baseColor}, transparent 40%)`,
-                boxShadow: `0 0 15px color-mix(in srgb, ${baseColor}, transparent 70%)`
+                boxShadow: `0 0 20px color-mix(in srgb, ${baseColor}, transparent 80%)`
             }}
         >
             
+            {/* Glass Sheen */}
+            <div className="absolute inset-0 bg-gradient-to-br from-white/10 via-transparent to-black/20 pointer-events-none z-0"></div>
+
             {/* Background Grid - Colored */}
             <div 
-                className="absolute inset-0 bg-[length:100%_4px] pointer-events-none"
+                className="absolute inset-0 bg-[length:100%_4px] pointer-events-none z-0"
                 style={{
-                    backgroundImage: `linear-gradient(color-mix(in srgb, ${baseColor}, transparent 90%) 1px, transparent 1px)`
+                    backgroundImage: `linear-gradient(color-mix(in srgb, ${baseColor}, transparent 85%) 1px, transparent 1px)`
                 }}
             ></div>
             
             {/* Decorative Corners - Colored */}
             {/* Top Left removed */}
-            <div className="absolute top-0 right-0 w-3 h-3 border-t border-r opacity-50" style={{ borderColor: baseColor }}></div>
-            <div className="absolute bottom-0 left-0 w-3 h-3 border-b border-l opacity-50" style={{ borderColor: baseColor }}></div>
+            <div className="absolute top-0 right-0 w-3 h-3 border-t border-r opacity-50 z-10" style={{ borderColor: baseColor }}></div>
+            <div className="absolute bottom-0 left-0 w-3 h-3 border-b border-l opacity-50 z-10" style={{ borderColor: baseColor }}></div>
             {/* Bottom Right removed */}
 
             {/* Header - Colored Background */}
             <div 
-                className="flex items-center gap-3 overflow-hidden whitespace-nowrap"
+                className="flex items-center gap-3 overflow-hidden whitespace-nowrap relative z-10"
                 style={{ 
                     height: `${HEADER_HEIGHT}px`, 
                     paddingLeft: '10px', 
@@ -362,7 +365,7 @@ const HologramEffect: React.FC<HologramEffectProps> = ({ effects }) => {
 
             {/* Content Body */}
             {showBody && (
-                <div className="p-4 font-mono text-white text-sm leading-relaxed text-shadow-neon absolute top-[40px] left-0 right-0 bottom-0">
+                <div className="p-4 font-mono text-white text-sm leading-relaxed text-shadow-neon absolute top-[40px] left-0 right-0 bottom-0 z-10">
                     {renderMessage.displayedText}
                     {renderMessage.phase === 'typing' && (
                         <span 
