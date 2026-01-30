@@ -21,6 +21,7 @@ import Marquee from './Marquee';
 import ProgressBar from './ProgressBar';
 import NotificationOverlay from './ui/NotificationOverlay';
 import HologramHelp from './ui/HologramHelp'; 
+import FpsCounter from './ui/FpsCounter'; // NEW
 
 // Effects
 import ScanlineEffect from './effects/ScanlineEffect';
@@ -33,6 +34,7 @@ import HologramEffect from './effects/HologramEffect';
 import GeminiChatEffect from './effects/GeminiChatEffect';
 import LightLeaksEffect from './effects/LightLeaksEffect';
 import RainEffect from './effects/RainEffect'; 
+import TronEffect from './effects/TronEffect'; // NEW
 import VignetteEffect from './effects/VignetteEffect'; // NEW
 
 // New Sub-Components
@@ -282,6 +284,7 @@ const RetroScreen = forwardRef<HTMLDivElement, RetroScreenProps>((props, externa
   return (
     <div className={`flex-grow flex items-center justify-center relative bg-gray-950 transition-all duration-500 ${focusMode ? 'p-0' : 'p-1 md:p-3'}`}>
       <div 
+        id="tutorial-screen"
         ref={shakeRef}
         onDoubleClick={() => setFocusMode(!focusMode)} 
         onMouseMove={handleMouseMove}
@@ -311,6 +314,9 @@ const RetroScreen = forwardRef<HTMLDivElement, RetroScreenProps>((props, externa
                 onStartRecording={onStartRecording}
                 onStopRecording={onStopRecording}
             />
+
+            {/* FPS Counter Overlay */}
+            {effectsConfig.showFps && <FpsCounter />}
 
             <ChromaticAberration intensity={effectiveChromatic} />
 
@@ -342,6 +348,7 @@ const RetroScreen = forwardRef<HTMLDivElement, RetroScreenProps>((props, externa
                 <PatternOverlay pattern={bgPattern} config={bgPatternConfig} />
                 <TransitionEffect phase={transitionPhase} mode={bgTransition} />
                 <RainEffect config={effectsConfig.rain} />
+                <TronEffect config={effectsConfig.tron} />
                 
                 {/* Independent Light Leaks Layers */}
                 {/* 1. Ambient (Settings) */}

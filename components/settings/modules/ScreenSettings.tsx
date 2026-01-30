@@ -101,7 +101,7 @@ export const ScreenVideoModule: React.FC<ScreenVideoModuleProps> = ({ isVideoAct
                             ? 'cursor-not-allowed bg-gray-800 border-gray-700 text-gray-500' 
                             : isVideoActive 
                                 ? 'bg-red-500/20 border-red-500 text-red-500 animate-pulse' 
-                                : 'bg-theme-panel border-theme-accent/50 text-theme-accent hover:bg-theme-accent hover:text-black'
+                                : 'bg-theme-panel border-theme-primary text-theme-primary hover:bg-theme-primary hover:text-black hover:shadow-[0_0_15px_var(--color-primary)]'
                         }
                     `}
                 >

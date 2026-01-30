@@ -139,7 +139,7 @@ const HelpModal: React.FC<HelpModalProps> = ({ onClose, onRestartTutorial, onUnl
                                 value={passInput}
                                 onChange={(e) => setPassInput(e.target.value)}
                                 placeholder="Enter Access Code"
-                                className={`flex-1 bg-black border rounded px-2 py-1 text-xs font-mono outline-none transition-colors ${unlockStatus === 'error' ? 'border-red-500 text-red-500' : 'border-theme-muted/50 focus:border-theme-primary text-theme-text'}`}
+                                className={`flex-1 bg-black border rounded px-2 py-1 text-xs font-mono outline-none transition-colors ${unlockStatus === 'error' ? 'border-red-500 text-red-500' : 'border-theme-primary text-theme-text shadow-[0_0_10px_var(--color-primary)]'}`}
                                 onKeyDown={(e) => e.key === 'Enter' && handleUnlock()}
                             />
                             <button 

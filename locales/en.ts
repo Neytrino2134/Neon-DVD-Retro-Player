@@ -33,6 +33,7 @@ export const en = {
   gemini_chat: "GEMINI AI LINK",
   light_leaks: "LIGHT LEAKS",
   rain_effect: "RAIN",
+  tron_game: "TRON GRID",
   waveform_config: "WAVEFORM CONFIG",
   dvd_config: "DVD CONFIG",
   scanline_config: "SCANLINE CONFIG",
@@ -82,6 +83,7 @@ export const en = {
   width: "WIDTH", 
   bg_opacity: "BG OPACITY",
   fps_limit: "FPS LIMIT",
+  show_fps: "SHOW FPS COUNTER",
   pixelation: "PIXELATION",
   static_noise: "STATIC NOISE",
   vhs_jitter: "VHS JITTER",
@@ -114,6 +116,10 @@ export const en = {
   rain_gustiness: "WIND GUSTS",
   rain_opacity: "DROP OPACITY", 
   rain_wander: "WIND WANDER",
+
+  // Tron
+  tron_speed: "AGENT SPEED",
+  tron_spawn: "SPAWN RATE",
 
   // Hologram Categories
   cat_system: "SYSTEM",
@@ -266,6 +272,11 @@ export const en = {
   // Tutorial
   tut_welcome_title: "WELCOME TO NEON RETRO PLAYER",
   tut_welcome_text: "A high-fidelity audio experience with cyberpunk aesthetics. \n\nCreate your atmosphere: upload photos or loop videos, customize the visualizer, and fine-tune CRT effects. \n\nDrag & Drop music files anywhere to start, or follow this quick guide.",
+  
+  // NEW OVERVIEW STEP
+  tut_overview_title: "INTERFACE OVERVIEW",
+  tut_overview_text: "Left: Parameters & Settings.\nCenter: Effects Screen.\nRight: Music Control.",
+
   tut_files_title: "FILE MANAGEMENT",
   tut_files_text: "Manage your media here. Upload Background Images/Videos, Audio Tracks, and custom Sound Effects (SFX). You can also Export your configuration.",
   tut_presets_title: "PRESETS",

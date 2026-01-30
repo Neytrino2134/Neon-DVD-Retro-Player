@@ -33,6 +33,7 @@ export const ru = {
   gemini_chat: "GEMINI AI ЧАТ",
   light_leaks: "СВЕТОВЫЕ БЛИКИ",
   rain_effect: "ДОЖДЬ",
+  tron_game: "СЕТКА ТРОНА",
   waveform_config: "НАСТРОЙКИ ВОЛНЫ",
   dvd_config: "НАСТРОЙКИ DVD",
   scanline_config: "НАСТРОЙКИ ЭЛТ",
@@ -82,6 +83,7 @@ export const ru = {
   width: "ШИРИНА", 
   bg_opacity: "ПРОЗР. ФОНА",
   fps_limit: "ЛИМИТ FPS",
+  show_fps: "СЧЁТЧИК FPS",
   pixelation: "ПИКСЕЛИЗАЦИЯ",
   static_noise: "БЕЛЫЙ ШУМ",
   vhs_jitter: "VHS ДРОЖАНИЕ",
@@ -114,6 +116,10 @@ export const ru = {
   rain_gustiness: "ПОРЫВЫ",
   rain_opacity: "ПРОЗР. КАПЕЛЬ", 
   rain_wander: "ГУЛЯНИЕ ВЕТРА",
+
+  // Tron
+  tron_speed: "СКОРОСТЬ АГЕНТА",
+  tron_spawn: "ЧАСТОТА СПАВНА",
 
   // Hologram Categories
   cat_system: "СИСТЕМНЫЕ",
@@ -266,6 +272,11 @@ export const ru = {
   // Tutorial
   tut_welcome_title: "NEON RETRO PLAYER ПРИВЕТСТВУЕТ",
   tut_welcome_text: "Аудиофильский опыт в стиле киберпанк. \n\nСоздайте свою атмосферу: загружайте фото или видео, настраивайте визуализацию и эффекты ЭЛТ. \n\nПеретащите музыку, чтобы начать, или следуйте этому гиду.",
+  
+  // NEW OVERVIEW STEP
+  tut_overview_title: "ОБЗОР ИНТЕРФЕЙСА",
+  tut_overview_text: "Слева: Параметры и настройки.\nПо центру: Экран с эффектами.\nСправа: Управление музыкой.",
+
   tut_files_title: "УПРАВЛЕНИЕ ФАЙЛАМИ",
   tut_files_text: "Управляйте медиафайлами здесь. Загружайте фоны, музыку и звуковые эффекты (SFX). Также можно экспортировать настройки.",
   tut_presets_title: "ПРЕСЕТЫ",

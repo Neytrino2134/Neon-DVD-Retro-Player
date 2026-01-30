@@ -1,8 +1,9 @@
 
 import React, { useEffect, useState, useRef } from 'react';
-import { Terminal, Cpu, Power, Key, ShieldCheck, Globe, X } from 'lucide-react';
+import { Terminal, Cpu, Power, Key, ShieldCheck, Globe, X, Circle } from 'lucide-react';
 import { useLanguage } from '../contexts/LanguageContext';
 import { APP_VERSION } from '../lib/version';
+import { Tooltip } from './ui/Tooltip';
 
 // Characters used for the glitch effect
 const GLITCH_CHARS = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789@#$%&*!??█▓▒░<>/[]{}-=_+";
@@ -67,14 +68,16 @@ interface StartupOverlayProps {
   onStopSfx?: () => void;
   apiKey: string;
   setApiKey: (key: string) => void;
-  forceSkip?: boolean; // New Prop
+  forceSkip?: boolean;
+  // New callback for auto-launch flow
+  onAutoLaunch?: () => void;
 }
 
 // Updated phases to include split_appear and split_expand
 type IntroPhase = 'black' | 'dot' | 'line' | 'split_appear' | 'split_expand' | 'text' | 'window_line' | 'window_expand' | 'content';
 type CollapsePhase = 'idle' | 'content_out' | 'line_merge' | 'height_collapse' | 'width_collapse' | 'done';
 
-const StartupOverlay: React.FC<StartupOverlayProps> = ({ onComplete, onFadeOut, onPlaySfx, onStopSfx, apiKey, setApiKey, forceSkip }) => {
+const StartupOverlay: React.FC<StartupOverlayProps> = ({ onComplete, onFadeOut, onPlaySfx, onStopSfx, apiKey, setApiKey, forceSkip, onAutoLaunch }) => {
   const [isVisible, setIsVisible] = useState(true);
   const [hasStarted, setHasStarted] = useState(false); 
   const [windowState, setWindowState] = useState<'hidden' | 'spawn' | 'expand' | 'full' | 'collapse'>('hidden');
@@ -98,6 +101,10 @@ const StartupOverlay: React.FC<StartupOverlayProps> = ({ onComplete, onFadeOut, 
   const [collapsePhase, setCollapsePhase] = useState<CollapsePhase>('idle');
   const [headerTyped, setHeaderTyped] = useState("");
 
+  // Wave Interaction State
+  const [isHoveringPower, setIsHoveringPower] = useState(false);
+  const isHoveringPowerRef = useRef(false);
+
   const { language, setLanguage, t } = useLanguage();
   const linesEndRef = useRef<HTMLDivElement>(null);
   const timeoutsRef = useRef<number[]>([]);
@@ -105,6 +112,25 @@ const StartupOverlay: React.FC<StartupOverlayProps> = ({ onComplete, onFadeOut, 
   
   // Guard to ensure sequence only runs once even if dependencies change
   const sequenceRunningRef = useRef(false);
+
+  // Check Environment
+  const isElectron = typeof navigator !== 'undefined' && /Electron/.test(navigator.userAgent);
+
+  // --- STABLE REFS FOR CALLBACKS ---
+  // Prevents useEffect from re-running if parent re-creates these functions
+  const onPlaySfxRef = useRef(onPlaySfx);
+  const onStopSfxRef = useRef(onStopSfx);
+  const onCompleteRef = useRef(onComplete);
+  const onFadeOutRef = useRef(onFadeOut);
+  const languageRef = useRef(language);
+
+  useEffect(() => {
+      onPlaySfxRef.current = onPlaySfx;
+      onStopSfxRef.current = onStopSfx;
+      onCompleteRef.current = onComplete;
+      onFadeOutRef.current = onFadeOut;
+      languageRef.current = language;
+  }, [onPlaySfx, onStopSfx, onComplete, onFadeOut, language]);
 
   // --- WAVE ANIMATION REFS ---
   const wavePath1Ref = useRef<SVGPathElement>(null);
@@ -131,38 +157,57 @@ const StartupOverlay: React.FC<StartupOverlayProps> = ({ onComplete, onFadeOut, 
     if (hasStarted || forceSkip) return;
 
     let time = 0;
-    // SLOWED DOWN BY 4x (0.003 / 4 = 0.00075)
-    const speed = 0.00075; 
+    
+    // Physics parameters for interpolation
+    let currentSpeed = 0.00075;
+    let currentFreq = 0.05; // Spatial frequency (width of waves)
+    
+    const BASE_SPEED = 0.00075;
+    const HOVER_SPEED = 0.003; // Faster when hovering
+    
+    const BASE_FREQ = 0.05;
+    const HOVER_FREQ = 0.12; // Higher freq = more compressed waves
 
     const animate = () => {
-      time += speed;
+      // Smoothly interpolate towards target values based on hover state
+      const targetSpeed = isHoveringPowerRef.current ? HOVER_SPEED : BASE_SPEED;
+      const targetFreq = isHoveringPowerRef.current ? HOVER_FREQ : BASE_FREQ;
+
+      // Lerp (Linear Interpolation) for smooth transition
+      currentSpeed += (targetSpeed - currentSpeed) * 0.05;
+      currentFreq += (targetFreq - currentFreq) * 0.05;
+
+      time += currentSpeed;
+      
       const width = 300; 
+      const center = width / 2; // Center anchor point for compression
       const step = 5;
       
       // WAVE 1
       const amp1 = 15 + 5 * Math.sin(time * 0.8); 
-      const startY1 = 50 + amp1 * Math.sin(0 * 0.05 - time * 9);
+      // We subtract 'center' from 'x' to make frequency scaling happen from the center outwards
+      const startY1 = 50 + amp1 * Math.sin((0 - center) * currentFreq - time * 9);
       let points1 = `M0,${startY1}`;
       for (let x = step; x <= width; x += step) {
-        const y = 50 + amp1 * Math.sin(x * 0.05 - time * 9);
+        const y = 50 + amp1 * Math.sin((x - center) * currentFreq - time * 9);
         points1 += ` L${x},${y}`;
       }
 
       // WAVE 2
       const amp2 = 12 + 4 * Math.sin(time * 0.5 + 2);
-      const startY2 = 50 + amp2 * Math.sin(0 * 0.03 - time * 4 + 1);
+      const startY2 = 50 + amp2 * Math.sin((0 - center) * (currentFreq * 0.6) - time * 4 + 1);
       let points2 = `M0,${startY2}`;
       for (let x = step; x <= width; x += step) {
-        const y = 50 + amp2 * Math.sin(x * 0.03 - time * 4 + 1);
+        const y = 50 + amp2 * Math.sin((x - center) * (currentFreq * 0.6) - time * 4 + 1);
         points2 += ` L${x},${y}`;
       }
 
       // WAVE 3
       const amp3 = 15 + 8 * Math.sin(time * 0.2 + 4);
-      const startY3 = 50 + amp3 * Math.sin(0 * 0.015 - time * 1.5 + 3);
+      const startY3 = 50 + amp3 * Math.sin((0 - center) * (currentFreq * 0.3) - time * 1.5 + 3);
       let points3 = `M0,${startY3}`;
       for (let x = step; x <= width; x += step) {
-        const y = 50 + amp3 * Math.sin(x * 0.015 - time * 1.5 + 3);
+        const y = 50 + amp3 * Math.sin((x - center) * (currentFreq * 0.3) - time * 1.5 + 3);
         points3 += ` L${x},${y}`;
       }
 
@@ -178,7 +223,7 @@ const StartupOverlay: React.FC<StartupOverlayProps> = ({ onComplete, onFadeOut, 
     return () => {
       cancelAnimationFrame(animationRef.current);
     };
-  }, [hasStarted, forceSkip]);
+  }, [hasStarted, forceSkip]); 
 
   // --- FORCE SKIP HANDLER ---
   useEffect(() => {
@@ -243,15 +288,15 @@ const StartupOverlay: React.FC<StartupOverlayProps> = ({ onComplete, onFadeOut, 
     if (skippedRef.current || !isVisible) return;
     skippedRef.current = true;
 
-    // Call stop SFX from parent
-    if (onStopSfx) onStopSfx();
+    // Call stop SFX from parent using REF to ensure up-to-date
+    onStopSfxRef.current?.();
 
     // Clear all active animation timers immediately
     timeoutsRef.current.forEach(window.clearTimeout);
     timeoutsRef.current = [];
 
     // Notify App to turn on main screen
-    if (onFadeOut) onFadeOut();
+    if (onFadeOutRef.current) onFadeOutRef.current();
 
     // Fade out immediately
     setContainerOpacity(0);
@@ -259,19 +304,23 @@ const StartupOverlay: React.FC<StartupOverlayProps> = ({ onComplete, onFadeOut, 
 
     // Short delay to allow fade out to render, then finish
     setTimeout(() => {
-        onComplete?.();
+        onCompleteRef.current?.();
         setIsVisible(false);
     }, 500);
   };
 
-  const handleStart = async () => {
+  const handleStart = async (isAutoLaunchMode = false) => {
+      // Guard: Only allow start if animation has finished presenting the window
       if (collapsePhase !== 'idle' || introPhase !== 'content') return;
       
       if (tempApiKey !== apiKey) {
           setApiKey(tempApiKey);
       }
       
-      // Removed onPlaySfx from here to sync with window appearance later
+      // If triggered by the "Rec & Launch" button
+      if (isAutoLaunchMode && onAutoLaunch) {
+          onAutoLaunch();
+      }
 
       // --- COLLAPSE ANIMATION SEQUENCE ---
       // 1. Fade out content, Collapse Width, Move Side Lines to Center
@@ -295,28 +344,32 @@ const StartupOverlay: React.FC<StartupOverlayProps> = ({ onComplete, onFadeOut, 
       // 5. Fade out entire overlay background
       setStandbyOpacity(0);
 
+      // Trigger the Login Sequence State
       setTimeout(() => {
           setHasStarted(true);
-      }, 1000);
+      }, 800);
   };
 
   // Keyboard listener for Enter
   useEffect(() => {
     if (hasStarted || collapsePhase !== 'idle' || forceSkip) return;
     const handleKeyDown = (e: KeyboardEvent) => {
-        if (e.key === 'Enter') handleStart();
+        if (e.key === 'Enter') handleStart(false);
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [hasStarted, collapsePhase, tempApiKey, introPhase, forceSkip]); 
 
+  // --- LOGIN SEQUENCE EFFECT ---
   useEffect(() => {
     // Only run if active and not already running
     if (!hasStarted || sequenceRunningRef.current || forceSkip) return;
     sequenceRunningRef.current = true;
 
     let mounted = true;
-    const isRu = language === 'ru';
+    
+    // Use ref to avoid re-runs when language changes
+    const isRu = languageRef.current === 'ru'; 
 
     const wait = (ms: number) => new Promise(resolve => {
         const id = window.setTimeout(resolve, ms);
@@ -342,7 +395,9 @@ const StartupOverlay: React.FC<StartupOverlayProps> = ({ onComplete, onFadeOut, 
     const runSequence = async () => {
       await wait(500);
       // Play SFX exactly when the first beginnings of the window appear
-      onPlaySfx?.('SFX_START.mp3');
+      // Use Ref to avoid useEffect dependency on function
+      onPlaySfxRef.current?.('SFX_START.mp3');
+      
       setWindowState('spawn');
       await wait(600);
       setWindowState('expand');
@@ -401,13 +456,16 @@ const StartupOverlay: React.FC<StartupOverlayProps> = ({ onComplete, onFadeOut, 
       setWindowState('collapse');
       await wait(800);
       
-      if (onFadeOut && mounted) onFadeOut();
+      // Notify App to reveal main UI before removing overlay
+      if (onFadeOutRef.current && mounted) onFadeOutRef.current();
 
+      // Fade out overlay container
       setContainerOpacity(0);
       await wait(1500); 
       
+      // FINISH: Unmount overlay and trigger tutorial if needed
       if (mounted && !skippedRef.current) {
-        onComplete?.();
+        onCompleteRef.current?.();
         setIsVisible(false);
       }
     };
@@ -417,8 +475,15 @@ const StartupOverlay: React.FC<StartupOverlayProps> = ({ onComplete, onFadeOut, 
     return () => {
         mounted = false;
         timeoutsRef.current.forEach(window.clearTimeout);
+        
+        // CRITICAL FIX: Stop any playing SFX when this specific effect cleans up.
+        // This solves duplication in React StrictMode (double mount) and ensures stops on unmount.
+        onStopSfxRef.current?.();
+        
+        // Reset running ref to allow re-run in strict mode or after re-mount
+        sequenceRunningRef.current = false;
     };
-  }, [hasStarted, language, onComplete, onFadeOut, onPlaySfx, forceSkip]);
+  }, [hasStarted, forceSkip]); // Minimized deps to prevent re-runs on prop changes
 
   if (!isVisible || forceSkip) return null;
 
@@ -466,6 +531,7 @@ const StartupOverlay: React.FC<StartupOverlayProps> = ({ onComplete, onFadeOut, 
                 opacity: standbyOpacity, 
                 transition: 'opacity 1s ease-in-out' 
             }}
+            onDoubleClick={handleSkip}
         >
             <div className="absolute inset-0 bg-white/5 opacity-5 pointer-events-none scanlines z-20"></div>
             <div className="absolute inset-0 pointer-events-none flicker opacity-0 z-20"></div>
@@ -536,17 +602,32 @@ const StartupOverlay: React.FC<StartupOverlayProps> = ({ onComplete, onFadeOut, 
                             <span className="text-[10px] font-mono font-bold tracking-widest uppercase">ACCESS CONTROL</span>
                         </div>
                         <div className="flex items-center gap-3">
+                            {/* REC & LAUNCH BUTTON - Only visible in Electron */}
+                            {onAutoLaunch && isElectron && (
+                                <Tooltip content="RECORD & LAUNCH" position="bottom">
+                                    <button
+                                        onClick={(e) => { e.stopPropagation(); handleStart(true); }}
+                                        className="flex items-center gap-1.5 px-2 py-0.5 rounded bg-neon-blue/20 border border-neon-blue/50 hover:bg-neon-blue/30 hover:border-neon-blue hover:shadow-[0_0_8px_var(--color-primary)] transition-all group"
+                                    >
+                                        <Circle size={8} className="text-neon-blue fill-neon-blue animate-pulse" />
+                                        <span className="text-[8px] font-mono font-bold text-neon-blue group-hover:text-white">REC</span>
+                                    </button>
+                                </Tooltip>
+                            )}
+
                             <div className="flex gap-1">
                                 <div className="w-1.5 h-1.5 bg-neon-blue rounded-full"></div>
                                 <div className="w-1.5 h-1.5 bg-neon-blue/50 rounded-full"></div>
                             </div>
-                            <button 
-                                onClick={(e) => { e.stopPropagation(); handleSkip(); }}
-                                className="text-neon-blue/50 hover:text-white transition-colors p-0.5 hover:bg-neon-blue/20 rounded"
-                                title="SKIP LOGIN"
-                            >
-                                <X size={14} />
-                            </button>
+                            
+                            <Tooltip content="SKIP SEQUENCE" position="bottom">
+                                <button 
+                                    onClick={(e) => { e.stopPropagation(); handleSkip(); }}
+                                    className="text-neon-blue/50 hover:text-white transition-colors p-0.5 hover:bg-neon-blue/20 rounded"
+                                >
+                                    <X size={14} />
+                                </button>
+                            </Tooltip>
                         </div>
                      </div>
 
@@ -556,7 +637,9 @@ const StartupOverlay: React.FC<StartupOverlayProps> = ({ onComplete, onFadeOut, 
                         style={{ opacity: collapsePhase === 'idle' ? 1 : 0 }}
                      >
                         {/* REPLACED STATIC GRID WITH RUNNING WAVES ANIMATION */}
-                        <div className="absolute left-0 right-0 top-[35%] -translate-y-1/2 h-40 pointer-events-none z-0 overflow-hidden opacity-20">
+                        <div 
+                            className={`absolute left-0 right-0 top-[35%] -translate-y-1/2 h-40 pointer-events-none z-0 overflow-hidden transition-all duration-700 ease-in-out ${isHoveringPower ? 'opacity-60 blur-[1px]' : 'opacity-20'}`}
+                        >
                             <svg viewBox="0 0 300 100" preserveAspectRatio="none" className="w-full h-full">
                                 <path 
                                     ref={wavePath3Ref} 
@@ -587,12 +670,31 @@ const StartupOverlay: React.FC<StartupOverlayProps> = ({ onComplete, onFadeOut, 
 
                         {/* CENTER AREA: POWER BUTTON */}
                         <div className="flex-1 flex items-center justify-center w-full z-10">
-                            <div 
-                                onClick={handleStart}
-                                className="w-32 h-32 rounded-full border-2 border-neon-blue flex items-center justify-center bg-neon-blue/5 shadow-[0_0_20px_rgba(0,243,255,0.3)] transition-all hover:scale-105 hover:shadow-[0_0_50px_#00f3ff] hover:bg-neon-blue/20 cursor-pointer group"
-                            >
-                                <Power size={64} className="text-neon-blue group-hover:animate-pulse" />
-                            </div>
+                            <Tooltip content="INITIALIZE SYSTEM" position="top">
+                                <div 
+                                    onClick={(e) => { e.stopPropagation(); handleStart(false); }}
+                                    onMouseEnter={() => {
+                                        setIsHoveringPower(true);
+                                        isHoveringPowerRef.current = true;
+                                    }}
+                                    onMouseLeave={() => {
+                                        setIsHoveringPower(false);
+                                        isHoveringPowerRef.current = false;
+                                    }}
+                                    className={`
+                                        w-32 h-32 rounded-full border-2 border-neon-blue flex items-center justify-center transition-all duration-500 ease-out cursor-pointer group
+                                        ${isHoveringPower 
+                                            ? 'bg-neon-blue/20 shadow-[0_0_60px_#00f3ff,inset_0_0_20px_#00f3ff] scale-110 border-white' 
+                                            : 'bg-neon-blue/5 shadow-[0_0_20px_rgba(0,243,255,0.3)]'
+                                        }
+                                    `}
+                                >
+                                    <Power 
+                                        size={64} 
+                                        className={`transition-all duration-300 ${isHoveringPower ? 'text-white drop-shadow-[0_0_10px_white]' : 'text-neon-blue group-hover:animate-pulse'}`} 
+                                    />
+                                </div>
+                            </Tooltip>
                         </div>
 
                         {/* BOTTOM AREA: CONTROLS */}
@@ -629,7 +731,7 @@ const StartupOverlay: React.FC<StartupOverlayProps> = ({ onComplete, onFadeOut, 
                             </div>
 
                             <div 
-                                onClick={handleStart}
+                                onClick={(e) => { e.stopPropagation(); handleStart(false); }}
                                 className="text-center cursor-pointer opacity-80 hover:opacity-100 transition-opacity"
                             >
                                 <p className="text-neon-blue font-mono text-xs tracking-[0.2em] font-bold animate-pulse">
@@ -697,7 +799,7 @@ const StartupOverlay: React.FC<StartupOverlayProps> = ({ onComplete, onFadeOut, 
             className="flex-1 p-8 font-mono text-sm text-neon-blue overflow-hidden flex flex-col"
             style={{ opacity: contentOpacity, transition: 'opacity 0.3s' }}
         >
-             <div className="flex-1 space-y-1 overflow-y-auto custom-scrollbar pb-2">
+             <div className="flex-1 space-y-1 overflow-y-auto no-scrollbar pb-2">
                  {/* 1. Pre-Login Lines */}
                  {lines.map((line, i) => (
                      <div key={i} className="leading-tight">{line}</div>

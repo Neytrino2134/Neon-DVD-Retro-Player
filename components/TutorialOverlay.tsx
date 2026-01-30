@@ -26,7 +26,7 @@ interface TutorialStep {
   text: string;
   actionCheck?: () => boolean; // Return true if action complete
   forceAction?: () => void; // Function to force open a menu if needed
-  placement?: 'left' | 'right'; // Explicit placement preference
+  placement?: 'left' | 'right' | 'bottom-center' | 'top-center'; // Added top-center
 }
 
 const TutorialOverlay: React.FC<TutorialOverlayProps> = ({
@@ -65,14 +65,23 @@ const TutorialOverlay: React.FC<TutorialOverlayProps> = ({
   const timeoutsRef = useRef<number[]>([]);
 
   const steps: TutorialStep[] = [
-    // --- WELCOME ---
+    // --- WELCOME (0) ---
     {
       id: 'welcome',
       type: 'welcome',
       title: t('tut_welcome_title'),
       text: t('tut_welcome_text')
     },
-    // --- EXPLANATION PHASE ---
+    // --- OVERVIEW (1) ---
+    {
+      id: 'overview',
+      type: 'explain',
+      targetId: 'tutorial-main-layout',
+      title: t('tut_overview_title'),
+      text: t('tut_overview_text'),
+      placement: 'top-center' // Changed from bottom-center to top-center
+    },
+    // --- EXPLANATION PHASE (2-7) ---
     {
       id: 'explain-files',
       type: 'explain',
@@ -107,16 +116,17 @@ const TutorialOverlay: React.FC<TutorialOverlayProps> = ({
       targetId: 'tutorial-screen',
       title: t('tut_screen_title'),
       text: t('tut_screen_text'),
-      placement: 'left'
+      placement: 'left' // Explicitly left as requested
     },
     {
       id: 'explain-player',
       type: 'explain',
       targetId: 'tutorial-player',
       title: t('tut_player_title'),
-      text: t('tut_player_text')
+      text: t('tut_player_text'),
+      placement: 'left' // Explicitly left for Right Panel target
     },
-    // --- PRACTICE PHASE ---
+    // --- PRACTICE PHASE (8-10) ---
     {
       id: 'practice-expand-files',
       type: 'practice',
@@ -147,14 +157,8 @@ const TutorialOverlay: React.FC<TutorialOverlayProps> = ({
       text: t('tut_act_play_text'),
       actionCheck: () => isPlaying
     },
-    // NEW STEP: Observe playback
-    {
-      id: 'observe-screen-1',
-      type: 'explain',
-      targetId: 'tutorial-screen',
-      title: t('tut_observe_title'),
-      text: t('tut_observe_text')
-    },
+    // --- VISUALIZER PHASE (11) ---
+    // Removed intermediate "Observe" step to realign index 11 to Waveform
     {
       id: 'practice-vis-expand',
       type: 'practice',
@@ -180,10 +184,10 @@ const TutorialOverlay: React.FC<TutorialOverlayProps> = ({
     {
       id: 'observe-vis-change',
       type: 'explain',
-      targetId: 'tutorial-screen',
+      targetId: 'tutorial-wave', // Changed from tutorial-screen
       title: t('tut_config_applied_title'),
       text: t('tut_config_applied_text'),
-      placement: 'left'
+      // placement removed to default to 'right' (next to the settings panel)
     },
     {
       id: 'practice-vis-center',
@@ -200,7 +204,6 @@ const TutorialOverlay: React.FC<TutorialOverlayProps> = ({
       targetId: 'tutorial-presets',
       title: t('tut_act_open_presets_title'),
       text: t('tut_act_open_presets_text'),
-      placement: 'left',
       actionCheck: () => {
         const el = document.getElementById('tutorial-presets');
         if (!el) return false;
@@ -214,7 +217,6 @@ const TutorialOverlay: React.FC<TutorialOverlayProps> = ({
       targetId: 'tutorial-save-preset-btn',
       title: t('tut_act_save_preset_title'),
       text: t('tut_act_save_preset_text'),
-      placement: 'left',
       actionCheck: () => presetsCount > initialPresetsRef.current
     },
     {
@@ -222,8 +224,7 @@ const TutorialOverlay: React.FC<TutorialOverlayProps> = ({
       type: 'explain',
       targetId: 'tutorial-presets',
       title: t('tut_preset_saved_title'),
-      text: t('tut_preset_saved_text'),
-      placement: 'left'
+      text: t('tut_preset_saved_text')
     },
     // --- FINISH ---
     {
@@ -471,14 +472,14 @@ const TutorialOverlay: React.FC<TutorialOverlayProps> = ({
     left: rect.left,
     width: rect.width,
     height: rect.height,
-    boxShadow: '0 0 0 9999px rgba(0, 0, 0, 0.85)',
+    boxShadow: '0 0 0 9999px rgba(0, 0, 0, 0.65)', // Reduced opacity from 0.85 to 0.65
     borderRadius: '8px',
     zIndex: 9998, 
     pointerEvents: 'none',
   } : {
     position: 'fixed',
     inset: 0,
-    backgroundColor: 'rgba(0,0,0,0.85)',
+    backgroundColor: 'rgba(0,0,0,0.65)', // Reduced opacity
     zIndex: 9998,
     transition: 'all 0.5s ease-in-out',
     // Hide this dimmer if we are in Modal mode, as Modal has its own bgOpacity controlled dimmer
@@ -574,32 +575,67 @@ const TutorialOverlay: React.FC<TutorialOverlayProps> = ({
       
       const placement = currentStep.placement || 'right';
 
-      if (placement === 'left') {
-          left = rect.left - 320;
+      if (placement === 'bottom-center') {
+          top = rect.bottom - 120; // 120px from bottom edge
+          left = rect.left + (rect.width / 2) - 150; // Center (assuming 300px width)
+          
+          tooltipStyle = {
+              position: 'fixed',
+              top: top,
+              left: left,
+              transform: 'none', 
+              width: tooltipPhase >= 1 ? '300px' : '0px',
+              height: tooltipPhase >= 2 ? 'auto' : '2px',
+              opacity: tooltipPhase >= 1 ? 1 : 0,
+              zIndex: 9999,
+              transition: 'width 0.3s ease-out, height 0.3s ease-out, top 0.3s, left 0.3s',
+              overflow: 'hidden'
+          };
+      } else if (placement === 'top-center') {
+          // New Top-Center Placement
+          top = rect.top + 80; // Push down from the very top of target
+          left = rect.left + (rect.width / 2); // Center horizontally based on target
+          
+          tooltipStyle = {
+              position: 'fixed',
+              top: top,
+              left: left,
+              transform: 'translate(-50%, 0)', // Center horizontally
+              width: tooltipPhase >= 1 ? '300px' : '0px',
+              height: tooltipPhase >= 2 ? 'auto' : '2px',
+              opacity: tooltipPhase >= 1 ? 1 : 0,
+              zIndex: 9999,
+              transition: 'width 0.3s ease-out, height 0.3s ease-out, top 0.3s, left 0.3s',
+              overflow: 'hidden'
+          };
       } else {
-          left = rect.right + 20;
+          // Standard Side Logic
+          if (placement === 'left') {
+              left = rect.left - 320;
+          } else {
+              left = rect.right + 20;
+          }
+          
+          if (placement === 'right' && left + 300 > window.innerWidth) {
+              left = rect.left - 320;
+          }
+          if (placement === 'left' && left < 0) {
+              left = rect.right + 20;
+          }
+          
+          tooltipStyle = {
+              position: 'fixed',
+              top: top,
+              left: left,
+              transform: 'translateY(-50%)',
+              width: tooltipPhase >= 1 ? '300px' : '0px',
+              height: tooltipPhase >= 2 ? 'auto' : '2px',
+              opacity: tooltipPhase >= 1 ? 1 : 0,
+              zIndex: 9999,
+              transition: 'width 0.3s ease-out, height 0.3s ease-out, top 0.3s, left 0.3s',
+              overflow: 'hidden'
+          };
       }
-      
-      if (placement === 'right' && left + 300 > window.innerWidth) {
-          left = rect.left - 320;
-      }
-      if (placement === 'left' && left < 0) {
-          left = rect.right + 20;
-      }
-      
-      tooltipStyle = {
-          position: 'fixed',
-          top: top,
-          left: left,
-          transform: 'translateY(-50%)',
-          width: tooltipPhase >= 1 ? '300px' : '0px',
-          height: tooltipPhase >= 2 ? 'auto' : '2px',
-          opacity: tooltipPhase >= 1 ? 1 : 0,
-          zIndex: 9999,
-          // Add standard tooltip transition for smooth size changes
-          transition: 'width 0.3s ease-out, height 0.3s ease-out, top 0.3s, left 0.3s',
-          overflow: 'hidden' // Important for growing animation
-      };
   }
 
   return (
@@ -631,7 +667,7 @@ const TutorialOverlay: React.FC<TutorialOverlayProps> = ({
                 </span>
             </div>
 
-            <div className="font-mono text-sm text-white leading-relaxed min-h-[60px]">
+            <div className="font-mono text-sm text-white leading-relaxed min-h-[60px] whitespace-pre-wrap">
                 {displayedText}
             </div>
 

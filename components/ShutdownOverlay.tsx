@@ -7,6 +7,9 @@ interface ShutdownOverlayProps {
   active: boolean; // Triggers the sequence
   onCancel?: () => void;
   onPlayRebootSfx?: () => void;
+  // Recording Props for auto-stop handling
+  isRecording?: boolean;
+  stopRecording?: () => Promise<boolean>;
 }
 
 type SequenceStep = 
@@ -20,7 +23,7 @@ type SequenceStep =
   | 'tv_off' 
   | 'silence';
 
-const ShutdownOverlay: React.FC<ShutdownOverlayProps> = ({ active, onCancel, onPlayRebootSfx }) => {
+const ShutdownOverlay: React.FC<ShutdownOverlayProps> = ({ active, onCancel, onPlayRebootSfx, isRecording, stopRecording }) => {
   const { t } = useLanguage();
   const [step, setStep] = useState<SequenceStep>('idle');
   
@@ -133,9 +136,18 @@ const ShutdownOverlay: React.FC<ShutdownOverlayProps> = ({ active, onCancel, onP
       setStep('tv_off');
       await wait(600);
 
-      // 8. Silence
+      // 8. Silence & Save Wait Logic
       setStep('silence');
+      
+      // Basic waiting time
       await wait(5000);
+
+      // --- RECORDING STOP LOGIC ---
+      if (isRecording && stopRecording) {
+          // Pause here if recording is active
+          // The promise from stopRecording resolves ONLY after file is saved (or cancelled)
+          await stopRecording();
+      }
 
       // 9. Reload
       window.location.reload();
@@ -162,11 +174,9 @@ const ShutdownOverlay: React.FC<ShutdownOverlayProps> = ({ active, onCancel, onP
 
     return () => {
        timeoutsRef.current.forEach(window.clearTimeout);
-       // Reset sequence lock on cleanup to ensure we don't get stuck in "running" state
-       // if the component re-renders/unmounts
        sequenceRef.current = false;
     };
-  }, [active, t]);
+  }, [active, t, isRecording, stopRecording]);
 
 
   if (!active && step === 'idle') return null;

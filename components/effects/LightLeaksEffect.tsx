@@ -25,8 +25,12 @@ const LightLeaksEffect: React.FC<LightLeaksEffectProps> = ({ config }) => {
   const leaksRef = useRef<Leak[]>([]);
   const animationRef = useRef<number>(0);
   
+  // Noise pattern for dithering
+  const noisePatternRef = useRef<CanvasPattern | null>(null);
+  
   // Master opacity for smooth transitions (0 to 1)
-  const fadeLevelRef = useRef<number>(0);
+  // Initialize to 1.0 if enabled to prevent fade-in flicker on remounts (e.g. Cinema Mode transition)
+  const fadeLevelRef = useRef<number>(config.enabled ? 1.0 : 0.0);
   
   // Time tracking for delta
   const lastTimeRef = useRef<number>(0);
@@ -71,8 +75,34 @@ const LightLeaksEffect: React.FC<LightLeaksEffectProps> = ({ config }) => {
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
-    const ctx = canvas.getContext('2d');
+    // Force High Quality Smoothing for gradients
+    const ctx = canvas.getContext('2d', { alpha: true }); 
     if (!ctx) return;
+    
+    // Explicitly enable smoothing (usually default, but good to ensure)
+    ctx.imageSmoothingEnabled = true;
+    ctx.imageSmoothingQuality = 'high';
+
+    // --- GENERATE NOISE PATTERN FOR DITHERING ---
+    // We create a small offscreen canvas with noise to tile over the gradients.
+    // This breaks up 8-bit color banding.
+    const noiseSize = 256;
+    const noiseCanvas = document.createElement('canvas');
+    noiseCanvas.width = noiseSize;
+    noiseCanvas.height = noiseSize;
+    const nCtx = noiseCanvas.getContext('2d');
+    if (nCtx) {
+        const idata = nCtx.createImageData(noiseSize, noiseSize);
+        const buffer32 = new Uint32Array(idata.data.buffer);
+        for(let i=0; i<buffer32.length; i++) {
+            // Random gray value with alpha
+            const val = Math.floor(Math.random() * 255);
+            // 0xAARRGGBB - Low alpha (approx 5-8%) is enough to dither without being dirty
+            buffer32[i] = (0x10000000 | (val << 16) | (val << 8) | val); 
+        }
+        nCtx.putImageData(idata, 0, 0);
+        noisePatternRef.current = ctx.createPattern(noiseCanvas, 'repeat');
+    }
 
     let w = canvas.width = canvas.offsetWidth;
     let h = canvas.height = canvas.offsetHeight;
@@ -89,6 +119,9 @@ const LightLeaksEffect: React.FC<LightLeaksEffectProps> = ({ config }) => {
         if (canvas.width !== canvas.offsetWidth || canvas.height !== canvas.offsetHeight) {
              w = canvas.width = canvas.offsetWidth;
              h = canvas.height = canvas.offsetHeight;
+             // Re-apply quality settings after resize reset
+             ctx.imageSmoothingEnabled = true;
+             ctx.imageSmoothingQuality = 'high';
         }
 
         const cfg = configRef.current;
@@ -113,22 +146,22 @@ const LightLeaksEffect: React.FC<LightLeaksEffectProps> = ({ config }) => {
         }
 
         // --- SMART ARRAY MANAGEMENT ---
-        // Dynamically add or remove leaks instead of hard resetting
         const currentLen = leaksRef.current.length;
         const targetLen = cfg.number;
 
         if (currentLen < targetLen) {
-             // Add new leaks without disturbing existing ones
              const toAdd = targetLen - currentLen;
              leaksRef.current.push(...initLeaks(w, h, toAdd));
         } else if (currentLen > targetLen) {
-             // Remove from end
              leaksRef.current.splice(targetLen);
         }
 
         ctx.clearRect(0, 0, w, h);
         
+        // Use 'screen' blending for nice light addition
         ctx.globalCompositeOperation = 'screen'; 
+        // FIX: Explicitly reset alpha to 1.0 every frame to prevent noise pass pollution
+        ctx.globalAlpha = 1.0;
 
         const speedMultiplier = cfg.speed * 120 * safeDt;
 
@@ -158,6 +191,7 @@ const LightLeaksEffect: React.FC<LightLeaksEffectProps> = ({ config }) => {
                 
                 gradient.addColorStop(0, `hsla(${leak.hue}, ${leak.saturation}%, ${leak.lightness}%, ${currentOpacity})`);
                 gradient.addColorStop(0.5, `hsla(${leak.hue}, ${leak.saturation}%, ${leak.lightness}%, ${currentOpacity * 0.5})`);
+                // Smooth falloff to zero helps prevent hard edges
                 gradient.addColorStop(1, `hsla(${leak.hue}, ${leak.saturation}%, ${leak.lightness}%, 0)`);
 
                 ctx.fillStyle = gradient;
@@ -167,6 +201,19 @@ const LightLeaksEffect: React.FC<LightLeaksEffectProps> = ({ config }) => {
                 ctx.fill();
             }
         });
+        
+        // --- DITHERING PASS (Fix Banding) ---
+        // Apply noise pattern over the lights to smooth 8-bit gradients
+        if (noisePatternRef.current && fadeLevelRef.current > 0.1) {
+            ctx.globalCompositeOperation = 'overlay';
+            ctx.globalAlpha = 0.08 * fadeLevelRef.current; // Subtle strength
+            ctx.fillStyle = noisePatternRef.current;
+            // Shift pattern slightly each frame to simulate film grain
+            ctx.save();
+            ctx.translate(Math.random() * 100, Math.random() * 100); 
+            ctx.fillRect(-100, -100, w + 100, h + 100);
+            ctx.restore();
+        }
         
         ctx.globalCompositeOperation = 'source-over';
 

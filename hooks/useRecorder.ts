@@ -8,6 +8,9 @@ export const useRecorder = (getAudioStream: () => MediaStream | null) => {
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<Blob[]>([]);
   const { addNotification } = useNotification();
+  
+  // Ref to hold the resolve function of the stopRecording promise
+  const stopResolveRef = useRef<((value: boolean) => void) | null>(null);
 
   const startRecording = useCallback(async (config: RecorderConfig) => {
     try {
@@ -72,6 +75,8 @@ export const useRecorder = (getAudioStream: () => MediaStream | null) => {
           // Stop video tracks to release capture hardware/UI
           videoStream.getTracks().forEach(t => t.stop());
           
+          let success = false;
+
           if ((window as any).require) {
               // Electron Save Strategy
               try {
@@ -82,6 +87,7 @@ export const useRecorder = (getAudioStream: () => MediaStream | null) => {
                   
                   if (result.success) {
                       addNotification(`Saved to: ${result.filePath}`, "success");
+                      success = true;
                   } else if (result.canceled) {
                       addNotification("Save cancelled", "info");
                   }
@@ -100,8 +106,16 @@ export const useRecorder = (getAudioStream: () => MediaStream | null) => {
               document.body.removeChild(a);
               URL.revokeObjectURL(url);
               addNotification("Download started", "success");
+              success = true;
           }
+          
           setIsRecording(false);
+          
+          // Resolve the promise if someone is waiting for stop to complete
+          if (stopResolveRef.current) {
+              stopResolveRef.current(success);
+              stopResolveRef.current = null;
+          }
       };
 
       recorder.start(1000); // chunk every second
@@ -120,10 +134,16 @@ export const useRecorder = (getAudioStream: () => MediaStream | null) => {
     }
   }, [getAudioStream, addNotification]);
 
-  const stopRecording = useCallback(() => {
-      if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
-          mediaRecorderRef.current.stop();
-      }
+  const stopRecording = useCallback((): Promise<boolean> => {
+      return new Promise((resolve) => {
+          if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
+              // Set the resolver ref so onstop can call it
+              stopResolveRef.current = resolve;
+              mediaRecorderRef.current.stop();
+          } else {
+              resolve(false);
+          }
+      });
   }, []);
 
   return { isRecording, startRecording, stopRecording };

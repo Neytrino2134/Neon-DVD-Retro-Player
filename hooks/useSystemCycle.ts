@@ -44,18 +44,33 @@ export const useSystemCycle = ({ player, setDevSkip, setIsEditorMode, stopAllSFX
       // Removed setViewMode('default') to preserve the current view state (e.g. Cinema Mode)
       setDevSkip(false); 
       setIsEditorMode(false); 
+      // Reset boot flag so notifications can fire again on next start
+      hasBootedRef.current = false;
   }, [introState, rebootPhase, player, setDevSkip, setIsEditorMode]);
 
   const handleBootComplete = useCallback(() => {
-      const tutorialDone = localStorage.getItem('neon_tutorial_complete');
-      if (!tutorialDone) {
-          setTimeout(() => setShowTutorial(true), 500);
-      }
       if (!hasBootedRef.current) {
           hasBootedRef.current = true;
+          
+          // 1. Immediate Success Notification
+          addNotification("SYSTEM INITIALIZED", "success");
+
+          // 2. Delayed User Verification Notification
           setTimeout(() => {
-              addNotification("SYSTEM ONLINE", "success");
-          }, 500);
+              addNotification("USER VERIFICATION: CHECKING...", "info");
+          }, 1200);
+
+          // 3. Delayed Tutorial Check
+          setTimeout(() => {
+              const tutorialDone = localStorage.getItem('neon_tutorial_complete');
+              // If tutorialDone is null, or anything other than strictly 'true', show tutorial
+              if (tutorialDone !== 'true') {
+                  setShowTutorial(true);
+                  addNotification("LAUNCHING SYSTEM GUIDE...", "warning");
+              } else {
+                  addNotification("WELCOME BACK, USER", "success");
+              }
+          }, 3000);
       }
   }, [addNotification]);
 

@@ -32,6 +32,7 @@ export const DEFAULT_DVD_CONFIG: DvdConfig = {
 
 export const DEFAULT_EFFECTS_CONFIG: EffectsConfig = {
   fps: 60, 
+  showFps: false,
   signalEnabled: true,
   pixelation: 1, 
   noise: 0, 
@@ -52,6 +53,7 @@ export const DEFAULT_EFFECTS_CONFIG: EffectsConfig = {
   },
   lightLeaks: { enabled: false, intensity: 0.5, speed: 0.5, number: 6 },
   rain: { enabled: false, intensity: 0.5, speed: 1.0, size: 1.0, direction: 0, wind: 0, gustiness: 0.5, opacity: 0.5, wander: 0.1 },
+  tron: { enabled: false, opacity: 0.8, speed: 2, spawnRate: 5 },
   vignette: { enabled: false, intensity: 0.5, roundness: 0.7 }
 };
 

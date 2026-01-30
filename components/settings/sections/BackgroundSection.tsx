@@ -91,7 +91,7 @@ const BackgroundSection: React.FC<BackgroundSectionProps> = ({
             />
         </ModuleWrapper>
 
-        <ModuleWrapper id="screen" label={<NumberedLabel num="04" k="background" custom="SCREEN SHARE" />} icon={Cast} isEnabled={true} isAlwaysOn={true} isExpanded={expandedState['screen']} onToggleExpand={(e) => toggleExpand('screen', e.shiftKey)} onToggleEnable={() => {}}>
+        <ModuleWrapper id="screen-share" label={<NumberedLabel num="04" k="background" custom="SCREEN SHARE" />} icon={Cast} isEnabled={true} isAlwaysOn={true} isExpanded={expandedState['screen-share']} onToggleExpand={(e) => toggleExpand('screen-share', e.shiftKey)} onToggleEnable={() => {}}>
             <ScreenVideoModule 
                 isVideoActive={isVideoActive} 
                 toggleVideo={toggleVideo} 

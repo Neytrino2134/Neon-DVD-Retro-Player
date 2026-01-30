@@ -222,6 +222,7 @@ export const PlaylistTabs: React.FC<PlaylistTabsProps> = ({
                             onBlur={finishRename}
                             onKeyDown={(e) => e.key === 'Enter' && finishRename()}
                             autoFocus
+                            onFocus={(e) => e.target.select()}
                             className="bg-black text-white w-20 outline-none border-b border-gray-600"
                         />
                     ) : (

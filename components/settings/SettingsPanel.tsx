@@ -25,7 +25,7 @@ import PostProcessingSection from './sections/PostProcessingSection';
 // Used for auto-collapsing children when switching tabs or clicking modules
 const SECTION_MODULES: Record<string, string[]> = {
   sys: ['files', 'presets', 'themes', 'debug'],
-  bg: ['bg-settings', 'bg-resources', 'bg-colors', 'screen'],
+  bg: ['bg-settings', 'bg-resources', 'bg-colors', 'screen-share'],
   sfx: ['mixer', 'ambience', 'sysaudio'],
   waves: ['wave', 'reactor', 'sine'],
   mod: ['marquee', 'dvd', 'leaks', 'rain', 'hologram', 'gemini', 'scan', 'cyber', 'glitch'],

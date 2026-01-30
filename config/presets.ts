@@ -81,6 +81,7 @@ export const OCEAN_BLUE_PRESET: AppPreset = {
     },
     effectsConfig: {
       fps: 60,
+      showFps: false,
       signalEnabled: true,
       pixelation: 1,
       noise: 0,
@@ -157,6 +158,12 @@ export const OCEAN_BLUE_PRESET: AppPreset = {
         gustiness: 0.5,
         opacity: 0.5,
         wander: 0.1
+      },
+      tron: {
+        enabled: false,
+        opacity: 0.8,
+        speed: 2,
+        spawnRate: 5
       },
       vignette: {
         enabled: true,

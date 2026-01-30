@@ -5,7 +5,7 @@ import CustomSelect from '../CustomSelect';
 import ToggleSwitch from '../ToggleSwitch';
 import { useLanguage } from '../../../contexts/LanguageContext';
 import { DvdConfig, EffectsConfig } from '../../../types';
-import { Volume2, Power, Play } from 'lucide-react';
+import { Volume2, Power, Play, Timer } from 'lucide-react';
 
 const FPS_OPTIONS = [
   { value: 60, label: '60 FPS (OFF)' },
@@ -159,6 +159,15 @@ export const FpsSettings: React.FC<{ config: EffectsConfig, update: (k: keyof Ef
     const { t } = useLanguage();
     return (
         <div className="pt-2">
+            <div className="mb-4">
+                <ToggleSwitch 
+                    label={t('show_fps')} 
+                    icon={Timer} 
+                    value={config.showFps} 
+                    onChange={(v) => update('showFps', v)} 
+                    color="green"
+                />
+            </div>
             <CustomSelect 
               label={t('fps_limit')} 
               value={config.fps} 

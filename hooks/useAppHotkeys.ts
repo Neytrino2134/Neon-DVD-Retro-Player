@@ -2,7 +2,7 @@
 import { useEffect, useRef } from 'react';
 import { useNotification } from '../contexts/NotificationContext';
 import { useTheme } from '../contexts/ThemeContext';
-import { ViewMode } from '../types';
+import { ViewMode, RecorderConfig } from '../types';
 
 interface UseAppHotkeysProps {
   player: any; // AudioPlayer hook return type
@@ -19,6 +19,12 @@ interface UseAppHotkeysProps {
   viewMode: ViewMode;
   setViewMode: (mode: ViewMode) => void;
   onGoHome: () => void;
+  // Recording
+  isRecording: boolean;
+  startRecording: (config: RecorderConfig) => void;
+  stopRecording: () => void;
+  // System State
+  introState: number;
 }
 
 export const useAppHotkeys = ({
@@ -35,13 +41,25 @@ export const useAppHotkeys = ({
   toggleRightPanel,
   viewMode,
   setViewMode,
-  onGoHome
+  onGoHome,
+  isRecording,
+  startRecording,
+  stopRecording,
+  introState
 }: UseAppHotkeysProps) => {
   const { addNotification } = useNotification();
   const { setTheme, setControlStyle } = useTheme();
   
   // Throttling ref for preset switching to prevent spam freeze
   const lastPresetSwitchTimeRef = useRef<number>(0);
+
+  // Default recording config for hotkey
+  const defaultRecConfig: RecorderConfig = {
+      resolution: '1080p',
+      fps: 60,
+      videoBitrate: 8000000,
+      audioBitrate: 192000
+  };
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -56,6 +74,7 @@ export const useAppHotkeys = ({
           return;
       }
 
+      // SKIP INTRO (Allowed during startup)
       if (e.code === 'Backslash' || e.code === 'Insert') {
           setDevSkip(true);
           setIntroState(2);
@@ -65,8 +84,24 @@ export const useAppHotkeys = ({
           return;
       }
 
+      // --- BLOCK OTHER HOTKEYS DURING STARTUP ---
+      // introState < 2 means we are in the boot/login sequence
+      if (introState < 2) return;
+
       if (e.code === 'Home') {
           onGoHome();
+          return;
+      }
+
+      // F9: Toggle Recording
+      if (e.code === 'F9') {
+          e.preventDefault();
+          if (isRecording) {
+              stopRecording();
+          } else {
+              startRecording(defaultRecConfig);
+              addNotification("RECORDING STARTED (1080p/60)", "success");
+          }
           return;
       }
 
@@ -175,5 +210,5 @@ export const useAppHotkeys = ({
 
     window.addEventListener('keydown', handleKeyDown, { capture: true });
     return () => window.removeEventListener('keydown', handleKeyDown, { capture: true });
-  }, [player, config, focusMode, handleScheduleReload, toggleFocusMode, addNotification, stopAllSFX, setTheme, setControlStyle, toggleLeftPanel, toggleRightPanel, viewMode, setViewMode, onGoHome]);
+  }, [player, config, focusMode, handleScheduleReload, toggleFocusMode, addNotification, stopAllSFX, setTheme, setControlStyle, toggleLeftPanel, toggleRightPanel, viewMode, setViewMode, onGoHome, isRecording, startRecording, stopRecording, introState]);
 };

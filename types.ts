@@ -190,8 +190,16 @@ export interface RainConfig {
   wander: number; // NEW: Direction randomness
 }
 
+export interface TronConfig {
+  enabled: boolean;
+  opacity: number;
+  speed: number;
+  spawnRate: number; // Frequency of new agents
+}
+
 export interface EffectsConfig {
   fps: number;
+  showFps: boolean; // NEW: Show FPS Counter
   signalEnabled: boolean; // NEW: Master toggle for signal processor
   pixelation: number;
   noise: number;
@@ -239,6 +247,7 @@ export interface EffectsConfig {
     number: number; // Amount of blobs
   };
   rain: RainConfig; // NEW: Rain Effect
+  tron: TronConfig; // NEW: Tron Game
   vignette: {
     enabled: boolean;
     intensity: number; // Opacity 0-1

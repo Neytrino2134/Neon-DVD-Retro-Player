@@ -48,11 +48,20 @@ const ScreenTopBar: React.FC<ScreenTopBarProps> = ({
   onStopRecording
 }) => {
   const { t } = useLanguage();
+  const isElectron = typeof navigator !== 'undefined' && /Electron/.test(navigator.userAgent);
+
+  // In Focus Mode (Big Screen), hide interface unless hovered
+  const containerClass = focusMode 
+    ? "opacity-0 hover:opacity-100 transition-opacity duration-500" 
+    : "opacity-100";
 
   return (
-    <>
+    <div className={`absolute inset-x-0 top-0 h-20 z-50 pointer-events-none ${containerClass}`}>
+        {/* Pointer events auto enabled on children to allow clicking even when parent is transparent, 
+            but we handle parent opacity hover for "Big Screen" effect */}
+        
         {/* TOP LEFT CONTROLS */}
-        <div className="absolute top-4 left-4 z-50 flex gap-2 opacity-0 hover:opacity-100 transition-opacity duration-300 p-2">
+        <div className="absolute top-4 left-4 flex gap-2 pointer-events-auto">
             <Tooltip content={t('reboot')} position="right">
             <button 
                 onClick={onScheduleReload} 
@@ -64,7 +73,7 @@ const ScreenTopBar: React.FC<ScreenTopBarProps> = ({
         </div>
 
         {/* TOP RIGHT CONTROLS & STATUS */}
-        <div className="absolute top-4 right-4 z-50 flex items-center gap-4">
+        <div className="absolute top-4 right-4 flex items-center gap-4 pointer-events-auto">
             
             {/* RECORDING INDICATOR (If active) */}
             {isRecording && (
@@ -75,7 +84,7 @@ const ScreenTopBar: React.FC<ScreenTopBarProps> = ({
             )}
 
             {rebootPhase === 'waiting' && (
-            <div className="flex items-center gap-3 animate-slide-in-right pointer-events-none pr-2">
+            <div className="flex items-center gap-3 animate-slide-in-right pr-2">
                 <div className="flex flex-col items-end">
                     <div className="flex items-center gap-2">
                     <span 
@@ -106,10 +115,10 @@ const ScreenTopBar: React.FC<ScreenTopBarProps> = ({
             )}
 
             {/* BUTTONS */}
-            <div className="opacity-0 hover:opacity-100 transition-opacity duration-300 flex items-center gap-2 p-2">
+            <div className={`flex items-center gap-2 p-2 rounded-full transition-colors duration-300 ${focusMode ? 'bg-black/40 backdrop-blur-md' : ''}`}>
                 
-                {/* REC BUTTON */}
-                {onStartRecording && onStopRecording && (
+                {/* REC BUTTON - Only visible in Electron */}
+                {onStartRecording && onStopRecording && isElectron && (
                     <Tooltip content={isRecording ? "STOP RECORDING" : "RECORD SCREEN"} position="left">
                         <button 
                             onClick={isRecording ? onStopRecording : onStartRecording}
@@ -157,7 +166,7 @@ const ScreenTopBar: React.FC<ScreenTopBarProps> = ({
                 </Tooltip>
             </div>
         </div>
-    </>
+    </div>
   );
 };
 
