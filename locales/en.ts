@@ -120,6 +120,10 @@ export const en = {
   // Tron
   tron_speed: "AGENT SPEED",
   tron_spawn: "SPAWN RATE",
+  tron_trail: "TRAIL LENGTH",
+  tron_size: "AGENT THICKNESS",
+  tron_max_agents: "MAX PLAYERS",
+  tron_show_names: "SHOW PLAYER NAMES",
 
   // Hologram Categories
   cat_system: "SYSTEM",

@@ -29,7 +29,7 @@ const FpsCounter: React.FC = () => {
 
   return (
     <div className="absolute bottom-4 left-4 z-[9999] pointer-events-none">
-        <div className="bg-black/60 border border-theme-primary/50 text-theme-primary px-2 py-1 rounded font-mono text-[10px] font-bold tracking-widest shadow-[0_0_10px_rgba(var(--color-primary),0.3)]">
+        <div className="bg-black/60 border border-theme-primary text-theme-primary px-2 py-1 rounded font-mono text-[10px] font-bold tracking-widest shadow-[0_0_10px_var(--color-primary)]">
             FPS: {fps}
         </div>
     </div>

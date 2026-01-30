@@ -120,6 +120,10 @@ export const ru = {
   // Tron
   tron_speed: "СКОРОСТЬ АГЕНТА",
   tron_spawn: "ЧАСТОТА СПАВНА",
+  tron_trail: "ДЛИНА СЛЕДА",
+  tron_size: "ТОЛЩИНА АГЕНТА",
+  tron_max_agents: "МАКС. ИГРОКОВ",
+  tron_show_names: "ПОКАЗЫВАТЬ ИМЕНА",
 
   // Hologram Categories
   cat_system: "СИСТЕМНЫЕ",

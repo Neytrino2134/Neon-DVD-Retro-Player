@@ -1,4 +1,74 @@
 
+export interface TronConfig {
+  enabled: boolean;
+  opacity: number;
+  speed: number;
+  spawnRate: number; // Frequency of new agents
+  trailLength: number; // NEW: 0.1 (short) to 1.0 (long)
+  size: number; // NEW: Thickness of agent (1-4)
+  maxAgents: number; // NEW: Maximum players on map (4-20)
+  showNames: boolean; // NEW: Show player nicknames
+}
+
+export interface EffectsConfig {
+  fps: number;
+  showFps: boolean; // NEW: Show FPS Counter
+  signalEnabled: boolean; // NEW: Master toggle for signal processor
+  pixelation: number;
+  noise: number;
+  chromaticEnabled: boolean; // NEW: Master toggle for chromatic aberration
+  chromaticAberration: number;
+  vhsJitter: number;
+  scanlineEnabled: boolean;
+  scanlineIntensity: number;
+  scanlineThickness: number;
+  glitch: {
+    enabled: boolean;
+    intensity: number;
+    speed: number;
+    opacity: number;
+    variant: 'v1' | 'v2';
+  };
+  cyberHack: {
+    enabled: boolean;
+    speed: number;
+    opacity: number;
+    density: number;
+    scale: number;
+    backgroundOpacity: number;
+  };
+  debugConsole: {
+    enabled: boolean;
+    opacity: number;
+    scale: number;
+  };
+  holograms: {
+    enabled: boolean;
+    opacity: number;
+    speed: number; // Typing speed
+    interval: number; // Seconds between messages
+    scale: number;
+    color?: string; // NEW: Specific color for hologram
+    enableIcons: boolean; // NEW: Enable graphical icons
+    categories: Record<HologramCategory, boolean>;
+  };
+  geminiChat: GeminiChatConfig; // NEW
+  lightLeaks: {
+    enabled: boolean;
+    intensity: number; // Opacity
+    speed: number; // Movement speed
+    number: number; // Amount of blobs
+  };
+  rain: RainConfig; // NEW: Rain Effect
+  tron: TronConfig; // NEW: Tron Game
+  vignette: {
+    enabled: boolean;
+    intensity: number; // Opacity 0-1
+    roundness: number; // 0-1 (Size of center hole)
+  };
+}
+
+// ... existing types (kept for context, but not modified in this block unless needed) ...
 export interface AudioTrack {
   id: string;
   playlistId: string; // New field to link track to a playlist
@@ -188,71 +258,6 @@ export interface RainConfig {
   gustiness: number; // Random wind variation
   opacity: number; // NEW: Rain opacity
   wander: number; // NEW: Direction randomness
-}
-
-export interface TronConfig {
-  enabled: boolean;
-  opacity: number;
-  speed: number;
-  spawnRate: number; // Frequency of new agents
-}
-
-export interface EffectsConfig {
-  fps: number;
-  showFps: boolean; // NEW: Show FPS Counter
-  signalEnabled: boolean; // NEW: Master toggle for signal processor
-  pixelation: number;
-  noise: number;
-  chromaticEnabled: boolean; // NEW: Master toggle for chromatic aberration
-  chromaticAberration: number;
-  vhsJitter: number;
-  scanlineEnabled: boolean;
-  scanlineIntensity: number;
-  scanlineThickness: number;
-  glitch: {
-    enabled: boolean;
-    intensity: number;
-    speed: number;
-    opacity: number;
-    variant: 'v1' | 'v2';
-  };
-  cyberHack: {
-    enabled: boolean;
-    speed: number;
-    opacity: number;
-    density: number;
-    scale: number;
-    backgroundOpacity: number;
-  };
-  debugConsole: {
-    enabled: boolean;
-    opacity: number;
-    scale: number;
-  };
-  holograms: {
-    enabled: boolean;
-    opacity: number;
-    speed: number; // Typing speed
-    interval: number; // Seconds between messages
-    scale: number;
-    color?: string; // NEW: Specific color for hologram
-    enableIcons: boolean; // NEW: Enable graphical icons
-    categories: Record<HologramCategory, boolean>;
-  };
-  geminiChat: GeminiChatConfig; // NEW
-  lightLeaks: {
-    enabled: boolean;
-    intensity: number; // Opacity
-    speed: number; // Movement speed
-    number: number; // Amount of blobs
-  };
-  rain: RainConfig; // NEW: Rain Effect
-  tron: TronConfig; // NEW: Tron Game
-  vignette: {
-    enabled: boolean;
-    intensity: number; // Opacity 0-1
-    roundness: number; // 0-1 (Size of center hole)
-  };
 }
 
 export interface CrossfadeConfig {

@@ -1,9 +1,8 @@
-
 import { AppPreset } from '../types';
 import { 
   DEFAULT_VISUALIZER_CONFIG, 
   DEFAULT_REACTOR_CONFIG, 
-  DEFAULT_SINE_WAVE_CONFIG,
+  DEFAULT_SINE_WAVE_CONFIG, 
   DEFAULT_DVD_CONFIG, 
   DEFAULT_EFFECTS_CONFIG, 
   DEFAULT_MARQUEE_CONFIG, 
@@ -162,8 +161,12 @@ export const OCEAN_BLUE_PRESET: AppPreset = {
       tron: {
         enabled: false,
         opacity: 0.8,
-        speed: 2,
-        spawnRate: 5
+        speed: 0.5,
+        spawnRate: 5,
+        trailLength: 0.8,
+        size: 1,
+        maxAgents: 12,
+        showNames: true
       },
       vignette: {
         enabled: true,
