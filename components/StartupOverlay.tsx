@@ -1,6 +1,6 @@
 
 import React, { useEffect, useState, useRef } from 'react';
-import { Terminal, Cpu, Power, Key, ShieldCheck, Globe, X, Circle } from 'lucide-react';
+import { Terminal, Cpu, Power, Key, ShieldCheck, Globe, X, Circle, Maximize } from 'lucide-react';
 import { useLanguage } from '../contexts/LanguageContext';
 import { APP_VERSION } from '../lib/version';
 import { Tooltip } from './ui/Tooltip';
@@ -350,6 +350,14 @@ const StartupOverlay: React.FC<StartupOverlayProps> = ({ onComplete, onFadeOut, 
       }, 800);
   };
 
+  const toggleFullscreen = () => {
+      if (!document.fullscreenElement) {
+          document.documentElement.requestFullscreen().catch(err => console.error(err));
+      } else {
+          document.exitFullscreen();
+      }
+  };
+
   // Keyboard listener for Enter
   useEffect(() => {
     if (hasStarted || collapsePhase !== 'idle' || forceSkip) return;
@@ -614,6 +622,16 @@ const StartupOverlay: React.FC<StartupOverlayProps> = ({ onComplete, onFadeOut, 
                                     </button>
                                 </Tooltip>
                             )}
+
+                            {/* FULLSCREEN BUTTON */}
+                            <Tooltip content="FULLSCREEN (SHIFT+F)" position="bottom">
+                                <button
+                                    onClick={(e) => { e.stopPropagation(); toggleFullscreen(); }}
+                                    className="text-neon-blue/50 hover:text-white transition-colors p-0.5 hover:bg-neon-blue/20 rounded"
+                                >
+                                    <Maximize size={14} />
+                                </button>
+                            </Tooltip>
 
                             <div className="flex gap-1">
                                 <div className="w-1.5 h-1.5 bg-neon-blue rounded-full"></div>

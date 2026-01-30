@@ -30,15 +30,9 @@ function createWindow() {
     },
   });
 
-  // --- ENABLE SYSTEM AUDIO CAPTURE ---
-  mainWindow.webContents.session.setDisplayMediaRequestHandler((request, callback) => {
-    desktopCapturer.getSources({ types: ['screen'] }).then((sources) => {
-      callback({ video: sources[0], audio: 'loopback' });
-    }).catch((e) => {
-      console.error(e);
-      callback(null);
-    });
-  });
+  // --- RECORDING HANDLER ---
+  // Note: We removed setDisplayMediaRequestHandler to allow the renderer process
+  // to select specific screen sources using desktopCapturer and getUserMedia.
 
   const isDev = process.env.NODE_ENV !== 'production' && !app.isPackaged;
 
@@ -77,43 +71,45 @@ function createWindow() {
   ipcMain.on('set-mini-mode', (event, { width, height }) => {
     if (!mainWindow) return;
     
-    // Set minimum constraints as requested: 770px width, 900px height
-    mainWindow.setMinimumSize(770, 900);
+    // Temporarily relax constraints to allow shrinking
+    mainWindow.setMinimumSize(1, 1);
     
-    // If the window is currently smaller than the new minimums, resize it up
-    const bounds = mainWindow.getBounds();
-    if (bounds.width < 770 || bounds.height < 900) {
-        mainWindow.setSize(Math.max(bounds.width, 770), Math.max(bounds.height, 900), true);
-    }
+    // Resize
+    mainWindow.setSize(width, height, true);
     
-    // Note: We do NOT force it to shrink if it's larger, preserving user's resize preference 
-    // unless they manually resize it down.
+    // We don't enforce strict min size here immediately to allow fluid transition,
+    // or we set it to the mini dimensions.
+    mainWindow.setMinimumSize(width, height);
   });
 
   ipcMain.on('set-full-mode', () => {
     if (!mainWindow) return;
     
-    // Temporarily relax constraints to allow resizing logic
-    mainWindow.setMinimumSize(770, 900);
+    // 1. CRITICAL FIX: Relax constraints completely BEFORE resizing.
+    // Setting minWidth to 770 while window is 540 causes conflict/freeze on some systems.
+    mainWindow.setMinimumSize(1, 1);
 
     const currentBounds = mainWindow.getBounds();
     const targetW = 1700;
     const targetH = 900;
 
-    // Logic: 
-    // If current size < 1700x900 -> Expand to 1700x900
-    // If current size >= 1700x900 -> Keep current size (do not shrink)
+    // Logic: Expand to default if smaller, otherwise keep current size
     const newW = Math.max(currentBounds.width, targetW);
     const newH = Math.max(currentBounds.height, targetH);
     
-    // Only apply resize if dimensions actually need to change
+    // 2. Resize
     if (newW !== currentBounds.width || newH !== currentBounds.height) {
-        mainWindow.setSize(newW, newH, true);
-        mainWindow.center(); // Center only if we had to resize/expand
+        mainWindow.setSize(newW, newH, true); // true = animate (system dependent)
+        mainWindow.center();
     }
 
-    // Enforce strict minimum constraints for Full Mode
-    mainWindow.setMinimumSize(targetW, targetH);
+    // 3. Re-apply constraints AFTER resize is initiated
+    // Used a small timeout to ensure the OS window manager has processed the size change
+    setTimeout(() => {
+        if (mainWindow && !mainWindow.isDestroyed()) {
+            mainWindow.setMinimumSize(770, 900);
+        }
+    }, 100);
   });
 
   // --- RECORDING SAVE HANDLER ---

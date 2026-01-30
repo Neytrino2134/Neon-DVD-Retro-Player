@@ -1,7 +1,7 @@
 
 import React, { useState, useRef } from 'react';
-import { List, ChevronDown, ChevronUp, Timer, Trash2, RefreshCw, Disc, Upload, Power, Shuffle } from 'lucide-react';
-import { BackgroundMedia, PatternConfig, BgTransitionType, BgAnimationType } from '../../types';
+import { List, ChevronDown, ChevronUp, Timer, Trash2, RefreshCw, Disc, Upload, Power, Shuffle, Plus, X, Play } from 'lucide-react';
+import { BackgroundMedia, PatternConfig, BgTransitionType, BgAnimationType, BackgroundPlaylist } from '../../types';
 import RangeControl from './RangeControl';
 import CustomSelect from './CustomSelect';
 import ToggleSwitch from './ToggleSwitch';
@@ -96,6 +96,14 @@ export const BgConfigModule: React.FC<BgConfigModuleProps> = ({
 interface BgResourceModuleProps {
   bgMedia: { type: 'image' | 'video', url: string } | null;
   bgList: BackgroundMedia[];
+  bgPlaylists: BackgroundPlaylist[];
+  activeBgPlaylistId: string;
+  playingBgPlaylistId: string;
+  setActiveBgPlaylistId: (id: string) => void;
+  setPlayingBgPlaylistId: (id: string) => void;
+  addBgPlaylist: () => void;
+  removeBgPlaylist: (id: string) => void;
+  renameBgPlaylist: (id: string, name: string) => void;
   currentBgIndex: number;
   onRemoveBg: (id: string) => void;
   onMoveBg: (index: number, dir: 'up' | 'down') => void;
@@ -110,7 +118,9 @@ interface BgResourceModuleProps {
 }
 
 export const BgResourceModule: React.FC<BgResourceModuleProps> = ({
-  bgList, currentBgIndex, onRemoveBg, onMoveBg, onSelectBg,
+  bgList, bgPlaylists = [], activeBgPlaylistId, playingBgPlaylistId,
+  setActiveBgPlaylistId, setPlayingBgPlaylistId, addBgPlaylist, removeBgPlaylist, renameBgPlaylist,
+  currentBgIndex, onRemoveBg, onMoveBg, onSelectBg,
   onClearBgMedia, onShuffleBg, onBgMediaUpload,
   bgAutoplayInterval, setBgAutoplayInterval,
   useAlbumArtAsBackground, setUseAlbumArtAsBackground
@@ -120,6 +130,8 @@ export const BgResourceModule: React.FC<BgResourceModuleProps> = ({
   
   // By default expanded in module view
   const [showBgList, setShowBgList] = useState(true);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editingName, setEditingName] = useState("");
 
   const isTimerOn = bgAutoplayInterval > 0;
   
@@ -131,6 +143,18 @@ export const BgResourceModule: React.FC<BgResourceModuleProps> = ({
       }
   };
 
+  const startRename = (id: string, name: string) => {
+      setEditingId(id);
+      setEditingName(name);
+  };
+
+  const finishRename = () => {
+      if (editingId && editingName.trim()) {
+          renameBgPlaylist(editingId, editingName);
+      }
+      setEditingId(null);
+  };
+
   return (
     <div className="pt-2 space-y-3">
         <div className="rounded bg-theme-panel/40 overflow-hidden mb-2 transition-all duration-300 border border-theme-border hover:border-theme-primary hover:shadow-[0_0_5px_var(--color-primary)]">
@@ -140,7 +164,7 @@ export const BgResourceModule: React.FC<BgResourceModuleProps> = ({
             >
                 <div className="flex items-center gap-2">
                     <List size={12} />
-                    <span>BG RESOURCES [{bgList.length}]</span>
+                    <span>BG RESOURCES</span>
                 </div>
                 <ChevronDown size={12} className={`transition-transform duration-300 ${showBgList ? 'rotate-180' : ''}`} />
             </button>
@@ -151,8 +175,74 @@ export const BgResourceModule: React.FC<BgResourceModuleProps> = ({
               `}
             >
                 <div className="overflow-hidden">
+                  
+                  {/* --- PLAYLIST TABS --- */}
+                  <div className="flex items-end gap-1 overflow-x-auto no-scrollbar scroll-smooth pl-2 pt-2 border-b border-theme-border bg-black/20">
+                      {bgPlaylists.map(playlist => {
+                          const isActive = playlist.id === activeBgPlaylistId;
+                          const isPlaying = playlist.id === playingBgPlaylistId;
+                          
+                          return (
+                              <div
+                                  key={playlist.id}
+                                  onClick={() => setActiveBgPlaylistId(playlist.id)}
+                                  onDoubleClick={() => startRename(playlist.id, playlist.name)}
+                                  className={`
+                                      group flex items-center gap-2 px-3 py-1.5 rounded-t text-[10px] font-mono cursor-pointer transition-all shrink-0 select-none border-t border-x
+                                      ${isActive 
+                                          ? 'bg-theme-panel text-theme-primary font-bold border-theme-border -mb-[1px] relative z-10' 
+                                          : 'bg-transparent text-theme-muted hover:bg-white/5 border-transparent opacity-70'}
+                                  `}
+                              >
+                                  {/* Playing Indicator */}
+                                  {isPlaying ? (
+                                      <div className="w-1.5 h-1.5 rounded-full bg-theme-accent animate-pulse shadow-[0_0_5px_var(--color-accent)]"></div>
+                                  ) : (
+                                      <Tooltip content="PLAY THIS GROUP" position="top">
+                                          <button 
+                                              onClick={(e) => { e.stopPropagation(); setPlayingBgPlaylistId(playlist.id); }}
+                                              className="opacity-0 group-hover:opacity-100 transition-opacity hover:text-theme-accent"
+                                          >
+                                              <Play size={8} fill="currentColor" />
+                                          </button>
+                                      </Tooltip>
+                                  )}
+
+                                  {editingId === playlist.id ? (
+                                      <input 
+                                          value={editingName}
+                                          onChange={(e) => setEditingName(e.target.value)}
+                                          onBlur={finishRename}
+                                          onKeyDown={(e) => e.key === 'Enter' && finishRename()}
+                                          autoFocus
+                                          className="bg-black text-white w-16 outline-none border-b border-theme-primary text-[10px]"
+                                      />
+                                  ) : (
+                                      <span>{playlist.name}</span>
+                                  )}
+
+                                  {bgPlaylists.length > 1 && (
+                                      <button 
+                                          onClick={(e) => { e.stopPropagation(); removeBgPlaylist(playlist.id); }}
+                                          className="opacity-0 group-hover:opacity-100 hover:text-red-500 transition-opacity"
+                                      >
+                                          <X size={10} />
+                                      </button>
+                                  )}
+                              </div>
+                          );
+                      })}
+                      
+                      <button 
+                          onClick={addBgPlaylist}
+                          className="px-2 py-1.5 text-theme-muted hover:text-theme-accent transition-colors mb-0.5"
+                      >
+                          <Plus size={12} />
+                      </button>
+                  </div>
+
                   {/* Timer Control */}
-                  <div className="flex items-center justify-between px-3 py-2 border-t border-b border-theme-border bg-theme-panel/50">
+                  <div className="flex items-center justify-between px-3 py-2 border-b border-theme-border bg-theme-panel/50">
                       <div className="flex items-center gap-2 text-theme-muted">
                           <Timer size={12} />
                           <span className="text-[10px] font-mono tracking-wider">{t('auto_timer')}</span>
@@ -226,19 +316,25 @@ export const BgResourceModule: React.FC<BgResourceModuleProps> = ({
                               NO BACKGROUNDS LOADED
                           </div>
                       )}
-                      {bgList.map((bg, index) => (
+                      {bgList.map((bg, index) => {
+                          // Is active if:
+                          // 1. We are viewing the playlist that is currently playing
+                          // 2. This item is the current index
+                          const isPlayingThisItem = activeBgPlaylistId === playingBgPlaylistId && index === currentBgIndex;
+                          
+                          return (
                           <div 
                               key={bg.id} 
                               className={`
                                   flex items-center justify-between p-2 rounded text-xs font-mono border cursor-pointer group
-                                  ${index === currentBgIndex 
+                                  ${isPlayingThisItem 
                                       ? 'bg-theme-panel border-theme-primary text-theme-primary' 
                                       : 'bg-transparent border-transparent text-theme-muted hover:bg-theme-panel/50 hover:text-theme-text'}
                               `}
                               onClick={() => onSelectBg(index)}
                           >
                               <div className="flex items-center gap-2 overflow-hidden">
-                                  <div className={`w-1.5 h-1.5 rounded-full ${index === currentBgIndex ? 'bg-theme-primary shadow-[0_0_5px_var(--color-primary)]' : 'bg-gray-600'}`}></div>
+                                  <div className={`w-1.5 h-1.5 rounded-full ${isPlayingThisItem ? 'bg-theme-primary shadow-[0_0_5px_var(--color-primary)]' : 'bg-gray-600'}`}></div>
                                   <span className="truncate max-w-[120px] font-mono">{bg.file.name}</span>
                               </div>
                               <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
@@ -264,7 +360,7 @@ export const BgResourceModule: React.FC<BgResourceModuleProps> = ({
                                   </button>
                               </div>
                           </div>
-                      ))}
+                      )})}
                   </div>
                 </div>
             </div>

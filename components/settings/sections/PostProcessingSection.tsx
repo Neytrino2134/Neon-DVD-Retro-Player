@@ -1,8 +1,8 @@
 
 import React from 'react';
-import { Timer, Zap, Layers, Aperture } from 'lucide-react';
+import { Timer, Zap, Layers, Aperture, Lightbulb } from 'lucide-react';
 import ModuleWrapper from '../ModuleWrapper';
-import { FpsSettings, SignalSettings, ChromaticSettings, VignetteSettings } from '../modules/EffectModules';
+import { FpsSettings, SignalSettings, ChromaticSettings, VignetteSettings, LightFlickerSettings } from '../modules/EffectModules';
 import { NumberedLabel } from '../SettingsSection';
 import { EffectsConfig } from '../../../types';
 
@@ -33,6 +33,10 @@ const PostProcessingSection: React.FC<PostProcessingSectionProps> = ({
 
         <ModuleWrapper id="vignette" label={<NumberedLabel num="04" k="vignette_effect" />} icon={Aperture} isEnabled={effectsConfig.vignette.enabled} isExpanded={expandedState['vignette']} onToggleExpand={(e) => toggleExpand('vignette', e.shiftKey)} onToggleEnable={() => safeAction(() => updateEffect('vignette', { ...effectsConfig.vignette, enabled: !effectsConfig.vignette.enabled }))}>
             <VignetteSettings config={effectsConfig.vignette} update={(v) => updateEffect('vignette', v)} />
+        </ModuleWrapper>
+
+        <ModuleWrapper id="flicker" label={<NumberedLabel num="05" k="light_flicker" />} icon={Lightbulb} isEnabled={effectsConfig.lightFlicker.enabled} isExpanded={expandedState['flicker']} onToggleExpand={(e) => toggleExpand('flicker', e.shiftKey)} onToggleEnable={() => safeAction(() => updateEffect('lightFlicker', { ...effectsConfig.lightFlicker, enabled: !effectsConfig.lightFlicker.enabled }))}>
+            <LightFlickerSettings config={effectsConfig.lightFlicker} update={(v) => updateEffect('lightFlicker', v)} />
         </ModuleWrapper>
     </div>
   );

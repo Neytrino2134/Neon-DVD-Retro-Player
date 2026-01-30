@@ -74,6 +74,19 @@ export const useAppHotkeys = ({
           return;
       }
 
+      // Shift + F: Toggle Fullscreen (GLOBAL, Works during Boot)
+      if (e.code === 'KeyF' && e.shiftKey) {
+          e.preventDefault();
+          if (!document.fullscreenElement) {
+              document.documentElement.requestFullscreen().catch(err => {
+                  console.error(`Error attempting to enable full-screen mode: ${err.message}`);
+              });
+          } else {
+              document.exitFullscreen();
+          }
+          return;
+      }
+
       // SKIP INTRO (Allowed during startup)
       if (e.code === 'Backslash' || e.code === 'Insert') {
           setDevSkip(true);
@@ -186,16 +199,8 @@ export const useAppHotkeys = ({
       } else if (e.code === 'ArrowLeft') {
         config.prevBg();
       } else if (e.code === 'KeyF') {
-        if (e.shiftKey) {
-            e.preventDefault();
-            if (!document.fullscreenElement) {
-                document.documentElement.requestFullscreen().catch(err => {
-                    console.error(`Error attempting to enable full-screen mode: ${err.message}`);
-                });
-            } else {
-                document.exitFullscreen();
-            }
-        } else if (!e.ctrlKey && !e.metaKey && !e.altKey) {
+        // Just 'F' is Cinema Mode
+        if (!e.ctrlKey && !e.metaKey && !e.altKey && !e.shiftKey) {
             e.preventDefault();
             toggleFocusMode();
         }
