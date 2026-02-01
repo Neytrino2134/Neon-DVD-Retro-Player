@@ -12,6 +12,7 @@ export const useScreenCapture = ({ onAudioStream, onVideoStream }: UseScreenCapt
   
   const [isVideoActive, setIsVideoActive] = useState(false);
   const [isAudioActive, setIsAudioActive] = useState(false);
+  const [audioSourceType, setAudioSourceType] = useState<'system' | 'mic'>('system');
   
   const videoStreamRef = useRef<MediaStream | null>(null);
   const audioStreamRef = useRef<MediaStream | null>(null);
@@ -62,50 +63,67 @@ export const useScreenCapture = ({ onAudioStream, onVideoStream }: UseScreenCapt
         audioStreamRef.current = null;
       }
       setIsAudioActive(false);
-      // We don't nullify in parent immediately to allow fade out if needed, but here we just toggle state
-      addNotification("System Audio Stopped", "info");
+      addNotification(audioSourceType === 'mic' ? "Microphone Stopped" : "System Audio Stopped", "info");
     } else {
       // START
       try {
-        // NOTE: In Electron/Chrome, getDisplayMedia usually asks for video even if we only want audio.
-        // We request both, use the audio track, and ignore/stop the video track.
-        const stream = await (navigator.mediaDevices as any).getDisplayMedia({
-          video: { width: 1, height: 1 }, // Minimal video requirement
-          audio: true
-        });
-        
-        // Important: Verify we actually got an audio track
-        const audioTracks = stream.getAudioTracks();
-        if (audioTracks.length === 0) {
-            addNotification("No Audio Track Selected", "warning");
-            // Stop any video track we might have gotten accidentally
-            stream.getTracks().forEach((t: any) => t.stop());
-            return;
+        let audioOnlyStream: MediaStream | null = null;
+
+        if (audioSourceType === 'mic') {
+            // MICROPHONE
+            audioOnlyStream = await navigator.mediaDevices.getUserMedia({
+                audio: {
+                    echoCancellation: false,
+                    autoGainControl: false,
+                    noiseSuppression: false,
+                    latency: 0
+                } as any
+            });
+        } else {
+            // SYSTEM (LOOPBACK via Screen Share)
+            // NOTE: In Electron/Chrome, getDisplayMedia usually asks for video even if we only want audio.
+            const stream = await (navigator.mediaDevices as any).getDisplayMedia({
+              video: { width: 1, height: 1 }, // Minimal video requirement
+              audio: true
+            });
+            
+            // Important: Verify we actually got an audio track
+            const audioTracks = stream.getAudioTracks();
+            if (audioTracks.length === 0) {
+                addNotification("No Audio Track Selected", "warning");
+                // Stop any video track we might have gotten accidentally
+                stream.getTracks().forEach((t: any) => t.stop());
+                return;
+            }
+
+            // Stop the dummy video track to save resources
+            stream.getVideoTracks().forEach((t: any) => t.stop());
+            
+            // Create a new stream with only audio
+            audioOnlyStream = new MediaStream(audioTracks);
         }
+        
+        if (audioOnlyStream) {
+            audioStreamRef.current = audioOnlyStream;
+            setIsAudioActive(true);
+            
+            if (onAudioStream) onAudioStream(audioOnlyStream);
 
-        // Stop the dummy video track to save resources
-        stream.getVideoTracks().forEach((t: any) => t.stop());
-        
-        // Create a new stream with only audio
-        const audioOnlyStream = new MediaStream(audioTracks);
-        
-        audioStreamRef.current = audioOnlyStream;
-        setIsAudioActive(true);
-        
-        if (onAudioStream) onAudioStream(audioOnlyStream);
-
-        // Handle user stopping via UI
-        audioTracks[0].onended = () => {
-            setIsAudioActive(false);
-            audioStreamRef.current = null;
-        };
+            // Handle user stopping via UI
+            audioOnlyStream.getAudioTracks()[0].onended = () => {
+                setIsAudioActive(false);
+                audioStreamRef.current = null;
+            };
+            
+            addNotification(audioSourceType === 'mic' ? "Microphone Active" : "System Audio Active", "success");
+        }
 
       } catch (err) {
         console.error("Audio capture failed", err);
         addNotification("Audio Capture Failed", "error");
       }
     }
-  }, [isAudioActive, onAudioStream, addNotification]);
+  }, [isAudioActive, onAudioStream, addNotification, audioSourceType]);
 
   // Cleanup on unmount
   useEffect(() => {
@@ -119,6 +137,8 @@ export const useScreenCapture = ({ onAudioStream, onVideoStream }: UseScreenCapt
     isVideoActive,
     isAudioActive,
     toggleVideoCapture,
-    toggleAudioCapture
+    toggleAudioCapture,
+    audioSourceType,
+    setAudioSourceType
   };
 };

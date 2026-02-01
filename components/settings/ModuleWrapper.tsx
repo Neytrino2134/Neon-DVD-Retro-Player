@@ -309,7 +309,14 @@ const ModuleWrapper: React.FC<ModuleWrapperProps> = ({
       <div 
         className="relative h-20 p-3 flex flex-col justify-between cursor-pointer select-none"
         onClick={(e) => {
-             if (isEnabled) onToggleExpand(e);
+             if (isEnabled) {
+                 // Shift + Click -> Turn Off
+                 if (e.shiftKey && !isAlwaysOn) {
+                     onToggleEnable();
+                 } else {
+                     onToggleExpand(e);
+                 }
+             }
              else if (!isAlwaysOn) onToggleEnable(); 
         }}
       >

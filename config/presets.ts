@@ -118,6 +118,7 @@ export const OCEAN_BLUE_PRESET: AppPreset = {
         interval: 15,
         scale: 1,
         enableIcons: false,
+        showHotspots: true,
         categories: {
           system: true,
           interactive: true,
@@ -173,7 +174,13 @@ export const OCEAN_BLUE_PRESET: AppPreset = {
         size: 1,
         maxAgents: 12,
         showNames: true,
-        enableUser: false
+        showLeaderboard: true,
+        enableUser: false,
+        enableDummies: true,
+        glowEnabled: false,
+        glowIntensity: 0.5,
+        bgEnabled: false,
+        bgPattern: 'grid'
       },
       vignette: {
         enabled: true,

@@ -7,6 +7,7 @@ interface WaveformScrubberProps {
     duration: number;
     onSeek: (time: number) => void;
     trackId?: string;
+    isLocked?: boolean; // Unused but kept for prop compatibility if needed
 }
 
 export const WaveformScrubber: React.FC<WaveformScrubberProps> = ({ currentTime, duration, onSeek, trackId }) => {
@@ -42,7 +43,7 @@ export const WaveformScrubber: React.FC<WaveformScrubberProps> = ({ currentTime,
     return (
         <div 
             ref={containerRef}
-            className="relative h-full w-full cursor-pointer group flex items-center gap-0.5"
+            className="relative h-full w-full group flex items-center gap-0.5 cursor-pointer"
             onMouseDown={handleClick}
             onMouseMove={handleMouseMove}
             onMouseEnter={() => setIsHovering(true)}

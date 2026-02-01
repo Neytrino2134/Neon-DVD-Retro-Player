@@ -1,6 +1,6 @@
 
 import { useState, useEffect, useCallback } from 'react';
-import { VisualizerConfig, DvdConfig, EffectsConfig, MarqueeConfig, PatternConfig, BackgroundMedia, BackgroundPlaylist, AppPreset, CursorStyle, WatermarkConfig, ThemeType, ControlStyle, BgTransitionType, BgAnimationType } from '../types';
+import { VisualizerConfig, DvdConfig, EffectsConfig, MarqueeConfig, PatternConfig, BackgroundMedia, BackgroundPlaylist, AppPreset, CursorStyle, WatermarkConfig, ThemeType, ControlStyle, BgTransitionType, BgAnimationType, BgHotspot } from '../types';
 import { getAllBackgrounds, saveBackground, deleteBackground, getAllBgPlaylists, saveBgPlaylist, deleteBgPlaylistAndFiles } from '../lib/db';
 import { 
   DEFAULT_VISUALIZER_CONFIG, 
@@ -195,12 +195,7 @@ export const useAppConfig = () => {
           const processedFiles = [];
           for (const bg of savedBgs) {
               const updated = { ...bg, playlistId: defaultId };
-              // We don't save back immediately to avoid race conditions with initDB index creation, 
-              // but for this runtime we use them.
-              // In a real app, we'd run a migration transaction.
-              // Here we assume new files will be added correctly.
               
-              // Only overwrite if it lacks playlistId
               if (!bg.playlistId) {
                   await saveBackground(updated);
                   bg.playlistId = defaultId;
@@ -263,9 +258,10 @@ export const useAppConfig = () => {
             playlistId: activeBgPlaylistId, 
             type, 
             file, 
-            url: URL.createObjectURL(file) 
+            url: URL.createObjectURL(file),
+            hotspots: [] // Init empty
         };
-        await saveBackground({ id, playlistId: activeBgPlaylistId, type, file });
+        await saveBackground({ id, playlistId: activeBgPlaylistId, type, file, hotspots: [] });
         newItems.push(newItem);
     }
 
@@ -276,11 +272,65 @@ export const useAppConfig = () => {
         return pl;
     }));
     
-    // If uploading to playing list and it was empty, start playing
     if (activeBgPlaylistId === playingBgPlaylistId && currentBgIndex === 0) {
-        // Just ensures index is valid
         setCurrentBgIndex(0);
     }
+  };
+
+  const updateBg = async (id: string, newFile: File) => {
+      // Find current to keep metadata
+      const currentPl = bgPlaylists.find(pl => pl.id === activeBgPlaylistId);
+      const currentItem = currentPl?.items.find(i => i.id === id);
+      const hotspots = currentItem?.hotspots || [];
+
+      // Update DB
+      await saveBackground({ id, playlistId: activeBgPlaylistId, type: 'image', file: newFile, hotspots });
+      
+      // Update State
+      setBgPlaylists(prev => prev.map(pl => {
+          if (pl.id === activeBgPlaylistId) {
+              const updatedItems = pl.items.map(item => {
+                  if (item.id === id) {
+                      URL.revokeObjectURL(item.url); 
+                      return { ...item, file: newFile, url: URL.createObjectURL(newFile), hotspots };
+                  }
+                  return item;
+              });
+              return { ...pl, items: updatedItems };
+          }
+          return pl;
+      }));
+  };
+
+  const updateBgMetadata = async (id: string, hotspots: BgHotspot[]) => {
+      // Find the playlist that contains this item (search all playlists)
+      const currentPl = bgPlaylists.find(pl => pl.items.some(i => i.id === id));
+      if (!currentPl) return;
+      const currentItem = currentPl.items.find(i => i.id === id);
+      if (!currentItem) return;
+
+      // Update DB - This is critical for persistence "JSON file" effect
+      await saveBackground({ 
+          id, 
+          playlistId: currentPl.id, 
+          type: currentItem.type, 
+          file: currentItem.file, 
+          hotspots 
+      });
+
+      // Update State (Force new object reference to trigger UI updates)
+      setBgPlaylists(prev => prev.map(pl => {
+          if (pl.id === currentPl.id) {
+              const updatedItems = pl.items.map(item => {
+                  if (item.id === id) {
+                      return { ...item, hotspots: [...hotspots] }; // Create new array ref
+                  }
+                  return item;
+              });
+              return { ...pl, items: updatedItems };
+          }
+          return pl;
+      }));
   };
 
   const addBgPlaylist = async () => {
@@ -293,7 +343,7 @@ export const useAppConfig = () => {
   };
 
   const removeBgPlaylist = async (id: string) => {
-      if (bgPlaylists.length <= 1) return; // Prevent deleting last one
+      if (bgPlaylists.length <= 1) return;
       
       const plToDelete = bgPlaylists.find(p => p.id === id);
       if (plToDelete) {
@@ -325,7 +375,6 @@ export const useAppConfig = () => {
   };
 
   const removeBg = async (id: string) => {
-    // Find playlist containing this BG
     const playlist = bgPlaylists.find(pl => pl.items.some(i => i.id === id));
     if (!playlist) return;
 
@@ -337,7 +386,6 @@ export const useAppConfig = () => {
     setBgPlaylists(prev => prev.map(pl => {
         if (pl.id === playlist.id) {
             const newItems = pl.items.filter(i => i.id !== id);
-            // If this was the playing playlist, adjust index
             if (pl.id === playingBgPlaylistId) {
                 if (newItems.length === 0) setCurrentBgIndex(0);
                 else if (currentBgIndex >= newItems.length) setCurrentBgIndex(newItems.length - 1);
@@ -372,8 +420,6 @@ export const useAppConfig = () => {
   };
 
   const selectBg = (index: number) => {
-      // This selects the BG to PLAY
-      // So we must switch playing playlist to active playlist
       if (activeBgPlaylistId !== playingBgPlaylistId) {
           setPlayingBgPlaylistId(activeBgPlaylistId);
       }
@@ -388,15 +434,11 @@ export const useAppConfig = () => {
 
   const handleClearBg = async () => {
       if (!activeBgPlaylistId) return;
-      // Clear items in active playlist
       const playlist = bgPlaylists.find(p => p.id === activeBgPlaylistId);
       if (!playlist) return;
 
       playlist.items.forEach(i => URL.revokeObjectURL(i.url));
       
-      // We need to delete specifically these files from DB. 
-      // The bulk delete function isn't exposed in db.ts for backgrounds yet, 
-      // so we iterate (not efficient but safe for now)
       for (const item of playlist.items) {
           await deleteBackground(item.id);
       }
@@ -536,18 +578,27 @@ export const useAppConfig = () => {
 
     const c = preset.config;
     
-    // Load all configs
-    setVisualizerConfig(c.visualizerConfig);
-    if (c.reactorConfig) setReactorConfig(c.reactorConfig);
-    if (c.sineWaveConfig) setSineWaveConfig(c.sineWaveConfig);
-    setDvdConfig(c.dvdConfig);
-    setEffectsConfig(c.effectsConfig);
-    setMarqueeConfig(c.marqueeConfig);
-    if (c.watermarkConfig) setWatermarkConfig(c.watermarkConfig);
+    // MERGE WITH DEFAULTS to prevent crashes from old presets
+    const safeVisualizer = safeMerge(DEFAULT_VISUALIZER_CONFIG, c.visualizerConfig);
+    const safeReactor = safeMerge(DEFAULT_REACTOR_CONFIG, c.reactorConfig || {});
+    const safeSine = safeMerge(DEFAULT_SINE_WAVE_CONFIG, c.sineWaveConfig || {});
+    const safeDvd = safeMerge(DEFAULT_DVD_CONFIG, c.dvdConfig);
+    const safeEffects = safeMerge(DEFAULT_EFFECTS_CONFIG, c.effectsConfig);
+    const safeMarquee = safeMerge(DEFAULT_MARQUEE_CONFIG, c.marqueeConfig);
+    const safeWatermark = safeMerge(DEFAULT_WATERMARK_CONFIG, c.watermarkConfig || {});
+    const safePatternConfig = safeMerge({ intensity: 0.25, scale: 1.0 }, c.bgPatternConfig);
+
+    setVisualizerConfig(safeVisualizer);
+    setReactorConfig(safeReactor);
+    setSineWaveConfig(safeSine);
+    setDvdConfig(safeDvd);
+    setEffectsConfig(safeEffects);
+    setMarqueeConfig(safeMarquee);
+    setWatermarkConfig(safeWatermark);
     
     setBgColor(c.bgColor);
     setBgPattern(c.bgPattern);
-    setBgPatternConfig(c.bgPatternConfig);
+    setBgPatternConfig(safePatternConfig);
     
     setShowVisualizer(c.showVisualizer);
     setShowVisualizer3D(c.showVisualizer3D || false);
@@ -706,6 +757,8 @@ export const useAppConfig = () => {
     bgTransition, setBgTransition,
     bgAnimation, setBgAnimation, 
     isAdvancedMode, setAdvancedMode,
-    useAlbumArtAsBackground, setUseAlbumArtAsBackground 
+    useAlbumArtAsBackground, setUseAlbumArtAsBackground,
+    updateBg,
+    updateBgMetadata // New export
   };
 };

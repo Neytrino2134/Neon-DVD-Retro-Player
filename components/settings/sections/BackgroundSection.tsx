@@ -5,11 +5,11 @@ import ModuleWrapper from '../ModuleWrapper';
 import { BgConfigModule, BgResourceModule, BgColorModule } from '../BackgroundSettings';
 import { ScreenVideoModule } from '../modules/ScreenSettings';
 import { NumberedLabel } from '../SettingsSection';
-import { BackgroundMedia, PatternConfig, BgTransitionType, BgAnimationType, BackgroundPlaylist } from '../../../types';
+import { BackgroundMedia, PatternConfig, BgTransitionType, BgAnimationType, BackgroundPlaylist, BgHotspot } from '../../../types';
 
 interface BackgroundSectionProps {
   expandedState: Record<string, boolean>;
-  toggleExpand: (id: string, isAdditive: boolean) => void;
+  toggleExpand: (id: string, isAdditive: boolean, forceOpen?: boolean) => void;
   // Props
   bgAnimation: BgAnimationType;
   setBgAnimation: (a: BgAnimationType) => void;
@@ -32,6 +32,8 @@ interface BackgroundSectionProps {
   onClearBgMedia: () => void;
   shuffleBgList?: () => void;
   onBgMediaUpload: (files: FileList) => void;
+  onUpdateBg: (id: string, newFile: File) => Promise<void>; // New Prop
+  onUpdateMetadata?: (id: string, hotspots: BgHotspot[]) => Promise<void>; // New Prop
   bgAutoplayInterval: number;
   setBgAutoplayInterval: (val: number) => void;
   useAlbumArtAsBackground: boolean;
@@ -54,7 +56,7 @@ const BackgroundSection: React.FC<BackgroundSectionProps> = ({
   bgAnimation, setBgAnimation, bgTransition, setBgTransition,
   bgMedia, bgList, bgPlaylists, activeBgPlaylistId, playingBgPlaylistId,
   setActiveBgPlaylistId, setPlayingBgPlaylistId, addBgPlaylist, removeBgPlaylist, renameBgPlaylist,
-  currentBgIndex, onRemoveBg, onMoveBg, onSelectBg, onClearBgMedia, shuffleBgList, onBgMediaUpload,
+  currentBgIndex, onRemoveBg, onMoveBg, onSelectBg, onClearBgMedia, shuffleBgList, onBgMediaUpload, onUpdateBg, onUpdateMetadata,
   bgAutoplayInterval, setBgAutoplayInterval, useAlbumArtAsBackground, setUseAlbumArtAsBackground,
   bgColor, setBgColor, bgPattern, setBgPattern, bgPatternConfig, setBgPatternConfig, onDeselectBg,
   isVideoActive, toggleVideo, streamMode, setStreamMode
@@ -89,6 +91,8 @@ const BackgroundSection: React.FC<BackgroundSectionProps> = ({
                 onClearBgMedia={onClearBgMedia}
                 onShuffleBg={shuffleBgList || (() => {})}
                 onBgMediaUpload={onBgMediaUpload}
+                onUpdateBg={onUpdateBg}
+                onUpdateMetadata={onUpdateMetadata}
                 bgAutoplayInterval={bgAutoplayInterval}
                 setBgAutoplayInterval={setBgAutoplayInterval}
                 useAlbumArtAsBackground={useAlbumArtAsBackground}

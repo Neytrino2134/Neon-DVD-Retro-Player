@@ -25,6 +25,9 @@ interface UseAppHotkeysProps {
   stopRecording: () => void;
   // System State
   introState: number;
+  // Playlist Lock
+  isPlaylistLocked: boolean;
+  setPlaylistLocked: (v: boolean) => void;
 }
 
 export const useAppHotkeys = ({
@@ -45,7 +48,9 @@ export const useAppHotkeys = ({
   isRecording,
   startRecording,
   stopRecording,
-  introState
+  introState,
+  isPlaylistLocked,
+  setPlaylistLocked
 }: UseAppHotkeysProps) => {
   const { addNotification } = useNotification();
   const { setTheme, setControlStyle } = useTheme();
@@ -133,6 +138,14 @@ export const useAppHotkeys = ({
           return;
       }
 
+      // Shift + L: Toggle Playlist Lock
+      if (e.code === 'KeyL' && e.shiftKey) {
+          e.preventDefault();
+          setPlaylistLocked(!isPlaylistLocked);
+          addNotification(isPlaylistLocked ? "PLAYLIST UNLOCKED" : "PLAYLIST LOCKED", "info");
+          return;
+      }
+
       // P: Toggle Media Player (Right Panel)
       if (e.code === 'KeyP') {
           toggleRightPanel();
@@ -142,7 +155,10 @@ export const useAppHotkeys = ({
       // Check for modifiers to avoid collisions with Ctrl+A, Ctrl+S, etc.
       const hasModifier = e.ctrlKey || e.metaKey || e.altKey;
 
+      // Playback controls allowed even when playlist is locked
       if (e.code === 'KeyA' && !hasModifier) {
+          // If locked, prevent previous track
+          if (isPlaylistLocked) return;
           player.prevTrack();
       } else if (e.code === 'KeyS') {
           if (e.shiftKey) {
@@ -150,10 +166,14 @@ export const useAppHotkeys = ({
               toggleLeftPanel();
           } else if (!hasModifier) {
               // S: Stop Playback
+              // If locked, prevent stop
+              if (isPlaylistLocked) return;
               player.stop();
               addNotification("STOPPED", "info");
           }
       } else if (e.code === 'KeyD' && !hasModifier) {
+          // If locked, prevent next track
+          if (isPlaylistLocked) return;
           player.nextTrack();
       } else if (e.code === 'ArrowUp') {
           e.preventDefault();
@@ -193,6 +213,11 @@ export const useAppHotkeys = ({
       }
       else if (e.code === 'Space') {
         e.preventDefault();
+        // If Locked: Only allow starting playback. Do NOT allow pausing.
+        if (isPlaylistLocked && player.isPlaying) {
+            addNotification("CONTROLS LOCKED", "warning");
+            return;
+        }
         player.togglePlay();
       } else if (e.code === 'ArrowRight') {
         config.nextBg();
@@ -215,5 +240,5 @@ export const useAppHotkeys = ({
 
     window.addEventListener('keydown', handleKeyDown, { capture: true });
     return () => window.removeEventListener('keydown', handleKeyDown, { capture: true });
-  }, [player, config, focusMode, handleScheduleReload, toggleFocusMode, addNotification, stopAllSFX, setTheme, setControlStyle, toggleLeftPanel, toggleRightPanel, viewMode, setViewMode, onGoHome, isRecording, startRecording, stopRecording, introState]);
+  }, [player, config, focusMode, handleScheduleReload, toggleFocusMode, addNotification, stopAllSFX, setTheme, setControlStyle, toggleLeftPanel, toggleRightPanel, viewMode, setViewMode, onGoHome, isRecording, startRecording, stopRecording, introState, isPlaylistLocked, setPlaylistLocked]);
 };

@@ -1,4 +1,3 @@
-
 @echo off
 title Neon Player - DEEP CLEAN AND BUILD
 color 0e
@@ -24,7 +23,7 @@ echo Step 2 of 3: Installing fresh dependencies...
 echo This will take a few minutes...
 echo.
 
-call npm install
+call npm install --legacy-peer-deps
 
 if %errorlevel% neq 0 (
     color 0c

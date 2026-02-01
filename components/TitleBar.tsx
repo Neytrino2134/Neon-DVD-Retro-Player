@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { Minus, Square, X, Disc, Maximize2, Radio } from 'lucide-react';
+import { Minus, Square, X, Disc, Maximize2 } from 'lucide-react';
 import { ViewMode, AudioTrack } from '../types';
 import { Tooltip } from './ui/Tooltip';
 
@@ -10,7 +10,7 @@ interface TitleBarProps {
   currentTrack?: AudioTrack;
 }
 
-const TitleBar: React.FC<TitleBarProps> = ({ viewMode = 'default', onRestore, currentTrack }) => {
+const TitleBar: React.FC<TitleBarProps> = ({ viewMode = 'default', onRestore }) => {
   const [isElectron, setIsElectron] = useState(false);
   const [ipcRenderer, setIpcRenderer] = useState<any>(null);
 
@@ -33,61 +33,9 @@ const TitleBar: React.FC<TitleBarProps> = ({ viewMode = 'default', onRestore, cu
   const handleMaximize = () => ipcRenderer?.send('window-maximize');
   const handleClose = () => ipcRenderer?.send('window-close');
 
-  // --- MINI MODE HEADER ---
-  if (viewMode === 'mini') {
-      return (
-        <div className="h-8 bg-[#111827] flex items-center justify-between select-none z-[99999] w-full shrink-0">
-            {/* Draggable Area - Mini */}
-            <div className="flex-1 h-full flex items-center px-3 gap-2 app-drag-region overflow-hidden">
-                <Radio size={14} className="text-theme-primary animate-pulse shrink-0" />
-                <div className="flex-1 overflow-hidden relative h-full flex items-center">
-                    {currentTrack ? (
-                        <div className="whitespace-nowrap text-[10px] font-mono font-bold text-theme-text animate-marquee w-full">
-                            {currentTrack.name.toUpperCase()}  ***  {currentTrack.name.toUpperCase()}
-                        </div>
-                    ) : (
-                        <span className="text-[10px] font-mono font-bold text-theme-muted tracking-widest">
-                            NEON PLAYER // MINI
-                        </span>
-                    )}
-                </div>
-            </div>
-
-            {/* Window Controls - Mini */}
-            <div className="flex h-full app-no-drag">
-                {/* RESTORE BUTTON */}
-                <Tooltip content="RESTORE VIEW" position="bottom">
-                    <button 
-                        onClick={onRestore}
-                        className="system-cursor w-10 h-full flex items-center justify-center text-theme-accent transition-all duration-200 hover:bg-white/5 hover:text-white focus:outline-none"
-                    >
-                        <Maximize2 size={12} />
-                    </button>
-                </Tooltip>
-
-                <Tooltip content="MINIMIZE" position="bottom">
-                    <button 
-                        onClick={handleMinimize}
-                        className="system-cursor w-10 h-full flex items-center justify-center text-theme-muted transition-all duration-200 hover:bg-white/5 hover:text-theme-primary focus:outline-none"
-                    >
-                        <Minus size={12} />
-                    </button>
-                </Tooltip>
-                
-                <Tooltip content="CLOSE" position="bottom-right">
-                    <button 
-                        onClick={handleClose}
-                        className="system-cursor w-10 h-full flex items-center justify-center text-theme-muted transition-all duration-200 hover:bg-white/5 hover:text-red-500 focus:outline-none"
-                    >
-                        <X size={12} />
-                    </button>
-                </Tooltip>
-            </div>
-        </div>
-      );
-  }
-
   // --- DEFAULT HEADER ---
+  // We use the default header even for 'mini' mode now, because 'mini' mode 
+  // is just a compact layout within the large 800x1000 window.
   return (
     <div className="h-8 bg-gray-950 flex items-center justify-between select-none z-[99999] w-full shrink-0 transition-colors duration-500">
       {/* Draggable Area */}
@@ -97,12 +45,23 @@ const TitleBar: React.FC<TitleBarProps> = ({ viewMode = 'default', onRestore, cu
         
         {/* Title Text - Uses Theme Primary Color */}
         <span className="text-[10px] font-mono font-bold text-theme-primary tracking-widest pt-0.5 truncate drop-shadow-[0_0_5px_rgba(0,0,0,0.5)]">
-          NEON RETRO PLAYER
+          NEON RETRO PLAYER {viewMode === 'mini' ? '// COMPACT' : ''}
         </span>
       </div>
 
       {/* Window Controls (No Drag) */}
       <div className="flex h-full app-no-drag">
+        {viewMode === 'mini' && onRestore && (
+             <Tooltip content="RESTORE LAYOUT" position="bottom">
+                <button 
+                onClick={onRestore}
+                className="system-cursor w-12 h-full flex items-center justify-center text-theme-accent transition-all duration-200 hover:bg-white/5 hover:text-white focus:outline-none"
+                >
+                <Maximize2 size={12} />
+                </button>
+            </Tooltip>
+        )}
+
         {/* Minimize Button - Theme Highlight on Hover */}
         <Tooltip content="MINIMIZE" position="bottom">
             <button 

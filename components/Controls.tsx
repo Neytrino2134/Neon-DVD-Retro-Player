@@ -1,6 +1,5 @@
-
 import React, { useState, useEffect, useRef } from 'react';
-import { Smartphone, Radio } from 'lucide-react';
+import { Smartphone, Radio, X, Minus, Maximize2, Disc } from 'lucide-react';
 import { AudioTrack, Playlist, ViewMode, VisualizerConfig } from '../types';
 import { Tooltip } from './ui/Tooltip';
 import ConfirmModal from './ConfirmModal';
@@ -43,7 +42,13 @@ interface ControlsProps {
   onFilesInserted: (files: File[], index: number) => void;
   onClearPlaylist: () => void;
   onSort: () => void;
+  onSortByTrackNumber: () => void; // New Prop
   onShuffle: () => void;
+  
+  // Rating & Sorting
+  onRateTrack: (trackId: string, delta: number) => void;
+  onSortByRating: () => void;
+
   // Playlist actions
   onAddPlaylist: () => void;
   onRemovePlaylist: (id: string) => void;
@@ -57,6 +62,15 @@ interface ControlsProps {
   // Drop to create
   onNewPlaylistWithTracks: (trackIds: string[], sourcePlaylistId: string) => void;
   onNewPlaylistWithFiles: (files: File[]) => void;
+  // Lock Props
+  isPlaylistLocked: boolean;
+  onToggleLock: () => void;
+  
+  // Playback Modes
+  isShuffle?: boolean;
+  setIsShuffle?: (v: boolean) => void;
+  isAutoNextPlaylist?: boolean;
+  setIsAutoNextPlaylist?: (v: boolean) => void;
 }
 
 const Controls: React.FC<ControlsProps> = ({
@@ -86,7 +100,10 @@ const Controls: React.FC<ControlsProps> = ({
   onFilesInserted,
   onClearPlaylist,
   onSort,
+  onSortByTrackNumber,
   onShuffle,
+  onRateTrack,
+  onSortByRating,
   onAddPlaylist,
   onRemovePlaylist,
   onRenamePlaylist,
@@ -96,7 +113,13 @@ const Controls: React.FC<ControlsProps> = ({
   reorderTracks,
   moveTracksToPlaylist,
   onNewPlaylistWithTracks,
-  onNewPlaylistWithFiles
+  onNewPlaylistWithFiles,
+  isPlaylistLocked,
+  onToggleLock,
+  isShuffle,
+  setIsShuffle,
+  isAutoNextPlaylist,
+  setIsAutoNextPlaylist
 }) => {
   // Drag State shared between TrackList and PlaylistTabs
   const [draggedTrackIds, setDraggedTrackIds] = useState<string[]>([]);
@@ -112,12 +135,13 @@ const Controls: React.FC<ControlsProps> = ({
   const animationRef = useRef<number>(0);
 
   // Hover state for Header/Info area to trigger wave acceleration
-  // Note: Chassis glow is now handled via CSS for performance
   const [isHeaderHovered, setIsHeaderHovered] = useState(false);
   const isHeaderHoveredRef = useRef(false); 
 
   // Check if running in Electron.
   const isElectron = typeof navigator !== 'undefined' && /Electron/.test(navigator.userAgent);
+  
+  // Determine if we are in Mini Mode layout
   const isMini = viewMode === 'mini';
 
   // --- MATHEMATICAL WAVE GENERATOR ---
@@ -217,14 +241,72 @@ const Controls: React.FC<ControlsProps> = ({
       }
   };
 
+  // Electron IPC Handlers for Mini Mode Header
+  const handleMinimize = () => {
+      if ((window as any).require) (window as any).require('electron').ipcRenderer.send('window-minimize');
+  };
+  const handleClose = () => {
+      if ((window as any).require) (window as any).require('electron').ipcRenderer.send('window-close');
+  };
+
+  // Outer container styling 
   const outerContainerClass = isMini 
     ? "relative w-full h-full flex flex-col bg-theme-bg overflow-hidden" 
     : "relative w-full h-full flex flex-col bg-theme-bg border-l-4 border-theme-panel shadow-inner p-4"; 
 
-  // Updated: uses 'player-chassis' CSS class for performant hover effect instead of JS state
+  // Inner Chassis Styling
   const innerContainerClass = isMini
-    ? "relative w-full h-full flex flex-col bg-theme-panel overflow-hidden" 
+    ? "relative w-full h-full flex flex-col bg-theme-panel overflow-hidden player-chassis" 
     : "relative w-full h-full flex flex-col bg-theme-panel rounded-xl overflow-hidden player-chassis"; 
+
+  // --- CUSTOM MINI-HEADER ---
+  const MiniHeader = () => (
+    <div className="h-8 bg-gray-950 flex items-center justify-between select-none z-[99999] w-full shrink-0 transition-colors duration-500 border-b border-white/5">
+      {/* Draggable Area */}
+      <div className="flex-1 h-full flex items-center px-3 gap-2 app-drag-region overflow-hidden">
+        {/* Logo Icon */}
+        <Disc size={16} className="text-theme-accent animate-spin-slow shrink-0" />
+        
+        {/* Title Text */}
+        <span className="text-[10px] font-mono font-bold text-theme-primary tracking-widest pt-0.5 truncate drop-shadow-[0_0_5px_rgba(0,0,0,0.5)]">
+          NEON PLAYER
+        </span>
+      </div>
+
+      {/* Window Controls (No Drag) */}
+      <div className="flex h-full app-no-drag">
+        {onToggleMiniMode && (
+             <Tooltip content="RESTORE LAYOUT" position="bottom">
+                <button 
+                onClick={onToggleMiniMode}
+                className="system-cursor w-12 h-full flex items-center justify-center text-theme-accent transition-all duration-200 hover:bg-white/5 hover:text-white focus:outline-none"
+                >
+                <Maximize2 size={12} />
+                </button>
+            </Tooltip>
+        )}
+
+        <Tooltip content="MINIMIZE" position="bottom">
+            <button 
+            onClick={handleMinimize}
+            className="system-cursor w-12 h-full flex items-center justify-center text-theme-muted transition-all duration-200 hover:bg-white/5 hover:text-theme-primary hover:shadow-[inset_0_-2px_0_var(--color-primary)] focus:outline-none"
+            >
+            <Minus size={14} />
+            </button>
+        </Tooltip>
+        
+        {/* Close Button Only - Mini mode is fixed size */}
+        <Tooltip content="CLOSE" position="bottom-right">
+            <button 
+            onClick={handleClose}
+            className="system-cursor w-12 h-full flex items-center justify-center text-theme-muted transition-all duration-200 hover:bg-white/5 hover:text-red-500 hover:shadow-[inset_0_-2px_0_#ef4444] focus:outline-none"
+            >
+            <X size={14} />
+            </button>
+        </Tooltip>
+      </div>
+    </div>
+  );
 
   return (
     // OUTER PANEL CONTAINER
@@ -238,17 +320,19 @@ const Controls: React.FC<ControlsProps> = ({
       {/* INNER PLAYER DEVICE CONTAINER */}
       <div className={innerContainerClass}>
 
+        {/* CUSTOM MINI TITLE BAR */}
+        {isMini && <MiniHeader />}
+
         {/* 
-            INTERACTIVE ZONE: Header + Waves + TrackInfo
-            Hovering this container triggers the wave acceleration
+            INTERACTIVE ZONE: Waves + TrackInfo
         */}
         <div 
-            className="relative z-10"
+            className="relative z-10 shrink-0"
             onMouseEnter={handleHeaderMouseEnter}
             onMouseLeave={handleHeaderMouseLeave}
         >
             {/* Background Graphic for Header - MATHEMATICAL WAVES */}
-            <div className="absolute top-0 left-0 w-full h-48 overflow-hidden z-0 pointer-events-none">
+            <div className={`absolute top-0 left-0 w-full overflow-hidden z-0 pointer-events-none ${isMini ? 'h-48' : 'h-48'}`}>
                 <svg viewBox="0 0 300 80" preserveAspectRatio="none" className="w-full h-full">
                     {/* Background Wave - Pink */}
                     <path 
@@ -292,25 +376,26 @@ const Controls: React.FC<ControlsProps> = ({
                 </svg>
             </div>
 
-            {/* Header - HIDDEN IN MINI MODE */}
+            {/* HEADER AREA (Regular Mode - Mini has its own custom header) */}
             {!isMini && (
-                <div className="flex items-center justify-between p-4 pb-2 shrink-0 relative z-10">
-                    <div className="flex items-center gap-2">
-                        <div className={`
-                            p-1.5 rounded-full transition-all duration-500 border
-                            ${isHeaderHovered 
-                                ? 'bg-theme-primary/20 shadow-[0_0_10px_var(--color-primary)] border-theme-primary' 
-                                : 'bg-theme-primary/10 border-transparent'}
-                        `}>
-                            <Radio className={`text-theme-primary transition-opacity ${isHeaderHovered ? 'opacity-100' : 'opacity-90'}`} size={16} />
-                        </div>
-                        <h2 className={`text-lg font-mono tracking-[0.2em] font-bold transition-all duration-500 ${isHeaderHovered ? 'text-white drop-shadow-[0_0_5px_rgba(255,255,255,0.5)]' : 'text-theme-text opacity-80'}`}>
-                        NEON PLAYER
-                        </h2>
+            <div className="flex items-center justify-between p-3 relative z-10 pb-2">
+                <div className="flex items-center gap-2">
+                    <div className={`
+                        p-1.5 rounded-full transition-all duration-500 border
+                        ${isHeaderHovered 
+                            ? 'bg-theme-primary/20 shadow-[0_0_10px_var(--color-primary)] border-theme-primary' 
+                            : 'bg-theme-primary/10 border-transparent'}
+                    `}>
+                        <Radio className={`text-theme-primary transition-opacity ${isHeaderHovered ? 'opacity-100' : 'opacity-90'}`} size={16} />
                     </div>
-                    {/* Mini Mode Toggle */}
+                    <h2 className={`text-xs font-mono tracking-[0.2em] font-bold transition-all duration-500 ${isHeaderHovered ? 'text-white drop-shadow-[0_0_5px_rgba(255,255,255,0.5)]' : 'text-theme-text opacity-80'}`}>
+                        NEON PLAYER
+                    </h2>
+                </div>
+
+                <div className="flex items-center gap-1 app-no-drag">
                     {isElectron && onToggleMiniMode && (
-                        <Tooltip content="FOCUS PLAYER" position="bottom">
+                        <Tooltip content="COMPACT VIEW" position="bottom">
                             <button 
                                 onClick={onToggleMiniMode}
                                 className="text-theme-muted hover:text-theme-accent transition-colors p-2 hover:bg-white/5 rounded-full"
@@ -320,20 +405,21 @@ const Controls: React.FC<ControlsProps> = ({
                         </Tooltip>
                     )}
                 </div>
+            </div>
             )}
             
-            {isMini && <div className="h-4"></div>}
-
             {/* Info & Art */}
-            <div className="px-4 relative z-10">
+            <div className={`px-4 relative z-10 ${isMini ? 'pt-4' : ''}`}>
                 <TrackInfo currentTrack={currentTrack} />
             </div>
         </div>
 
-        {/* Control Grid - Height increased to h-44 */}
-        <div className="flex gap-4 mb-4 h-44 shrink-0 relative z-10 px-4">
+        {/* Control Grid - Height fixed for standard layout */}
+        <div className={`flex gap-4 mb-4 shrink-0 relative z-10 px-4 h-44`}>
+            {/* Volume Control */}
             <VolumeControl volume={volume} onVolumeChange={onVolumeChange} />
             
+            {/* Transport */}
             <TransportControls 
                 isPlaying={isPlaying} 
                 onPlay={onPlay} 
@@ -345,17 +431,22 @@ const Controls: React.FC<ControlsProps> = ({
                 duration={duration}
                 onSeek={onSeek}
                 trackId={currentTrack?.id}
+                isLocked={isPlaylistLocked}
+                isShuffle={isShuffle}
+                setIsShuffle={setIsShuffle}
+                isAutoNextPlaylist={isAutoNextPlaylist}
+                setIsAutoNextPlaylist={setIsAutoNextPlaylist}
             />
         </div>
 
-        {/* Playlist Tabs - Added shrink-0 to prevent compression */}
+        {/* Playlist Tabs & List - ALWAYS VISIBLE now even in Mini Mode, as 800x900 is plenty of space */}
         <div className="px-4 shrink-0">
             <PlaylistTabs 
                 playlists={playlists}
                 activePlaylistId={activePlaylistId}
                 playingPlaylistId={playingPlaylistId}
                 isPlaying={isPlaying}
-                isLocked={false} 
+                isLocked={isPlaylistLocked} 
                 onSwitchPlaylist={onSwitchPlaylist}
                 onAddPlaylist={onAddPlaylist}
                 onRequestRemovePlaylist={handleRequestRemovePlaylist}
@@ -371,29 +462,26 @@ const Controls: React.FC<ControlsProps> = ({
             />
         </div>
 
-        {/* Track List - Fills remaining space */}
-        {/* CHANGED: border-theme-primary/60 to border-theme-border to remove white line effect */}
-        <div className={`flex-1 min-w-0 overflow-hidden bg-theme-bg/40 shadow-inner border-t border-theme-border
-            ${isMini ? 'mx-0 mb-0 rounded-none border-x-0 border-b-0' : 'mx-4 mb-4 rounded-b-lg rounded-tr-lg'}
-        `}>
+        {/* Track List */}
+        <div className="flex-1 min-w-0 overflow-hidden bg-theme-bg/40 shadow-inner border-t border-theme-border mx-4 mb-4 rounded-b-lg rounded-tr-lg">
             <TrackList 
                 tracks={tracks}
                 activePlaylistId={activePlaylistId}
                 playingPlaylistId={playingPlaylistId}
                 currentTrackIndex={currentTrackIndex}
-                
-                // Pass visualizer props
                 analyser={analyser}
                 visualizerConfig={visualizerConfig}
                 isPlaying={isPlaying}
                 volume={volume}
-
                 onTrackSelect={onTrackSelect}
                 onFilesSelected={onFilesSelected}
                 onFilesInserted={onFilesInserted}
                 onClearPlaylist={onClearPlaylist}
                 onSort={onSort}
+                onSortByTrackNumber={onSortByTrackNumber}
                 onShuffle={onShuffle}
+                onRateTrack={onRateTrack}
+                onSortByRating={onSortByRating}
                 removeTracks={removeTracks}
                 reorderTracks={reorderTracks}
                 moveTracksToPlaylist={moveTracksToPlaylist}
@@ -401,10 +489,12 @@ const Controls: React.FC<ControlsProps> = ({
                 setDragSourcePlaylistId={setDragSourcePlaylistId}
                 draggedTrackIds={draggedTrackIds}
                 dragSourcePlaylistId={dragSourcePlaylistId}
+                isPlaylistLocked={isPlaylistLocked}
+                onToggleLock={onToggleLock}
             />
         </div>
 
-        {/* CONFIRMATION MODAL OVERLAY (Absolute over the player controls) */}
+        {/* CONFIRMATION MODAL OVERLAY */}
         {playlistToDelete && (
             <ConfirmModal 
                 onConfirm={confirmRemovePlaylist}

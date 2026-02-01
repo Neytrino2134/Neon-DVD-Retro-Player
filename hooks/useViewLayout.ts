@@ -1,5 +1,5 @@
 
-import React, { useState, useCallback, useEffect } from 'react';
+import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { useNotification } from '../contexts/NotificationContext';
 import { useSFX } from './useSFX';
 import { ViewMode } from '../types';
@@ -14,17 +14,30 @@ export type AnimSequence =
   | 'reveal_right'      // Player panel slides in
   | 'reveal_center';    // Screen pops in
 
+type Breakpoint = 'mobile' | 'tablet' | 'desktop';
+
 export const useViewLayout = (introState: number) => {
   const { addNotification } = useNotification();
   const { playSFX } = useSFX();
 
   const [viewMode, setViewMode] = useState<ViewMode>('default');
+  
+  // Visibility States
   const [showLeftPanel, setShowLeftPanel] = useState(true);
+  const [showCenterPanel, setShowCenterPanel] = useState(true);
   const [showRightPanel, setShowRightPanel] = useState(true);
+  
+  // Layout State
+  const [currentBreakpoint, setCurrentBreakpoint] = useState<Breakpoint>('desktop');
+  
   const [animSequence, setAnimSequence] = useState<AnimSequence>('idle');
   const [isFullscreen, setIsFullscreen] = useState(false);
 
+  // Ref to block responsive resize logic during animation transitions
+  const isTransitioningRef = useRef(false);
+
   const focusMode = viewMode === 'cinema';
+  const isResizing = animSequence === 'exiting_default' || animSequence === 'exiting_mini' || animSequence === 'void_layout';
 
   // Fullscreen listener
   useEffect(() => {
@@ -35,99 +48,180 @@ export const useViewLayout = (introState: number) => {
       return () => document.removeEventListener('fullscreenchange', handleFullscreenChange);
   }, []);
 
-  // Automatic Cinema Mode Toggle based on panels
+  // --- SMART BREAKPOINT LOGIC ---
+  // Calculates the current breakpoint based on width
+  const getBreakpoint = (width: number): Breakpoint => {
+      if (width < 950) return 'mobile';
+      if (width < 1300) return 'tablet';
+      return 'desktop';
+  };
+
+  // 1. Handle Window Resize -> Update Breakpoint
   useEffect(() => {
-    if (viewMode === 'mini') return;
+    const handleResize = () => {
+        if (viewMode === 'cinema' || viewMode === 'mini' || isTransitioningRef.current) return;
+        
+        const w = window.innerWidth;
+        const newBreakpoint = getBreakpoint(w);
+        
+        if (newBreakpoint !== currentBreakpoint) {
+            setCurrentBreakpoint(newBreakpoint);
+        }
+    };
 
-    const areBothPanelsHidden = !showLeftPanel && !showRightPanel;
+    // Initial check
+    handleResize();
 
-    if (areBothPanelsHidden && viewMode !== 'cinema') {
-      setViewMode('cinema');
-      if ((window as any).require) {
-          const { ipcRenderer } = (window as any).require('electron');
-          ipcRenderer.send('set-full-mode');
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, [currentBreakpoint, viewMode]);
+
+  // 2. Handle Breakpoint Changes -> Apply Defaults
+  useEffect(() => {
+      if (viewMode !== 'default' || isTransitioningRef.current) return;
+
+      if (currentBreakpoint === 'mobile') {
+          // Mobile: Only Player by default
+          setShowLeftPanel(false);
+          setShowCenterPanel(false);
+          setShowRightPanel(true);
+      } else if (currentBreakpoint === 'tablet') {
+          // Tablet: Screen + Player (Hide Left)
+          setShowLeftPanel(false);
+          setShowCenterPanel(true);
+          setShowRightPanel(true);
+      } else {
+          // Desktop: Show All
+          setShowLeftPanel(true);
+          setShowCenterPanel(true);
+          setShowRightPanel(true);
       }
-      addNotification("Cinema Mode Auto-Enabled", "info");
-    } else if (!areBothPanelsHidden && viewMode === 'cinema') {
-      setViewMode('default');
-      if ((window as any).require) {
-          const { ipcRenderer } = (window as any).require('electron');
-          ipcRenderer.send('set-full-mode');
-      }
-    }
-  }, [showLeftPanel, showRightPanel, viewMode, addNotification]);
+  }, [currentBreakpoint, viewMode]);
+
+
+  // --- MUTUAL EXCLUSION TOGGLING ---
+  
+  const toggleLeftPanel = useCallback(() => {
+      setShowLeftPanel(prev => {
+          const willShow = !prev;
+          if (willShow && currentBreakpoint === 'tablet') {
+              setShowRightPanel(false);
+          }
+          return willShow;
+      });
+  }, [currentBreakpoint]);
+
+  const toggleRightPanel = useCallback(() => {
+      setShowRightPanel(prev => {
+          const willShow = !prev;
+          if (willShow && currentBreakpoint === 'tablet') {
+              setShowLeftPanel(false);
+          }
+          return willShow;
+      });
+  }, [currentBreakpoint]);
+
 
   const handleSetViewMode = useCallback(async (targetMode: ViewMode) => {
       const wait = (ms: number) => new Promise(r => setTimeout(r, ms));
       const ipc = (window as any).require ? (window as any).require('electron').ipcRenderer : null;
 
-      // 1. SWITCHING TO MINI MODE (Cinematic Fade Out)
-      if (targetMode === 'mini' && viewMode !== 'mini') {
-          playSFX('WHOOSH_IN.mp3');
-          setAnimSequence('exiting_default');
-          await wait(600); 
+      if (isTransitioningRef.current) return;
+      isTransitioningRef.current = true; // LOCK responsive logic
 
-          if (ipc) ipc.send('set-mini-mode', { width: 540, height: 920 });
-          
-          setViewMode('mini');
-          setShowLeftPanel(false);
-          setShowRightPanel(true);
-          
-          setAnimSequence('void_layout'); 
-          await wait(250); 
+      try {
+          // 1. SWITCHING TO MINI MODE (Compact Mode: No Left Panel, Fixed Size)
+          if (targetMode === 'mini' && viewMode !== 'mini') {
+              playSFX('WHOOSH_IN.mp3');
+              setAnimSequence('exiting_default');
+              await wait(600); 
 
-          setAnimSequence('idle');
-      } 
-      
-      // 2. SWITCHING TO DEFAULT/FULL MODE (Cinematic Sequential Reveal)
-      else if (targetMode === 'default' && viewMode === 'mini') {
-          playSFX('WHOOSH_OUT.mp3'); // Play immediately on click
-          setAnimSequence('exiting_mini');
-          await wait(600); 
+              if (ipc) ipc.send('set-mini-mode');
+              
+              setViewMode('mini');
+              // Mini Mode Logic: Show Screen + Player, Hide Settings
+              setShowLeftPanel(false);
+              setShowCenterPanel(false); // Hide center screen in true mini mode
+              setShowRightPanel(true);
+              
+              setAnimSequence('void_layout'); 
+              await wait(100); 
+              
+              // Reveal animation
+              setAnimSequence('reveal_right');
+              await wait(400);
+          } 
+          
+          // 2. SWITCHING TO DEFAULT/FULL MODE
+          else if (targetMode === 'default' && viewMode === 'mini') {
+              playSFX('WHOOSH_OUT.mp3'); 
+              setAnimSequence('exiting_mini');
+              await wait(600); 
 
-          // Trigger resize
-          if (ipc) ipc.send('set-full-mode');
-          
-          // CRITICAL FIX: Wait for Electron window to physically resize before asking React to render heavy components.
-          // Without this delay, React tries to render the 3D canvas while the window geometry is invalid/changing, causing a freeze.
-          await wait(150); 
-          
+              if (ipc) ipc.send('set-full-mode');
+              
+              setViewMode('default');
+              
+              // Recalculate layout based on current width (which shouldn't have changed)
+              const w = window.innerWidth;
+              const bp = getBreakpoint(w);
+              setCurrentBreakpoint(bp);
+
+              const shouldShowLeft = bp === 'desktop';
+              const shouldShowCenter = bp !== 'mobile';
+
+              setShowLeftPanel(shouldShowLeft);
+              setShowCenterPanel(shouldShowCenter);
+              setShowRightPanel(true);
+              
+              setAnimSequence('void_layout');
+              await wait(200);
+
+              if (shouldShowLeft) {
+                  setAnimSequence('reveal_left');
+                  await wait(200);
+              }
+              setAnimSequence('reveal_right');
+              await wait(200);
+              if (shouldShowCenter) {
+                  setAnimSequence('reveal_center');
+                  await wait(600);
+              }
+          }
+          // 3. CINEMA MODE
+          else if (targetMode === 'cinema') {
+              setViewMode('cinema');
+              setShowLeftPanel(false);
+              setShowCenterPanel(true);
+              setShowRightPanel(false);
+              if (ipc) ipc.send('set-full-mode');
+          } 
+          else {
+              setViewMode(targetMode);
+              if (targetMode === 'default') {
+                  const bp = getBreakpoint(window.innerWidth);
+                  setShowLeftPanel(bp === 'desktop');
+                  setShowCenterPanel(bp !== 'mobile');
+                  setShowRightPanel(true);
+              }
+          }
+      } catch (err) {
+          console.error("View transition error", err);
+          // Fallback to default safe state
           setViewMode('default');
           setShowLeftPanel(true);
+          setShowCenterPanel(true);
           setShowRightPanel(true);
-          setAnimSequence('void_layout');
-          
-          await wait(400);
-
-          setAnimSequence('reveal_left');
-          // Removed Beep
-          await wait(300);
-
-          setAnimSequence('reveal_right');
-          // Removed Beep
-          await wait(300);
-
-          setAnimSequence('reveal_center');
-          // Removed delayed Whoosh
-          await wait(800);
-
+      } finally {
           setAnimSequence('idle');
+          isTransitioningRef.current = false; // UNLOCK
+          
+          // Trigger a manual resize event to ensure Canvases update dimensions after animation
+          setTimeout(() => {
+              window.dispatchEvent(new Event('resize'));
+          }, 100);
       }
-      
-      // 3. INSTANT TOGGLES (Cinema Mode)
-      else if (targetMode === 'cinema') {
-          setViewMode('cinema');
-          setShowLeftPanel(false);
-          setShowRightPanel(false);
-          if (ipc) ipc.send('set-full-mode');
-      } 
-      else {
-          setViewMode(targetMode);
-          if (targetMode === 'default') {
-              setShowLeftPanel(true);
-              setShowRightPanel(true);
-          }
-      }
+
   }, [viewMode, playSFX]);
 
   const toggleFocusMode = useCallback((forceState?: boolean) => {
@@ -141,10 +235,8 @@ export const useViewLayout = (introState: number) => {
       }
   }, [focusMode, addNotification, handleSetViewMode]);
 
-  const toggleLeftPanel = useCallback(() => setShowLeftPanel(prev => !prev), []);
-  const toggleRightPanel = useCallback(() => setShowRightPanel(prev => !prev), []);
-
-  // --- RENDER STYLES CALCULATION ---
+  // --- RENDER STYLES ---
+  
   let masterStyle: React.CSSProperties = { 
       opacity: 1, 
       transform: 'scale(1)', 
@@ -165,30 +257,37 @@ export const useViewLayout = (introState: number) => {
       viewMode !== 'mini' && 
       (animSequence === 'reveal_left' || animSequence === 'reveal_right' || animSequence === 'reveal_center' || animSequence === 'idle');
 
-  const leftPanelClass = `shrink-0 z-20 transition-all duration-700 ease-[cubic-bezier(0.25,1,0.5,1)]
-      ${!isLeftPanelVisible ? '-ml-[100%] md:-ml-[460px] opacity-0 -translate-x-10' : 'ml-0 opacity-100 translate-x-0'}
-      w-full md:w-[460px] relative
+  const leftPanelClass = `shrink-0 z-20 transition-all duration-700 ease-[cubic-bezier(0.25,1,0.5,1)] overflow-hidden
+      ${!isLeftPanelVisible 
+          ? 'w-0 opacity-0 -translate-x-10' 
+          : 'w-full md:w-[460px] opacity-100 translate-x-0'
+      }
   `;
 
+  // Right Panel is now the MAIN container for Mini Mode
   const isRightPanelVisible = 
-      viewMode === 'mini' || 
+      (viewMode === 'mini' && (animSequence === 'reveal_right' || animSequence === 'reveal_center' || animSequence === 'idle')) || 
       (
           introState >= 1 &&
           showRightPanel && 
           (animSequence === 'reveal_right' || animSequence === 'reveal_center' || animSequence === 'idle')
       );
 
-  const rightPanelClass = `shrink-0 z-20 transition-all duration-700 ease-[cubic-bezier(0.25,1,0.5,1)]
-      ${!isRightPanelVisible ? 'w-0 opacity-0 translate-x-10' : (viewMode === 'mini' ? 'w-full opacity-100' : 'w-full md:w-[580px] opacity-100 translate-x-0')}
+  const rightPanelClass = `shrink-0 z-20 transition-all duration-700 ease-[cubic-bezier(0.25,1,0.5,1)] overflow-hidden
+      ${!isRightPanelVisible 
+          ? 'w-0 opacity-0 translate-x-10' 
+          : (viewMode === 'mini' ? 'w-full opacity-100 translate-x-0' : 'w-full md:w-[580px] opacity-100 translate-x-0')
+      }
   `;
 
   const isScreenVisible = 
       introState >= 2 && 
-      viewMode !== 'mini' &&
+      viewMode !== 'mini' && 
+      showCenterPanel &&
       (animSequence === 'reveal_center' || animSequence === 'idle');
 
   const screenContainerClass = `flex-grow flex flex-col relative transition-all duration-1000 ease-[cubic-bezier(0.34,1.56,0.64,1)] overflow-hidden
-      ${!isScreenVisible ? 'scale-75 opacity-0' : 'scale-100 opacity-100'}
+      ${!isScreenVisible ? 'w-0 opacity-0 scale-95' : 'w-auto opacity-100 scale-100'}
   `;
 
   return {
@@ -197,6 +296,7 @@ export const useViewLayout = (introState: number) => {
     showLeftPanel,
     setShowLeftPanel,
     toggleLeftPanel,
+    showCenterPanel, 
     showRightPanel,
     setShowRightPanel,
     toggleRightPanel,
@@ -207,6 +307,7 @@ export const useViewLayout = (introState: number) => {
     masterStyle,
     leftPanelClass,
     rightPanelClass,
-    screenContainerClass
+    screenContainerClass,
+    isResizing
   };
 };

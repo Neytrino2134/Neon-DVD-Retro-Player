@@ -44,7 +44,7 @@ export const DEFAULT_EFFECTS_CONFIG: EffectsConfig = {
   cyberHack: { enabled: false, speed: 5, opacity: 0.7, density: 0.5, scale: 1.0, backgroundOpacity: 0.4 },
   debugConsole: { enabled: false, opacity: 0.9, scale: 1.0 },
   holograms: { 
-    enabled: false, opacity: 0.8, speed: 1.0, interval: 15, scale: 1.0, enableIcons: false,
+    enabled: false, opacity: 0.8, speed: 1.0, interval: 15, scale: 1.0, enableIcons: false, showHotspots: true,
     categories: { system: true, interactive: true, music: true, motivational: true, philosophy: false, space: false }
   },
   geminiChat: {
@@ -54,7 +54,26 @@ export const DEFAULT_EFFECTS_CONFIG: EffectsConfig = {
   lightLeaks: { enabled: false, intensity: 0.5, speed: 0.5, number: 6 },
   lightFlicker: { enabled: false, intensity: 0.3, speed: 0.5 }, // Default: Off, moderate intensity
   rain: { enabled: false, intensity: 0.5, speed: 1.0, size: 1.0, direction: 0, wind: 0, gustiness: 0.5, opacity: 0.5, wander: 0.1 },
-  tron: { enabled: false, opacity: 0.8, speed: 0.2, spawnRate: 5, trailLength: 0.8, size: 2, maxAgents: 6, showNames: true, enableUser: false },
+  tron: { 
+    enabled: false, 
+    opacity: 0.8, 
+    speed: 0.311, // Calculated for UI level 6 (0.2 + (5/9)*0.2)
+    spawnRate: 5, 
+    trailLength: 0.1, 
+    size: 3, 
+    maxAgents: 6, 
+    showNames: true, 
+    showLeaderboard: true, // NEW
+    enableUser: false, 
+    enableDummies: true, // Default enabled for chaos
+    glowEnabled: false, 
+    glowIntensity: 0.5, 
+    bgEnabled: false, 
+    bgPattern: 'grid', 
+    erasureSpeed: 2, 
+    speedVariance: 0.5,
+    roundMode: false 
+  },
   vignette: { enabled: false, intensity: 0.5, roundness: 0.7 }
 };
 

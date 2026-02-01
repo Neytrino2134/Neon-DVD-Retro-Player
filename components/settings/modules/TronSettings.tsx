@@ -3,9 +3,10 @@ import React, { useState } from 'react';
 import { EffectsConfig } from '../../../types';
 import RangeControl from '../RangeControl';
 import ToggleSwitch from '../ToggleSwitch';
+import CustomSelect from '../CustomSelect';
 import { useLanguage } from '../../../contexts/LanguageContext';
 import { useTheme } from '../../../contexts/ThemeContext';
-import { User, ChevronDown, Gamepad2 } from 'lucide-react';
+import { User, ChevronDown, Gamepad2, Zap, Grid, Trophy, Bot, List } from 'lucide-react';
 
 interface TronSettingsProps {
   config: EffectsConfig['tron'];
@@ -18,10 +19,12 @@ const TronSettings: React.FC<TronSettingsProps> = ({ config, update }) => {
 
   // State for collapsible sections
   const [expanded, setExpanded] = useState({
-    user: true,
-    player: true,
-    arena: true,
-    style: true
+    user: false,
+    player: false,
+    arena: false,
+    style: false,
+    bg: false,
+    round: true // New Section default open
   });
 
   const toggle = (key: keyof typeof expanded) => {
@@ -56,12 +59,8 @@ const TronSettings: React.FC<TronSettingsProps> = ({ config, update }) => {
     );
   };
 
-  // Speed Mapper:
-  // UI: 1 to 10
-  // Config: 0.2 to 0.4
-  // Mapping: config = 0.2 + ((ui - 1) / 9) * 0.2
+  // Speed Mapper
   const speedToUI = (val: number) => {
-      // Clamp for safety
       const clamped = Math.max(0.2, Math.min(0.4, val));
       return Math.round(1 + ((clamped - 0.2) / 0.2) * 9);
   };
@@ -70,10 +69,119 @@ const TronSettings: React.FC<TronSettingsProps> = ({ config, update }) => {
       return 0.2 + ((ui - 1) / 9) * 0.2;
   };
 
+  const patternOptions = [
+      { value: 'grid', label: t('pat_grid') },
+      { value: 'iso', label: t('pat_iso') },
+      { value: 'hex', label: t('pat_hex') },
+      { value: 'dots', label: t('pat_dots') }
+  ];
+
   return (
     <div className="pt-2">
        
-       {/* USER SETTINGS */}
+       {/* ROUND MODE (NEW) */}
+       {renderSection('round', t('tron_round_mode'), (
+           <>
+                <ToggleSwitch 
+                    label={t('tron_round_enable')} 
+                    icon={Trophy} 
+                    value={config.roundMode || false} 
+                    onChange={(v) => update({ ...config, roundMode: v })} 
+                    color="green"
+                />
+                {config.roundMode && (
+                    <div className="mt-2 text-[9px] font-mono text-theme-muted opacity-80 border-l-2 border-green-500 pl-2">
+                        {t('tron_round_desc')}
+                    </div>
+                )}
+           </>
+       ))}
+
+       {/* PLAYER SETTINGS */}
+       {renderSection('player', "PLAYER SETTINGS", (
+           <>
+                <ToggleSwitch 
+                    label={t('tron_show_names')} 
+                    icon={User} 
+                    value={config.showNames !== false} 
+                    onChange={(v) => update({ ...config, showNames: v })} 
+                    color="blue"
+                />
+                <ToggleSwitch 
+                    label={t('tron_show_leaderboard')} 
+                    icon={List} 
+                    value={config.showLeaderboard !== false} 
+                    onChange={(v) => update({ ...config, showLeaderboard: v })} 
+                    color="blue"
+                />
+                <ToggleSwitch 
+                    label="DUMMY BOTS" 
+                    icon={Bot} 
+                    value={config.enableDummies !== false} 
+                    onChange={(v) => update({ ...config, enableDummies: v })} 
+                    color="purple"
+                />
+                <RangeControl 
+                    label={t('tron_speed')} 
+                    value={speedToUI(config.speed)} 
+                    min={1} 
+                    max={10} 
+                    step={1} 
+                    onChange={v => update({ ...config, speed: uiToSpeed(v) })} 
+                    className="mb-4 last:mb-0" 
+                />
+                <RangeControl label={t('tron_variance')} value={config.speedVariance || 0} min={0} max={1} step={0.1} onChange={v => update({ ...config, speedVariance: v })} className="mb-4 last:mb-0" />
+                <RangeControl label={t('tron_size')} value={config.size || 1} min={1} max={4} step={0.5} onChange={v => update({ ...config, size: v })} className="mb-4 last:mb-0" />
+                <RangeControl label={t('tron_trail')} value={config.trailLength !== undefined ? config.trailLength : 0.8} min={0.1} max={0.4} step={0.01} onChange={v => update({ ...config, trailLength: v })} className="mb-4 last:mb-0" />
+                <RangeControl label={t('tron_erasure')} value={config.erasureSpeed || 1.5} min={1} max={4} step={0.1} onChange={v => update({ ...config, erasureSpeed: v })} className="mb-0" />
+           </>
+       ))}
+
+       {/* ARENA SETTINGS */}
+       {renderSection('arena', "ARENA SETTINGS", (
+           <>
+                <RangeControl label={t('tron_max_agents')} value={config.maxAgents || 12} min={4} max={20} step={1} onChange={v => update({ ...config, maxAgents: v })} className="mb-4 last:mb-0" />
+                <RangeControl label={t('tron_spawn')} value={config.spawnRate} min={1} max={20} step={1} onChange={v => update({ ...config, spawnRate: v })} className="mb-0" />
+           </>
+       ))}
+
+       {/* BG SETTINGS */}
+       {renderSection('bg', t('tron_bg_settings'), (
+           <>
+                <ToggleSwitch 
+                    label={t('tron_bg_enable')} 
+                    icon={Grid} 
+                    value={config.bgEnabled || false} 
+                    onChange={(v) => update({ ...config, bgEnabled: v })} 
+                    color="blue"
+                />
+                <CustomSelect 
+                    label={t('tron_bg_pattern')} 
+                    value={config.bgPattern || 'grid'} 
+                    options={patternOptions} 
+                    onChange={(v) => update({ ...config, bgPattern: v })} 
+                />
+           </>
+       ))}
+
+       {/* STYLE */}
+       {renderSection('style', "STYLE", (
+           <>
+                <ToggleSwitch 
+                    label={t('tron_glow')} 
+                    icon={Zap} 
+                    value={config.glowEnabled || false} 
+                    onChange={(v) => update({ ...config, glowEnabled: v })} 
+                    color="purple"
+                />
+                {config.glowEnabled && (
+                    <RangeControl label={t('tron_glow_intensity')} value={config.glowIntensity || 0.5} min={0.1} max={2.0} step={0.1} onChange={v => update({ ...config, glowIntensity: v })} className="mb-4" />
+                )}
+                <RangeControl label={t('opacity')} value={config.opacity} min={0.1} max={1.0} step={0.1} onChange={v => update({ ...config, opacity: v })} className="mb-0" />
+           </>
+       ))}
+
+       {/* USER SETTINGS (Moved to bottom) */}
        {renderSection('user', "USER SETTINGS", (
            <>
                 <ToggleSwitch 
@@ -90,45 +198,6 @@ const TronSettings: React.FC<TronSettingsProps> = ({ config, update }) => {
                         RESTART: NUMPAD 0
                     </div>
                 )}
-           </>
-       ))}
-
-       {/* PLAYER SETTINGS */}
-       {renderSection('player', "PLAYER SETTINGS", (
-           <>
-                <RangeControl 
-                    label={t('tron_speed')} 
-                    value={speedToUI(config.speed)} 
-                    min={1} 
-                    max={10} 
-                    step={1} 
-                    onChange={v => update({ ...config, speed: uiToSpeed(v) })} 
-                    className="mb-4 last:mb-0" 
-                />
-                <RangeControl label={t('tron_size')} value={config.size || 1} min={1} max={4} step={0.5} onChange={v => update({ ...config, size: v })} className="mb-4 last:mb-0" />
-                <RangeControl label={t('tron_trail')} value={config.trailLength !== undefined ? config.trailLength : 0.8} min={0.1} max={1.0} step={0.1} onChange={v => update({ ...config, trailLength: v })} className="mb-0" />
-           </>
-       ))}
-
-       {/* ARENA SETTINGS */}
-       {renderSection('arena', "ARENA SETTINGS", (
-           <>
-                <RangeControl label={t('tron_max_agents')} value={config.maxAgents || 12} min={4} max={20} step={1} onChange={v => update({ ...config, maxAgents: v })} className="mb-4 last:mb-0" />
-                <RangeControl label={t('tron_spawn')} value={config.spawnRate} min={1} max={20} step={1} onChange={v => update({ ...config, spawnRate: v })} className="mb-0" />
-           </>
-       ))}
-
-       {/* STYLE */}
-       {renderSection('style', "STYLE", (
-           <>
-                <RangeControl label={t('opacity')} value={config.opacity} min={0.1} max={1.0} step={0.1} onChange={v => update({ ...config, opacity: v })} className="mb-4" />
-                <ToggleSwitch 
-                    label={t('tron_show_names')} 
-                    icon={User} 
-                    value={config.showNames !== false} 
-                    onChange={(v) => update({ ...config, showNames: v })} 
-                    color="blue"
-                />
            </>
        ))}
 

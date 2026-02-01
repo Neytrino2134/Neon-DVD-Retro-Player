@@ -18,11 +18,9 @@ export default defineConfig(({ mode }) => {
       open: false, 
     },
     define: {
-      // This is critical for the Google GenAI SDK to work if it relies on process.env
-      // or if we use process.env.API_KEY in our code.
-      'process.env': {
-        API_KEY: JSON.stringify(env.API_KEY)
-      }
+      // FIX: Define ONLY the specific key to avoid overwriting the entire process.env object
+      // This prevents breaking libraries (like React) that rely on process.env.NODE_ENV
+      'process.env.API_KEY': JSON.stringify(env.API_KEY || "")
     }
   }
 })

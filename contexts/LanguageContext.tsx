@@ -1,5 +1,4 @@
 
-
 import React, { createContext, useContext, useState, ReactNode } from 'react';
 import { en } from '../locales/en';
 import { ru } from '../locales/ru';

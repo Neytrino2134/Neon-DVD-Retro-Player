@@ -163,6 +163,7 @@ const HologramHelp: React.FC<HologramHelpProps> = ({ onClose }) => {
           items: [
               { key: "H", desc: isRu ? "Справка (Закрыть)" : renderLabel("Help (Close)", "H") },
               { key: "L", desc: isRu ? "Список треков (Вкл/Выкл)" : renderLabel("Playlist (Toggle)", "L") },
+              { key: "Shift + L", desc: isRu ? "Блок. плейлиста" : renderLabel("Lock Playlist", "L") },
               { key: "P", desc: isRu ? "Плеер (Панель)" : renderLabel("Player Panel", "P") },
               { key: "Shift + S", desc: isRu ? "Настройки" : renderLabel("Settings", "S") },
               { key: "Shift + C", desc: isRu ? "Мини Плеер" : renderLabel("Compact Mode", "C") },
@@ -183,7 +184,8 @@ const HologramHelp: React.FC<HologramHelpProps> = ({ onClose }) => {
             className="relative overflow-hidden pointer-events-auto flex flex-col transition-all ease-in-out duration-500 backdrop-blur-md"
             style={{
                 width: phase >= 1 ? '100%' : '4px',
-                maxWidth: '56rem', // max-w-4xl
+                // Increased width for 2-column system layout
+                maxWidth: '72rem', 
                 // Height Transition Logic
                 height: phase >= 2 ? 'auto' : '4px',
                 maxHeight: phase >= 2 ? '80vh' : '4px',
@@ -239,37 +241,40 @@ const HologramHelp: React.FC<HologramHelpProps> = ({ onClose }) => {
                 className="p-6 grid grid-cols-1 md:grid-cols-2 gap-6 overflow-y-auto custom-scrollbar relative z-10 transition-opacity duration-300"
                 style={{ opacity: contentActive ? 1 : 0 }}
             >
-                {sections.map((section, idx) => (
-                    <div key={idx} className="space-y-3">
-                        <div className="flex items-center gap-2 mb-2 pb-1 border-b" style={{ borderColor: `color-mix(in srgb, ${baseColor}, transparent 80%)` }}>
-                            <section.icon size={14} style={{ color: baseColor }} />
-                            <TypingBlock 
-                                active={contentActive} 
-                                text={section.title}
-                                className="font-mono text-xs font-bold tracking-widest text-white/70 uppercase"
-                                delay={200 + (idx * 100)}
-                            />
+                {sections.map((section, idx) => {
+                    const isSystem = section.title === (isRu ? "СИСТЕМА" : "SYSTEM");
+                    return (
+                        <div key={idx} className={`space-y-3 ${isSystem ? 'col-span-1 md:col-span-2' : ''}`}>
+                            <div className="flex items-center gap-2 mb-2 pb-1 border-b" style={{ borderColor: `color-mix(in srgb, ${baseColor}, transparent 80%)` }}>
+                                <section.icon size={14} style={{ color: baseColor }} />
+                                <TypingBlock 
+                                    active={contentActive} 
+                                    text={section.title}
+                                    className="font-mono text-xs font-bold tracking-widest text-white/70 uppercase"
+                                    delay={200 + (idx * 100)}
+                                />
+                            </div>
+                            <div className={`grid gap-x-4 gap-y-2 ${isSystem ? 'grid-cols-[auto_1fr] md:grid-cols-[auto_1fr_auto_1fr]' : 'grid-cols-[auto_1fr]'}`}>
+                                {section.items.map((item, i) => (
+                                    <React.Fragment key={i}>
+                                        <div 
+                                            className="font-mono text-xs font-bold text-right py-1 px-2 rounded min-w-[30px]"
+                                            style={{ 
+                                                backgroundColor: `color-mix(in srgb, ${baseColor}, transparent 85%)`,
+                                                color: baseColor
+                                            }}
+                                        >
+                                            <TypingBlock active={contentActive} text={item.key} delay={300 + (idx * 50) + (i * 20)} />
+                                        </div>
+                                        <div className="font-mono text-xs text-white/80 flex items-center">
+                                            <TypingBlock active={contentActive} text={item.desc} delay={300 + (idx * 50) + (i * 20)} />
+                                        </div>
+                                    </React.Fragment>
+                                ))}
+                            </div>
                         </div>
-                        <div className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-2">
-                            {section.items.map((item, i) => (
-                                <React.Fragment key={i}>
-                                    <div 
-                                        className="font-mono text-xs font-bold text-right py-1 px-2 rounded min-w-[30px]"
-                                        style={{ 
-                                            backgroundColor: `color-mix(in srgb, ${baseColor}, transparent 85%)`,
-                                            color: baseColor
-                                        }}
-                                    >
-                                        <TypingBlock active={contentActive} text={item.key} delay={300 + (idx * 50) + (i * 20)} />
-                                    </div>
-                                    <div className="font-mono text-xs text-white/80 flex items-center">
-                                        <TypingBlock active={contentActive} text={item.desc} delay={300 + (idx * 50) + (i * 20)} />
-                                    </div>
-                                </React.Fragment>
-                            ))}
-                        </div>
-                    </div>
-                ))}
+                    );
+                })}
             </div>
 
             {/* Footer */}
