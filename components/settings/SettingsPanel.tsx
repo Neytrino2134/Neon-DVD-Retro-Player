@@ -1,7 +1,7 @@
 
 import React, { useState, useRef, useEffect } from 'react';
 import { Settings, HelpCircle, Power, Home } from 'lucide-react';
-import { VisualizerConfig, EffectsConfig, DvdConfig, MarqueeConfig, PatternConfig, BackgroundMedia, AppPreset, CursorStyle, WatermarkConfig, ThemeType, ControlStyle, BgTransitionType, AmbienceFile, AmbienceConfig, BgAnimationType, BackgroundPlaylist } from '../../types';
+import { VisualizerConfig, EffectsConfig, DvdConfig, MarqueeConfig, PatternConfig, BackgroundMedia, AppPreset, CursorStyle, WatermarkConfig, ThemeType, ControlStyle, BgTransitionType, AmbienceFile, AmbienceConfig, BgAnimationType } from '../../types';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { useTheme } from '../../contexts/ThemeContext';
 import { useNotification } from '../../contexts/NotificationContext';
@@ -29,7 +29,7 @@ const SECTION_MODULES: Record<string, string[]> = {
   sfx: ['mixer', 'ambience', 'sysaudio'],
   waves: ['wave', 'reactor', 'sine'],
   mod: ['marquee', 'dvd', 'leaks', 'rain', 'hologram', 'gemini', 'scan', 'cyber', 'glitch'],
-  post: ['fps', 'signal', 'chromatic', 'vignette', 'flicker']
+  post: ['fps', 'signal', 'chromatic', 'vignette']
 };
 
 interface SettingsPanelProps {
@@ -69,14 +69,6 @@ interface SettingsPanelProps {
   onSfxUpload: (file: File) => void;
   bgMedia: { type: 'image' | 'video', url: string } | null;
   bgList: BackgroundMedia[];
-  bgPlaylists: BackgroundPlaylist[]; // New
-  activeBgPlaylistId: string; // New
-  playingBgPlaylistId: string; // New
-  setActiveBgPlaylistId: (id: string) => void; // New
-  setPlayingBgPlaylistId: (id: string) => void; // New
-  addBgPlaylist: () => void; // New
-  removeBgPlaylist: (id: string) => void; // New
-  renameBgPlaylist: (id: string, name: string) => void; // New
   currentBgIndex: number;
   onRemoveBg: (id: string) => void;
   onMoveBg: (index: number, dir: 'up' | 'down') => void;
@@ -168,7 +160,7 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
   showVisualizer, setShowVisualizer, showVisualizer3D, setShowVisualizer3D, showSineWave, setShowSineWave, showDvd, setShowDvd, marqueeConfig, setMarqueeConfig,
   visualizerConfig, setVisualizerConfig, reactorConfig, setReactorConfig, sineWaveConfig, setSineWaveConfig, dvdConfig, setDvdConfig,
   effectsConfig, setEffectsConfig, watermarkConfig, setWatermarkConfig, bgColor, setBgColor, bgPattern = 'none', setBgPattern, bgPatternConfig, setBgPatternConfig,
-  onBgMediaUpload, onAudioUpload, onSfxUpload, bgMedia, bgList, bgPlaylists, activeBgPlaylistId, playingBgPlaylistId, setActiveBgPlaylistId, setPlayingBgPlaylistId, addBgPlaylist, removeBgPlaylist, renameBgPlaylist, currentBgIndex, onRemoveBg, onMoveBg, onSelectBg, onDeselectBg, onClearBgMedia, onExportConfig,
+  onBgMediaUpload, onAudioUpload, onSfxUpload, bgMedia, bgList, currentBgIndex, onRemoveBg, onMoveBg, onSelectBg, onDeselectBg, onClearBgMedia, onExportConfig,
   bgAutoplayInterval, setBgAutoplayInterval, onScheduleReload, onGoHome,
   crossfadeDuration, setCrossfadeDuration, smoothStart, setSmoothStart,
   savedPresets, activePresetId, savePreset, overwritePreset, loadPreset, deletePreset, renamePreset, onResetDefault,
@@ -273,7 +265,7 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
   };
 
   // --- SECTION SCROLL LOGIC ---
-  const handleSectionToggle = (sectionId: string, isAdditive: boolean = false) => {
+  const handleSectionToggle = (sectionId: string, index: number, isAdditive: boolean = false) => {
       if (wasDragged.current) return;
 
       setOpenSections(prev => {
@@ -307,6 +299,21 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
                   });
                   return nextExpanded;
               });
+          }
+          
+          if (newState[sectionId]) {
+              setTimeout(() => {
+                  if (!scrollContainerRef.current) return;
+                  const headerEl = document.getElementById(`section-header-${sectionId}`);
+                  if (headerEl) {
+                      const stickyOffset = index * 36;
+                      const targetScroll = headerEl.offsetTop - stickyOffset;
+                      scrollContainerRef.current.scrollTo({
+                          top: targetScroll,
+                          behavior: 'smooth'
+                      });
+                  }
+              }, 100);
           }
           
           return newState;
@@ -361,13 +368,12 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
           if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.tagName === 'SELECT') return;
           if (e.ctrlKey || e.altKey || e.metaKey) return;
 
-          // USE 'code' property (Digit1) instead of 'key' ('1') to distinguish from Numpad
-          if (e.code === 'Digit1') handleSectionToggle('sys', false);
-          if (e.code === 'Digit2') handleSectionToggle('bg', false);
-          if (e.code === 'Digit3') handleSectionToggle('sfx', false);
-          if (e.code === 'Digit4') handleSectionToggle('waves', false);
-          if (e.code === 'Digit5') handleSectionToggle('mod', false);
-          if (e.code === 'Digit6') handleSectionToggle('post', false);
+          if (e.key === '1') handleSectionToggle('sys', 0, false);
+          if (e.key === '2') handleSectionToggle('bg', 1, false);
+          if (e.key === '3') handleSectionToggle('sfx', 2, false);
+          if (e.key === '4') handleSectionToggle('waves', 3, false);
+          if (e.key === '5') handleSectionToggle('mod', 4, false);
+          if (e.key === '6') handleSectionToggle('post', 5, false);
       };
 
       window.addEventListener('keydown', handleKeyDown);
@@ -461,7 +467,7 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
             id="sys" 
             title={<><span className="text-theme-muted opacity-50 font-normal mr-2">1 //</span> <TranslatedText k="system_params" /></>} 
             isOpen={openSections['sys']} 
-            onToggle={(isAdditive) => handleSectionToggle('sys', isAdditive)}
+            onToggle={(isAdditive) => handleSectionToggle('sys', 0, isAdditive)}
             stickyTop="0px"
         >
             <SystemSection 
@@ -480,7 +486,7 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
             id="bg" 
             title={<><span className="text-theme-muted opacity-50 font-normal mr-2">2 //</span> <TranslatedText k="cat_backgrounds" /></>} 
             isOpen={openSections['bg']} 
-            onToggle={(isAdditive) => handleSectionToggle('bg', isAdditive)}
+            onToggle={(isAdditive) => handleSectionToggle('bg', 1, isAdditive)}
             stickyTop="36px"
         >
             <BackgroundSection 
@@ -490,7 +496,6 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
                 bgAutoplayInterval={bgAutoplayInterval} setBgAutoplayInterval={setBgAutoplayInterval} useAlbumArtAsBackground={useAlbumArtAsBackground} setUseAlbumArtAsBackground={setUseAlbumArtAsBackground}
                 bgColor={bgColor} setBgColor={setBgColor} bgPattern={bgPattern} setBgPattern={setBgPattern} bgPatternConfig={bgPatternConfig} setBgPatternConfig={setBgPatternConfig} onDeselectBg={onDeselectBg}
                 isVideoActive={isVideoActive} toggleVideo={toggleVideo} streamMode={streamMode} setStreamMode={setStreamMode}
-                bgPlaylists={bgPlaylists} activeBgPlaylistId={activeBgPlaylistId} playingBgPlaylistId={playingBgPlaylistId} setActiveBgPlaylistId={setActiveBgPlaylistId} setPlayingBgPlaylistId={setPlayingBgPlaylistId} addBgPlaylist={addBgPlaylist} removeBgPlaylist={removeBgPlaylist} renameBgPlaylist={renameBgPlaylist}
             />
         </SettingsSection>
 
@@ -498,7 +503,7 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
             id="sfx" 
             title={<><span className="text-theme-muted opacity-50 font-normal mr-2">3 //</span> <TranslatedText k="cat_sound_effects" /></>} 
             isOpen={openSections['sfx']} 
-            onToggle={(isAdditive) => handleSectionToggle('sfx', isAdditive)}
+            onToggle={(isAdditive) => handleSectionToggle('sfx', 2, isAdditive)}
             stickyTop="72px"
         >
             <SoundSection 
@@ -513,7 +518,7 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
             id="waves" 
             title={<><span className="text-theme-muted opacity-50 font-normal mr-2">4 //</span> WAVEFORMS</>} 
             isOpen={openSections['waves']} 
-            onToggle={(isAdditive) => handleSectionToggle('waves', isAdditive)}
+            onToggle={(isAdditive) => handleSectionToggle('waves', 3, isAdditive)}
             stickyTop="108px"
         >
             <WaveformSection 
@@ -528,7 +533,7 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
             id="mod" 
             title={<><span className="text-theme-muted opacity-50 font-normal mr-2">5 //</span> <TranslatedText k="modules" /></>} 
             isOpen={openSections['mod']} 
-            onToggle={(isAdditive) => handleSectionToggle('mod', isAdditive)}
+            onToggle={(isAdditive) => handleSectionToggle('mod', 4, isAdditive)}
             stickyTop="144px"
         >
             <ModulesSection 
@@ -543,7 +548,7 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
             id="post" 
             title={<><span className="text-theme-muted opacity-50 font-normal mr-2">6 //</span> <TranslatedText k="cat_screen_effects" /></>} 
             isOpen={openSections['post']} 
-            onToggle={(isAdditive) => handleSectionToggle('post', isAdditive)}
+            onToggle={(isAdditive) => handleSectionToggle('post', 5, isAdditive)}
             stickyTop="180px"
         >
             <PostProcessingSection 

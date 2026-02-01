@@ -14,7 +14,6 @@ import ContextMenu from './components/ContextMenu';
 import CustomCursor from './components/CustomCursor';
 import StreamWindow from './components/ui/StreamWindow';
 import RecordingSettingsModal from './components/modals/RecordingSettingsModal';
-import CollapseTab from './components/ui/CollapseTab';
 
 // Components - Main Modules
 import SettingsPanel from './components/settings/SettingsPanel';
@@ -260,30 +259,6 @@ function AppContent() {
           retroScreenStyle={config.retroScreenCursorStyle}
         />
 
-        {/* SIDEBAR TOGGLE TABS */}
-        {view.viewMode !== 'mini' && (
-          <>
-            <CollapseTab 
-              side="left" 
-              isOpen={view.showLeftPanel} 
-              onClick={view.toggleLeftPanel} 
-              style={{
-                  left: view.showLeftPanel ? '460px' : '0px',
-                  transition: 'left 0.7s cubic-bezier(0.25, 1, 0.5, 1)'
-              }}
-            />
-            <CollapseTab 
-              side="right" 
-              isOpen={view.showRightPanel} 
-              onClick={view.toggleRightPanel} 
-              style={{
-                  right: view.showRightPanel ? '580px' : '0px',
-                  transition: 'right 0.7s cubic-bezier(0.25, 1, 0.5, 1)'
-              }}
-            />
-          </>
-        )}
-
         <StartupOverlay
           key={system.startupKey}
           onFadeOut={() => system.setIntroState(2)}
@@ -396,14 +371,6 @@ function AppContent() {
                   onBgMediaUpload={(f: FileList) => { config.handleBgUpload(f); addNotification(`${f.length} backgrounds added`, "success"); }}
                   bgMedia={config.bgMedia}
                   bgList={config.bgList}
-                  bgPlaylists={config.bgPlaylists}
-                  activeBgPlaylistId={config.activeBgPlaylistId}
-                  playingBgPlaylistId={config.playingBgPlaylistId}
-                  setActiveBgPlaylistId={config.setActiveBgPlaylistId}
-                  setPlayingBgPlaylistId={config.setPlayingBgPlaylistId}
-                  addBgPlaylist={config.addBgPlaylist}
-                  removeBgPlaylist={config.removeBgPlaylist}
-                  renameBgPlaylist={config.renameBgPlaylist}
                   currentBgIndex={config.currentBgIndex}
                   onRemoveBg={config.removeBg}
                   onMoveBg={config.moveBg}

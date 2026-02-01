@@ -1,7 +1,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
-import { VisualizerConfig, DvdConfig, EffectsConfig, MarqueeConfig, PatternConfig, BackgroundMedia, BackgroundPlaylist, AppPreset, CursorStyle, WatermarkConfig, ThemeType, ControlStyle, BgTransitionType, BgAnimationType } from '../types';
-import { getAllBackgrounds, saveBackground, deleteBackground, getAllBgPlaylists, saveBgPlaylist, deleteBgPlaylistAndFiles } from '../lib/db';
+import { VisualizerConfig, DvdConfig, EffectsConfig, MarqueeConfig, PatternConfig, BackgroundMedia, AppPreset, CursorStyle, WatermarkConfig, ThemeType, ControlStyle, BgTransitionType, BgAnimationType } from '../types';
+import { getAllBackgrounds, saveBackground, clearBackgrounds, deleteBackground } from '../lib/db';
 import { 
   DEFAULT_VISUALIZER_CONFIG, 
   DEFAULT_REACTOR_CONFIG,
@@ -16,7 +16,7 @@ import { DEFAULT_PRESETS, DEFAULT_SYSTEM_PRESET } from '../config/presets';
 const STORAGE_KEYS = {
   VISUALIZER: 'neon_visualizer_config',
   REACTOR: 'neon_reactor_config',
-  SINE_WAVE: 'neon_sine_wave_config', 
+  SINE_WAVE: 'neon_sine_wave_config', // NEW
   DVD: 'neon_dvd_config',
   EFFECTS: 'neon_effects_config',
   BG_COLOR: 'neon_bg_color',
@@ -24,7 +24,7 @@ const STORAGE_KEYS = {
   BG_PATTERN_CONFIG: 'neon_bg_pattern_config',
   SHOW_VISUALIZER: 'neon_show_visualizer',
   SHOW_VISUALIZER_3D: 'neon_show_visualizer_3d', 
-  SHOW_SINE_WAVE: 'neon_show_sine_wave',
+  SHOW_SINE_WAVE: 'neon_show_sine_wave', // NEW
   SHOW_DVD: 'neon_show_dvd',
   MARQUEE: 'neon_marquee_config',
   WATERMARK: 'neon_watermark_config',
@@ -37,9 +37,7 @@ const STORAGE_KEYS = {
   BG_TRANSITION: 'neon_bg_transition',
   BG_ANIMATION: 'neon_bg_animation', 
   ADVANCED_MODE: 'neon_advanced_mode',
-  USE_ALBUM_ART: 'neon_use_album_art',
-  ACTIVE_BG_PLAYLIST: 'neon_active_bg_playlist',
-  PLAYING_BG_PLAYLIST: 'neon_playing_bg_playlist'
+  USE_ALBUM_ART: 'neon_use_album_art'
 };
 
 // --- HELPER: SAFE MERGE ---
@@ -77,7 +75,7 @@ export const useAppConfig = () => {
   const [apiKey, setApiKey] = useState(() => localStorage.getItem(STORAGE_KEYS.API_KEY) || '');
   const [showVisualizer, setShowVisualizer] = useState(() => getInitial(STORAGE_KEYS.SHOW_VISUALIZER, true));
   const [showVisualizer3D, setShowVisualizer3D] = useState(() => getInitial(STORAGE_KEYS.SHOW_VISUALIZER_3D, false)); 
-  const [showSineWave, setShowSineWave] = useState(() => getInitial(STORAGE_KEYS.SHOW_SINE_WAVE, false));
+  const [showSineWave, setShowSineWave] = useState(() => getInitial(STORAGE_KEYS.SHOW_SINE_WAVE, false)); // NEW
   const [showDvd, setShowDvd] = useState(() => getInitial(STORAGE_KEYS.SHOW_DVD, true));
   const [cursorStyle, setCursorStyle] = useState<CursorStyle>(() => getInitial(STORAGE_KEYS.CURSOR, 'theme-sync'));
   const [retroScreenCursorStyle, setRetroScreenCursorStyle] = useState<CursorStyle>(() => getInitial(STORAGE_KEYS.RETRO_CURSOR, 'dos-terminal'));
@@ -92,7 +90,7 @@ export const useAppConfig = () => {
   // Independent Configs
   const [visualizerConfig, setVisualizerConfig] = useState<VisualizerConfig>(() => getInitial(STORAGE_KEYS.VISUALIZER, DEFAULT_VISUALIZER_CONFIG));
   const [reactorConfig, setReactorConfig] = useState<VisualizerConfig>(() => getInitial(STORAGE_KEYS.REACTOR, DEFAULT_REACTOR_CONFIG));
-  const [sineWaveConfig, setSineWaveConfig] = useState<VisualizerConfig>(() => getInitial(STORAGE_KEYS.SINE_WAVE, DEFAULT_SINE_WAVE_CONFIG));
+  const [sineWaveConfig, setSineWaveConfig] = useState<VisualizerConfig>(() => getInitial(STORAGE_KEYS.SINE_WAVE, DEFAULT_SINE_WAVE_CONFIG)); // NEW
   
   const [dvdConfig, setDvdConfig] = useState<DvdConfig>(() => getInitial(STORAGE_KEYS.DVD, DEFAULT_DVD_CONFIG));
   const [effectsConfig, setEffectsConfig] = useState<EffectsConfig>(() => getInitial(STORAGE_KEYS.EFFECTS, DEFAULT_EFFECTS_CONFIG));
@@ -101,10 +99,7 @@ export const useAppConfig = () => {
   const [bgPattern, setBgPattern] = useState(() => localStorage.getItem(STORAGE_KEYS.BG_PATTERN) || 'none');
   const [bgPatternConfig, setBgPatternConfig] = useState<PatternConfig>(() => getInitial(STORAGE_KEYS.BG_PATTERN_CONFIG, { intensity: 0.25, scale: 1.0 }));
   
-  // --- BACKGROUND PLAYLISTS STATE ---
-  const [bgPlaylists, setBgPlaylists] = useState<BackgroundPlaylist[]>([]);
-  const [activeBgPlaylistId, setActiveBgPlaylistId] = useState<string>(''); // For viewing/editing
-  const [playingBgPlaylistId, setPlayingBgPlaylistId] = useState<string>(''); // For playback
+  const [bgList, setBgList] = useState<BackgroundMedia[]>([]);
   const [currentBgIndex, setCurrentBgIndex] = useState<number>(0);
   
   const [bgAutoplayInterval, setBgAutoplayInterval] = useState<number>(() => getInitial(STORAGE_KEYS.BG_AUTOPLAY, 5));
@@ -114,6 +109,7 @@ export const useAppConfig = () => {
 
   // Active Preset State
   const [activePresetId, setActivePresetId] = useState<string | null>(() => {
+      // Default to 'default_system' if nothing saved
       return localStorage.getItem(STORAGE_KEYS.ACTIVE_PRESET) || 'default_system';
   });
 
@@ -138,7 +134,7 @@ export const useAppConfig = () => {
   useEffect(() => {
     localStorage.setItem(STORAGE_KEYS.VISUALIZER, JSON.stringify(visualizerConfig));
     localStorage.setItem(STORAGE_KEYS.REACTOR, JSON.stringify(reactorConfig));
-    localStorage.setItem(STORAGE_KEYS.SINE_WAVE, JSON.stringify(sineWaveConfig));
+    localStorage.setItem(STORAGE_KEYS.SINE_WAVE, JSON.stringify(sineWaveConfig)); // NEW
     localStorage.setItem(STORAGE_KEYS.DVD, JSON.stringify(dvdConfig));
     localStorage.setItem(STORAGE_KEYS.EFFECTS, JSON.stringify(effectsConfig));
     localStorage.setItem(STORAGE_KEYS.BG_COLOR, bgColor);
@@ -146,7 +142,7 @@ export const useAppConfig = () => {
     localStorage.setItem(STORAGE_KEYS.BG_PATTERN_CONFIG, JSON.stringify(bgPatternConfig));
     localStorage.setItem(STORAGE_KEYS.SHOW_VISUALIZER, JSON.stringify(showVisualizer));
     localStorage.setItem(STORAGE_KEYS.SHOW_VISUALIZER_3D, JSON.stringify(showVisualizer3D));
-    localStorage.setItem(STORAGE_KEYS.SHOW_SINE_WAVE, JSON.stringify(showSineWave));
+    localStorage.setItem(STORAGE_KEYS.SHOW_SINE_WAVE, JSON.stringify(showSineWave)); // NEW
     localStorage.setItem(STORAGE_KEYS.SHOW_DVD, JSON.stringify(showDvd));
     localStorage.setItem(STORAGE_KEYS.MARQUEE, JSON.stringify(marqueeConfig));
     localStorage.setItem(STORAGE_KEYS.WATERMARK, JSON.stringify(watermarkConfig));
@@ -171,305 +167,137 @@ export const useAppConfig = () => {
     }
   }, [activePresetId]);
 
-  // Persist Active/Playing BG Playlist
-  useEffect(() => {
-      if (activeBgPlaylistId) localStorage.setItem(STORAGE_KEYS.ACTIVE_BG_PLAYLIST, activeBgPlaylistId);
-      if (playingBgPlaylistId) localStorage.setItem(STORAGE_KEYS.PLAYING_BG_PLAYLIST, playingBgPlaylistId);
-  }, [activeBgPlaylistId, playingBgPlaylistId]);
-
-  // --- HYDRATE BACKGROUNDS AND PLAYLISTS ---
   useEffect(() => {
     const hydrate = async () => {
       const savedBgs = await getAllBackgrounds();
-      const savedPlaylists = await getAllBgPlaylists();
-      
-      let hydratedPlaylists: BackgroundPlaylist[] = [];
-
-      // MIGRATION: If we have files but no playlists, create default
-      if (savedPlaylists.length === 0) {
-          const defaultId = crypto.randomUUID();
-          const defaultPl = { id: defaultId, name: 'DEFAULT', order: 0 };
-          await saveBgPlaylist(defaultPl);
-          
-          // Migrate files
-          const processedFiles = [];
-          for (const bg of savedBgs) {
-              const updated = { ...bg, playlistId: defaultId };
-              // We don't save back immediately to avoid race conditions with initDB index creation, 
-              // but for this runtime we use them.
-              // In a real app, we'd run a migration transaction.
-              // Here we assume new files will be added correctly.
-              
-              // Only overwrite if it lacks playlistId
-              if (!bg.playlistId) {
-                  await saveBackground(updated);
-                  bg.playlistId = defaultId;
-              }
-              processedFiles.push({
-                  ...bg,
-                  url: URL.createObjectURL(bg.file)
-              });
-          }
-          
-          hydratedPlaylists = [{ ...defaultPl, items: processedFiles }];
-      } else {
-          // Normal Load
-          const processedFiles = savedBgs.map(bg => ({
-              ...bg,
-              url: URL.createObjectURL(bg.file)
-          }));
-
-          hydratedPlaylists = savedPlaylists.map(pl => ({
-              ...pl,
-              items: processedFiles.filter(f => f.playlistId === pl.id)
-          }));
+      if (savedBgs.length > 0) {
+        const processed = savedBgs.map(bg => ({
+            ...bg,
+            url: URL.createObjectURL(bg.file)
+        }));
+        setBgList(processed);
+        setCurrentBgIndex(0);
       }
-
-      setBgPlaylists(hydratedPlaylists);
-
-      const savedActive = localStorage.getItem(STORAGE_KEYS.ACTIVE_BG_PLAYLIST);
-      const savedPlaying = localStorage.getItem(STORAGE_KEYS.PLAYING_BG_PLAYLIST);
-
-      if (savedActive && hydratedPlaylists.some(p => p.id === savedActive)) {
-          setActiveBgPlaylistId(savedActive);
-      } else if (hydratedPlaylists.length > 0) {
-          setActiveBgPlaylistId(hydratedPlaylists[0].id);
-      }
-
-      if (savedPlaying && hydratedPlaylists.some(p => p.id === savedPlaying)) {
-          setPlayingBgPlaylistId(savedPlaying);
-      } else if (hydratedPlaylists.length > 0) {
-          setPlayingBgPlaylistId(hydratedPlaylists[0].id);
-      }
-      
-      setCurrentBgIndex(0);
     };
     hydrate();
   }, []);
 
-  // --- ACTIONS ---
-
   const handleBgUpload = async (files: FileList | File[]) => {
-    if (!activeBgPlaylistId) return;
-
     const fileArray = Array.from(files);
     const newItems: BackgroundMedia[] = [];
 
     for (const file of fileArray) {
         const type = file.type.startsWith('video') ? 'video' : 'image';
         const id = crypto.randomUUID();
-        const newItem: BackgroundMedia = { 
-            id, 
-            playlistId: activeBgPlaylistId, 
-            type, 
-            file, 
-            url: URL.createObjectURL(file) 
-        };
-        await saveBackground({ id, playlistId: activeBgPlaylistId, type, file });
+        const newItem: BackgroundMedia = { id, type, file, url: URL.createObjectURL(file) };
+        await saveBackground({ id, type, file });
         newItems.push(newItem);
     }
 
-    setBgPlaylists(prev => prev.map(pl => {
-        if (pl.id === activeBgPlaylistId) {
-            return { ...pl, items: [...pl.items, ...newItems] };
-        }
-        return pl;
-    }));
-    
-    // If uploading to playing list and it was empty, start playing
-    if (activeBgPlaylistId === playingBgPlaylistId && currentBgIndex === 0) {
-        // Just ensures index is valid
-        setCurrentBgIndex(0);
-    }
-  };
-
-  const addBgPlaylist = async () => {
-      const id = crypto.randomUUID();
-      const name = `GROUP ${bgPlaylists.length + 1}`;
-      const newPl = { id, name, order: bgPlaylists.length, items: [] };
-      await saveBgPlaylist(newPl);
-      setBgPlaylists(prev => [...prev, newPl]);
-      setActiveBgPlaylistId(id);
-  };
-
-  const removeBgPlaylist = async (id: string) => {
-      if (bgPlaylists.length <= 1) return; // Prevent deleting last one
-      
-      const plToDelete = bgPlaylists.find(p => p.id === id);
-      if (plToDelete) {
-          plToDelete.items.forEach(i => URL.revokeObjectURL(i.url));
-      }
-      
-      await deleteBgPlaylistAndFiles(id);
-      
-      setBgPlaylists(prev => {
-          const filtered = prev.filter(p => p.id !== id);
-          if (id === activeBgPlaylistId) setActiveBgPlaylistId(filtered[0].id);
-          if (id === playingBgPlaylistId) {
-              setPlayingBgPlaylistId(filtered[0].id);
-              setCurrentBgIndex(0);
-          }
-          return filtered;
-      });
-  };
-
-  const renameBgPlaylist = async (id: string, newName: string) => {
-      setBgPlaylists(prev => prev.map(p => {
-          if (p.id === id) {
-              const updated = { ...p, name: newName };
-              saveBgPlaylist({ id: updated.id, name: updated.name, order: updated.order });
-              return updated;
-          }
-          return p;
-      }));
+    setBgList(prev => {
+        const updated = [...prev, ...newItems];
+        if (prev.length === 0) setCurrentBgIndex(0);
+        return updated;
+    });
   };
 
   const removeBg = async (id: string) => {
-    // Find playlist containing this BG
-    const playlist = bgPlaylists.find(pl => pl.items.some(i => i.id === id));
-    if (!playlist) return;
-
-    const item = playlist.items.find(i => i.id === id);
-    if (item) URL.revokeObjectURL(item.url);
-
+    const index = bgList.findIndex(item => item.id === id);
+    if (index === -1) return;
+    if (bgList[index].url) URL.revokeObjectURL(bgList[index].url);
+    const newList = bgList.filter(item => item.id !== id);
+    setBgList(newList);
+    if (newList.length === 0) {
+        setCurrentBgIndex(0);
+    } else if (currentBgIndex >= newList.length) {
+        setCurrentBgIndex(newList.length - 1);
+    } else if (currentBgIndex > index) {
+        setCurrentBgIndex(currentBgIndex - 1);
+    }
     await deleteBackground(id);
-
-    setBgPlaylists(prev => prev.map(pl => {
-        if (pl.id === playlist.id) {
-            const newItems = pl.items.filter(i => i.id !== id);
-            // If this was the playing playlist, adjust index
-            if (pl.id === playingBgPlaylistId) {
-                if (newItems.length === 0) setCurrentBgIndex(0);
-                else if (currentBgIndex >= newItems.length) setCurrentBgIndex(newItems.length - 1);
-            }
-            return { ...pl, items: newItems };
-        }
-        return pl;
-    }));
   };
 
   const moveBg = (index: number, direction: 'up' | 'down') => {
-    setBgPlaylists(prev => prev.map(pl => {
-        if (pl.id === activeBgPlaylistId) {
-            const newItems = [...pl.items];
-            if (direction === 'up' && index > 0) {
-                [newItems[index - 1], newItems[index]] = [newItems[index], newItems[index - 1]];
-                if (pl.id === playingBgPlaylistId) {
-                    if (currentBgIndex === index) setCurrentBgIndex(index - 1);
-                    else if (currentBgIndex === index - 1) setCurrentBgIndex(index);
-                }
-            } else if (direction === 'down' && index < newItems.length - 1) {
-                [newItems[index + 1], newItems[index]] = [newItems[index], newItems[index + 1]];
-                if (pl.id === playingBgPlaylistId) {
-                    if (currentBgIndex === index) setCurrentBgIndex(index + 1);
-                    else if (currentBgIndex === index + 1) setCurrentBgIndex(index);
-                }
-            }
-            return { ...pl, items: newItems };
-        }
-        return pl;
-    }));
+    if (direction === 'up' && index > 0) {
+        const newList = [...bgList];
+        [newList[index - 1], newList[index]] = [newList[index], newList[index - 1]];
+        setBgList(newList);
+        if (currentBgIndex === index) setCurrentBgIndex(index - 1);
+        else if (currentBgIndex === index - 1) setCurrentBgIndex(index);
+    } else if (direction === 'down' && index < bgList.length - 1) {
+        const newList = [...bgList];
+        [newList[index + 1], newList[index]] = [newList[index], newList[index + 1]];
+        setBgList(newList);
+        if (currentBgIndex === index) setCurrentBgIndex(index + 1);
+        else if (currentBgIndex === index + 1) setCurrentBgIndex(index);
+    }
   };
 
   const selectBg = (index: number) => {
-      // This selects the BG to PLAY
-      // So we must switch playing playlist to active playlist
-      if (activeBgPlaylistId !== playingBgPlaylistId) {
-          setPlayingBgPlaylistId(activeBgPlaylistId);
+      if (index >= 0 && index < bgList.length) {
+        setCurrentBgIndex(index);
+        setTimerResetToken(prev => prev + 1); // Reset auto-timer
       }
-      setCurrentBgIndex(index);
-      setTimerResetToken(prev => prev + 1);
   };
 
   const deselectBg = () => {
       setCurrentBgIndex(-1);
-      setTimerResetToken(prev => prev + 1);
+      setTimerResetToken(prev => prev + 1); // Reset auto-timer
   };
 
   const handleClearBg = async () => {
-      if (!activeBgPlaylistId) return;
-      // Clear items in active playlist
-      const playlist = bgPlaylists.find(p => p.id === activeBgPlaylistId);
-      if (!playlist) return;
-
-      playlist.items.forEach(i => URL.revokeObjectURL(i.url));
-      
-      // We need to delete specifically these files from DB. 
-      // The bulk delete function isn't exposed in db.ts for backgrounds yet, 
-      // so we iterate (not efficient but safe for now)
-      for (const item of playlist.items) {
-          await deleteBackground(item.id);
-      }
-
-      setBgPlaylists(prev => prev.map(pl => {
-          if (pl.id === activeBgPlaylistId) {
-              if (pl.id === playingBgPlaylistId) setCurrentBgIndex(0);
-              return { ...pl, items: [] };
-          }
-          return pl;
-      }));
+    bgList.forEach(bg => URL.revokeObjectURL(bg.url));
+    await clearBackgrounds();
+    setBgList([]);
+    setCurrentBgIndex(0);
   };
 
   const shuffleBgList = () => {
-      setBgPlaylists(prev => prev.map(pl => {
-          if (pl.id === activeBgPlaylistId) {
-              const shuffled = [...pl.items];
-              for (let i = shuffled.length - 1; i > 0; i--) {
-                  const j = Math.floor(Math.random() * (i + 1));
-                  [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
-              }
-              if (pl.id === playingBgPlaylistId) {
-                  setCurrentBgIndex(0);
-                  setTimerResetToken(prev => prev + 1);
-              }
-              return { ...pl, items: shuffled };
+      setBgList(prev => {
+          const shuffled = [...prev];
+          for (let i = shuffled.length - 1; i > 0; i--) {
+              const j = Math.floor(Math.random() * (i + 1));
+              [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
           }
-          return pl;
-      }));
+          return shuffled;
+      });
+      setCurrentBgIndex(0); // Start from first item of new order
+      setTimerResetToken(prev => prev + 1); // Reset auto-timer
   };
 
-  // --- CYCLING ---
-  
-  const getPlayingList = useCallback(() => {
-      const pl = bgPlaylists.find(p => p.id === playingBgPlaylistId);
-      return pl ? pl.items : [];
-  }, [bgPlaylists, playingBgPlaylistId]);
-
   const nextBg = useCallback(() => {
-    const list = getPlayingList();
-    if (list.length === 0) return;
-    setCurrentBgIndex(prev => (prev + 1) % list.length);
-    setTimerResetToken(prev => prev + 1);
-  }, [getPlayingList]);
+    if (bgList.length === 0) return;
+    setCurrentBgIndex(prev => (prev + 1) % bgList.length);
+    setTimerResetToken(prev => prev + 1); // Reset auto-timer
+  }, [bgList.length]);
 
   const prevBg = useCallback(() => {
-    const list = getPlayingList();
-    if (list.length === 0) return;
-    setCurrentBgIndex(prev => (prev - 1 + list.length) % list.length);
-    setTimerResetToken(prev => prev + 1);
-  }, [getPlayingList]);
+    if (bgList.length === 0) return;
+    setCurrentBgIndex(prev => (prev - 1 + bgList.length) % bgList.length);
+    setTimerResetToken(prev => prev + 1); // Reset auto-timer
+  }, [bgList.length]);
 
   useEffect(() => {
-    const list = getPlayingList();
-    if (list.length <= 1 || bgAutoplayInterval <= 0) return;
+    if (bgList.length <= 1 || bgAutoplayInterval <= 0) return;
     const intervalMs = bgAutoplayInterval * 60 * 1000;
     const intervalId = setInterval(() => {
       nextBg();
     }, intervalMs);
     return () => clearInterval(intervalId);
-  }, [getPlayingList, bgAutoplayInterval, nextBg, timerResetToken]);
+  }, [bgList.length, bgAutoplayInterval, nextBg, timerResetToken]); // Add timerResetToken to dependency
 
   // --- PRESET MANAGEMENT ---
 
-  const savePreset = (name: string, theme?: ThemeType, controlStyle?: ControlStyle) => {
+  const savePreset = (name: string, theme: ThemeType, controlStyle: ControlStyle) => {
+    const id = crypto.randomUUID();
     const newPreset: AppPreset = {
-      id: crypto.randomUUID(),
+      id,
       name,
       createdAt: Date.now(),
       config: {
         visualizerConfig,
-        reactorConfig,
-        sineWaveConfig,
+        reactorConfig, 
+        sineWaveConfig, // NEW
         dvdConfig,
         effectsConfig,
         marqueeConfig,
@@ -479,24 +307,22 @@ export const useAppConfig = () => {
         bgPatternConfig,
         showVisualizer,
         showVisualizer3D,
-        showSineWave,
+        showSineWave, // NEW
         showDvd,
         bgAutoplayInterval,
         cursorStyle,
-        retroScreenCursorStyle,
+        retroScreenCursorStyle, 
         theme,
         controlStyle,
         bgTransition,
-        bgAnimation,
-        ambienceConfig: undefined 
+        bgAnimation 
       }
     };
-    
     setSavedPresets(prev => [...prev, newPreset]);
-    setActivePresetId(newPreset.id);
+    setActivePresetId(id); 
   };
 
-  const overwritePreset = (id: string, theme?: ThemeType, controlStyle?: ControlStyle) => {
+  const overwritePreset = (id: string, currentTheme: ThemeType, currentControlStyle: ControlStyle) => {
       setSavedPresets(prev => prev.map(p => {
           if (p.id === id) {
               return {
@@ -504,7 +330,7 @@ export const useAppConfig = () => {
                   config: {
                     visualizerConfig,
                     reactorConfig,
-                    sineWaveConfig,
+                    sineWaveConfig, // NEW
                     dvdConfig,
                     effectsConfig,
                     marqueeConfig,
@@ -514,184 +340,240 @@ export const useAppConfig = () => {
                     bgPatternConfig,
                     showVisualizer,
                     showVisualizer3D,
-                    showSineWave,
+                    showSineWave, // NEW
                     showDvd,
                     bgAutoplayInterval,
                     cursorStyle,
                     retroScreenCursorStyle,
-                    theme: theme || p.config.theme,
-                    controlStyle: controlStyle || p.config.controlStyle,
+                    theme: currentTheme,
+                    controlStyle: currentControlStyle,
                     bgTransition,
-                    bgAnimation
+                    bgAnimation 
                   }
               };
           }
           return p;
       }));
+      setActivePresetId(id);
+  };
+
+  const resetDefaultPreset = () => {
+      setSavedPresets(prev => prev.map(p => 
+          p.id === 'default_system' ? DEFAULT_SYSTEM_PRESET : p
+      ));
+      setActivePresetId('default_system');
+      return DEFAULT_SYSTEM_PRESET.config;
   };
 
   const loadPreset = (id: string): AppPreset['config'] | null => {
     const preset = savedPresets.find(p => p.id === id);
     if (!preset) return null;
 
-    const c = preset.config;
-    
-    // Load all configs
-    setVisualizerConfig(c.visualizerConfig);
-    if (c.reactorConfig) setReactorConfig(c.reactorConfig);
-    if (c.sineWaveConfig) setSineWaveConfig(c.sineWaveConfig);
-    setDvdConfig(c.dvdConfig);
-    setEffectsConfig(c.effectsConfig);
-    setMarqueeConfig(c.marqueeConfig);
-    if (c.watermarkConfig) setWatermarkConfig(c.watermarkConfig);
-    
-    setBgColor(c.bgColor);
-    setBgPattern(c.bgPattern);
-    setBgPatternConfig(c.bgPatternConfig);
-    
-    setShowVisualizer(c.showVisualizer);
-    setShowVisualizer3D(c.showVisualizer3D || false);
-    setShowSineWave(c.showSineWave || false);
-    setShowDvd(c.showDvd);
-    
-    setBgAutoplayInterval(c.bgAutoplayInterval);
-    if (c.cursorStyle) setCursorStyle(c.cursorStyle);
-    if (c.retroScreenCursorStyle) setRetroScreenCursorStyle(c.retroScreenCursorStyle);
-    if (c.bgTransition) setBgTransition(c.bgTransition);
-    if (c.bgAnimation) setBgAnimation(c.bgAnimation);
-
     setActivePresetId(id);
-    return c;
+
+    // Sanitize preset config before applying
+    const config = preset.config;
+    
+    setVisualizerConfig(safeMerge(DEFAULT_VISUALIZER_CONFIG, config.visualizerConfig));
+    setReactorConfig(safeMerge(DEFAULT_REACTOR_CONFIG, config.reactorConfig || DEFAULT_REACTOR_CONFIG));
+    setSineWaveConfig(safeMerge(DEFAULT_SINE_WAVE_CONFIG, config.sineWaveConfig || DEFAULT_SINE_WAVE_CONFIG)); // NEW
+    setDvdConfig(safeMerge(DEFAULT_DVD_CONFIG, config.dvdConfig));
+    setEffectsConfig(safeMerge(DEFAULT_EFFECTS_CONFIG, config.effectsConfig));
+    setMarqueeConfig(safeMerge(DEFAULT_MARQUEE_CONFIG, config.marqueeConfig));
+    if (config.watermarkConfig) setWatermarkConfig(safeMerge(DEFAULT_WATERMARK_CONFIG, config.watermarkConfig));
+    
+    setBgColor(config.bgColor || '#000000');
+    setBgPattern(config.bgPattern || 'none');
+    setBgPatternConfig(safeMerge({ intensity: 0.25, scale: 1.0 }, config.bgPatternConfig));
+    
+    setShowVisualizer(config.showVisualizer ?? true);
+    setShowVisualizer3D(config.showVisualizer3D ?? false); 
+    setShowSineWave(config.showSineWave ?? false); // NEW
+    setShowDvd(config.showDvd ?? true);
+    setBgAutoplayInterval(config.bgAutoplayInterval ?? 5);
+    
+    if (config.cursorStyle) setCursorStyle(config.cursorStyle);
+    if (config.retroScreenCursorStyle) setRetroScreenCursorStyle(config.retroScreenCursorStyle);
+    if (config.bgTransition) setBgTransition(config.bgTransition);
+    if (config.bgAnimation) setBgAnimation(config.bgAnimation); 
+    
+    return config;
   };
 
   const deletePreset = (id: string) => {
     setSavedPresets(prev => prev.filter(p => p.id !== id));
-    if (activePresetId === id) setActivePresetId(null);
+    if (activePresetId === id) {
+        setActivePresetId(null);
+    }
   };
 
   const renamePreset = (id: string, newName: string) => {
-    setSavedPresets(prev => prev.map(p => p.id === id ? { ...p, name: newName } : p));
+    setSavedPresets(prev => prev.map(p => 
+      p.id === id ? { ...p, name: newName } : p
+    ));
   };
 
-  const resetDefaultPreset = () => {
-      // Just returns default config to apply in App.tsx
-      setActivePresetId(null);
-      return DEFAULT_SYSTEM_PRESET.config;
+  // --- EXPORT / IMPORT ---
+
+  const exportConfig = (theme: ThemeType, controlStyle: ControlStyle) => {
+    const config = {
+      visualizerConfig, reactorConfig, sineWaveConfig, dvdConfig, effectsConfig, bgColor, bgPattern, bgPatternConfig, showVisualizer, showVisualizer3D, showSineWave, showDvd, marqueeConfig, watermarkConfig, bgAutoplayInterval, cursorStyle, retroScreenCursorStyle, theme, controlStyle, bgTransition, bgAnimation, version: '1.6'
+    };
+    const blob = new Blob([JSON.stringify(config, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const date = new Date();
+    const fileName = `Neon_Retro_Player_Config_${date.toISOString().split('T')[0]}.NRP`;
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = fileName;
+    link.click();
+    URL.revokeObjectURL(url);
   };
 
-  const exportConfig = (currentTheme?: ThemeType, currentControlStyle?: ControlStyle) => {
-      const configToExport = {
-        visualizerConfig,
-        reactorConfig,
-        sineWaveConfig,
-        dvdConfig,
-        effectsConfig,
-        marqueeConfig,
-        watermarkConfig,
-        bgColor,
-        bgPattern,
-        bgPatternConfig,
-        showVisualizer,
-        showVisualizer3D,
-        showSineWave,
-        showDvd,
-        bgAutoplayInterval,
-        cursorStyle,
-        retroScreenCursorStyle,
-        theme: currentTheme,
-        controlStyle: currentControlStyle,
-        bgTransition,
-        bgAnimation
-      };
-      
-      const blob = new Blob([JSON.stringify(configToExport, null, 2)], { type: 'application/json' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `neon-config-${Date.now()}.NRP`; // Neon Retro Player config
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
+  const importConfig = (file: File, onLoadCallback: (config: any) => void) => {
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      try {
+        const rawContent = JSON.parse(event.target?.result as string);
+        
+        // 1. Sanitize Data
+        const visualizerSafe = safeMerge(DEFAULT_VISUALIZER_CONFIG, rawContent.visualizerConfig);
+        const reactorSafe = safeMerge(DEFAULT_REACTOR_CONFIG, rawContent.reactorConfig || DEFAULT_REACTOR_CONFIG);
+        const sineWaveSafe = safeMerge(DEFAULT_SINE_WAVE_CONFIG, rawContent.sineWaveConfig || DEFAULT_SINE_WAVE_CONFIG); // NEW
+        const dvdSafe = safeMerge(DEFAULT_DVD_CONFIG, rawContent.dvdConfig);
+        const effectsSafe = safeMerge(DEFAULT_EFFECTS_CONFIG, rawContent.effectsConfig);
+        const marqueeSafe = safeMerge(DEFAULT_MARQUEE_CONFIG, rawContent.marqueeConfig);
+        const watermarkSafe = safeMerge(DEFAULT_WATERMARK_CONFIG, rawContent.watermarkConfig);
+        const patternConfigSafe = safeMerge({ intensity: 0.25, scale: 1.0 }, rawContent.bgPatternConfig);
+
+        // 2. Apply States
+        setVisualizerConfig(visualizerSafe);
+        setReactorConfig(reactorSafe);
+        setSineWaveConfig(sineWaveSafe); // NEW
+        setDvdConfig(dvdSafe);
+        setEffectsConfig(effectsSafe);
+        setMarqueeConfig(marqueeSafe);
+        setWatermarkConfig(watermarkSafe);
+        
+        if (rawContent.bgColor) setBgColor(rawContent.bgColor);
+        if (rawContent.bgPattern) setBgPattern(rawContent.bgPattern);
+        setBgPatternConfig(patternConfigSafe);
+        
+        if (typeof rawContent.showVisualizer === 'boolean') setShowVisualizer(rawContent.showVisualizer);
+        if (typeof rawContent.showVisualizer3D === 'boolean') setShowVisualizer3D(rawContent.showVisualizer3D);
+        if (typeof rawContent.showSineWave === 'boolean') setShowSineWave(rawContent.showSineWave); // NEW
+        if (typeof rawContent.showDvd === 'boolean') setShowDvd(rawContent.showDvd);
+        if (typeof rawContent.bgAutoplayInterval === 'number') setBgAutoplayInterval(rawContent.bgAutoplayInterval);
+        
+        if (rawContent.cursorStyle) setCursorStyle(rawContent.cursorStyle);
+        if (rawContent.retroScreenCursorStyle) setRetroScreenCursorStyle(rawContent.retroScreenCursorStyle);
+        if (rawContent.bgTransition) setBgTransition(rawContent.bgTransition);
+        if (rawContent.bgAnimation) setBgAnimation(rawContent.bgAnimation);
+        
+        setActivePresetId(null);
+
+        if (onLoadCallback) {
+            onLoadCallback({
+                ...rawContent,
+                visualizerConfig: visualizerSafe,
+                reactorConfig: reactorSafe,
+                sineWaveConfig: sineWaveSafe,
+                effectsConfig: effectsSafe
+            });
+        }
+
+      } catch (err) {
+        console.error("Failed to parse NRP config file", err);
+      }
+    };
+    reader.readAsText(file);
   };
 
-  const importConfig = async (file: File): Promise<string | null> => {
-      return new Promise((resolve) => {
+  // --- NEW: BATCH IMPORT FOR DRAG & DROP ---
+  const batchImportPresets = async (files: File[]): Promise<string | null> => {
+      const promises = files.map(file => new Promise<AppPreset | null>((resolve) => {
           const reader = new FileReader();
           reader.onload = (e) => {
               try {
-                  const content = e.target?.result as string;
-                  const parsed = JSON.parse(content);
+                  const rawContent = JSON.parse(e.target?.result as string);
                   
-                  // Create a new preset from imported config
+                  // Sanitize config using the same logic as importConfig
+                  // Note: We don't apply it here, just prepare the object
+                  const config: AppPreset['config'] = {
+                      visualizerConfig: safeMerge(DEFAULT_VISUALIZER_CONFIG, rawContent.visualizerConfig),
+                      reactorConfig: safeMerge(DEFAULT_REACTOR_CONFIG, rawContent.reactorConfig || DEFAULT_REACTOR_CONFIG),
+                      sineWaveConfig: safeMerge(DEFAULT_SINE_WAVE_CONFIG, rawContent.sineWaveConfig || DEFAULT_SINE_WAVE_CONFIG), // NEW
+                      dvdConfig: safeMerge(DEFAULT_DVD_CONFIG, rawContent.dvdConfig),
+                      effectsConfig: safeMerge(DEFAULT_EFFECTS_CONFIG, rawContent.effectsConfig),
+                      marqueeConfig: safeMerge(DEFAULT_MARQUEE_CONFIG, rawContent.marqueeConfig),
+                      watermarkConfig: safeMerge(DEFAULT_WATERMARK_CONFIG, rawContent.watermarkConfig),
+                      bgColor: rawContent.bgColor || '#000000',
+                      bgPattern: rawContent.bgPattern || 'none',
+                      bgPatternConfig: safeMerge({ intensity: 0.25, scale: 1.0 }, rawContent.bgPatternConfig),
+                      showVisualizer: rawContent.showVisualizer ?? true,
+                      showVisualizer3D: rawContent.showVisualizer3D ?? false,
+                      showSineWave: rawContent.showSineWave ?? false, // NEW
+                      showDvd: rawContent.showDvd ?? true,
+                      bgAutoplayInterval: rawContent.bgAutoplayInterval ?? 5,
+                      cursorStyle: rawContent.cursorStyle || 'theme-sync',
+                      retroScreenCursorStyle: rawContent.retroScreenCursorStyle || 'dos-terminal',
+                      theme: rawContent.theme || 'neon-retro',
+                      controlStyle: rawContent.controlStyle || 'default',
+                      bgTransition: rawContent.bgTransition || 'glitch',
+                      bgAnimation: rawContent.bgAnimation || 'none'
+                  };
+
+                  const presetName = file.name.replace(/\.nrp$/i, '').replace(/_/g, ' ');
                   const newPreset: AppPreset = {
                       id: crypto.randomUUID(),
-                      name: file.name.replace('.NRP', '').replace('.json', '') + ' (Imported)',
+                      name: presetName,
                       createdAt: Date.now(),
-                      config: parsed
+                      config: config
                   };
-                  
-                  setSavedPresets(prev => [...prev, newPreset]);
-                  resolve(newPreset.id);
-              } catch (err) {
-                  console.error("Failed to import config", err);
+                  resolve(newPreset);
+              } catch {
                   resolve(null);
               }
           };
           reader.readAsText(file);
-      });
-  };
+      }));
 
-  const batchImportPresets = async (files: File[]): Promise<string | null> => {
-      let lastId: string | null = null;
-      for (const file of files) {
-          lastId = await importConfig(file);
+      const results = await Promise.all(promises);
+      const validPresets = results.filter(p => p !== null) as AppPreset[];
+
+      if (validPresets.length > 0) {
+          setSavedPresets(prev => [...prev, ...validPresets]);
+          // Return the ID of the LAST imported preset so we can apply it
+          return validPresets[validPresets.length - 1].id;
       }
-      return lastId;
+      return null;
   };
-
-  // Derived state for consumers
-  const playingList = getPlayingList();
-  const currentBgMedia = playingList[currentBgIndex] || null;
-  const activePlaylist = bgPlaylists.find(p => p.id === activeBgPlaylistId);
-  const activeList = activePlaylist ? activePlaylist.items : [];
 
   return {
     apiKey, setApiKey,
     showVisualizer, setShowVisualizer,
     showVisualizer3D, setShowVisualizer3D,
-    showSineWave, setShowSineWave,
+    showSineWave, setShowSineWave, // NEW
     showDvd, setShowDvd,
     marqueeConfig, setMarqueeConfig,
     visualizerConfig, setVisualizerConfig,
     reactorConfig, setReactorConfig,
-    sineWaveConfig, setSineWaveConfig,
+    sineWaveConfig, setSineWaveConfig, // NEW
     dvdConfig, setDvdConfig,
     effectsConfig, setEffectsConfig,
     watermarkConfig, setWatermarkConfig,
     bgColor, setBgColor,
     bgPattern, setBgPattern,
     bgPatternConfig, setBgPatternConfig,
-    
-    // Updated BG props
-    bgMedia: currentBgMedia,
-    bgList: activeList, // Return active list for UI editing
-    bgPlaylists, // New
-    activeBgPlaylistId, // New
-    setActiveBgPlaylistId, // New
-    playingBgPlaylistId, // New
-    setPlayingBgPlaylistId, // New
-    addBgPlaylist, // New
-    removeBgPlaylist, // New
-    renameBgPlaylist, // New
-    
+    bgMedia: bgList[currentBgIndex] || null, 
+    bgList,
     currentBgIndex,
     bgAutoplayInterval, setBgAutoplayInterval,
     handleBgUpload, handleClearBg,
     removeBg, moveBg, selectBg, deselectBg,
     nextBg, prevBg,
     shuffleBgList, 
-    bgCount: activeList.length,
+    bgCount: bgList.length,
     exportConfig, importConfig, batchImportPresets, 
     savedPresets,
     activePresetId,

@@ -21,7 +21,7 @@ export const NumberedLabel = ({ num, k, custom }: { num: string, k?: any, custom
 
 const SettingsSection: React.FC<SettingsSectionProps> = ({ id, title, isOpen, onToggle, stickyTop, children }) => {
   return (
-    <>
+    <div className="relative">
       {/* Sticky Header */}
       <div 
         id={`section-header-${id}`}
@@ -65,7 +65,7 @@ const SettingsSection: React.FC<SettingsSectionProps> = ({ id, title, isOpen, on
             </div>
          </div>
       </div>
-    </>
+    </div>
   );
 };
 

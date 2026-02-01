@@ -8,7 +8,6 @@ export interface TronConfig {
   size: number; // NEW: Thickness of agent (1-4)
   maxAgents: number; // NEW: Maximum players on map (4-20)
   showNames: boolean; // NEW: Show player nicknames
-  enableUser: boolean; // NEW: User playable character
 }
 
 export interface EffectsConfig {
@@ -60,11 +59,6 @@ export interface EffectsConfig {
     speed: number; // Movement speed
     number: number; // Amount of blobs
   };
-  lightFlicker: { // NEW: Light Bulb Flicker Effect
-    enabled: boolean;
-    intensity: number; // How much brightness/darkness changes
-    speed: number; // How erratic the flicker is
-  };
   rain: RainConfig; // NEW: Rain Effect
   tron: TronConfig; // NEW: Tron Game
   vignette: {
@@ -104,18 +98,9 @@ export interface Playlist {
 
 export interface BackgroundMedia {
   id: string;
-  playlistId: string; // NEW: Link to BG Playlist
   type: 'image' | 'video';
   url: string;
   file: File;
-  order?: number;
-}
-
-export interface BackgroundPlaylist {
-  id: string;
-  name: string;
-  order: number;
-  items: BackgroundMedia[];
 }
 
 // NEW: Ambience File Type
@@ -139,7 +124,6 @@ export interface RecorderConfig {
   fps: 30 | 60;
   videoBitrate: number; // bps
   audioBitrate: number; // bps
-  sourceId?: string; // NEW: Electron Screen Source ID
 }
 
 // NEW: System Audio Configuration

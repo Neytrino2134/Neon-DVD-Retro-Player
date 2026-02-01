@@ -10,12 +10,10 @@ interface Agent {
   id: number;
   x: number;
   y: number;
-  spawnX: number; 
-  spawnY: number; 
   dirIndex: number; // 0: Up, 1: Right, 2: Down, 3: Left
   color: string;
-  hue: number;
-  name: string;
+  hue: number; // Keep track of Hue to avoid duplicates
+  name: string; // NEW: Nickname
   alive: boolean;
   erasing: boolean; 
   stepsAlive: number;
@@ -23,9 +21,6 @@ interface Agent {
   moveAccumulator: number; 
   eraseAccumulator: number; 
   path: {x: number, y: number}[]; 
-  // User specifics
-  isUser: boolean;
-  immortality: number; // Seconds
 }
 
 interface ExplosionParticle {
@@ -37,9 +32,9 @@ interface ExplosionParticle {
   maxLife: number;
   color: string;
   size: number;
-  type: 'pixel' | 'ring' | 'glitch' | 'text';
+  type: 'pixel' | 'ring' | 'glitch' | 'text'; // Added Text type
   phase: number; 
-  text?: string;
+  text?: string; // For text particles
 }
 
 const BASE_CELL_SIZE = 4;
@@ -75,9 +70,6 @@ const TronEffect: React.FC<TronEffectProps> = ({ config }) => {
   const explosionsRef = useRef<ExplosionParticle[]>([]);
   const agentIdCounter = useRef(0);
   
-  // User Input State
-  const userNextDirRef = useRef<number | null>(null);
-  
   // Grid: 0 = empty, 1 = wall
   const gridRef = useRef<Uint8Array | null>(null);
   const gridDimsRef = useRef({ w: 0, h: 0 });
@@ -87,6 +79,13 @@ const TronEffect: React.FC<TronEffectProps> = ({ config }) => {
   useEffect(() => {
       configRef.current = config;
   }, [config]);
+
+  const DIRECTIONS = [
+      { x: 0, y: -1 }, // 0: Up
+      { x: 1, y: 0 },  // 1: Right
+      { x: 0, y: 1 },  // 2: Down
+      { x: -1, y: 0 }  // 3: Left
+  ];
 
   // Spawn Gate Logic
   const getGateCoordinates = (gridW: number, gridH: number) => {
@@ -98,136 +97,32 @@ const TronEffect: React.FC<TronEffectProps> = ({ config }) => {
       ];
   };
 
-  const spawnUser = (gridW: number, gridH: number): Agent => {
-      // Bottom Gate for User
-      const x = Math.floor(gridW / 2);
-      const y = gridH - 5;
-      const dir = 0; // Up
-
-      userNextDirRef.current = dir; // Reset input
-
-      return {
-          id: agentIdCounter.current++,
-          x,
-          y,
-          spawnX: x,
-          spawnY: y,
-          dirIndex: dir,
-          color: '#ffffff',
-          hue: 0,
-          name: "USER",
-          alive: true,
-          erasing: false,
-          stepsAlive: 0,
-          lastTurnStep: 0,
-          moveAccumulator: 0,
-          eraseAccumulator: 0,
-          path: [],
-          isUser: true,
-          immortality: 3.0 // 3 Seconds
-      };
-  };
-
-  // Input Listener
-  useEffect(() => {
-      const handleKeyDown = (e: KeyboardEvent) => {
-          if (!configRef.current.enableUser) return;
-
-          // RESTART USER
-          if (e.code === 'Numpad0') {
-              const cols = gridDimsRef.current.w;
-              const rows = gridDimsRef.current.h;
-              if (cols === 0 || rows === 0) return;
-
-              // Find existing user to reset
-              const userAgent = agentsRef.current.find(a => a.isUser);
-              
-              if (userAgent) {
-                  // FIX: We MUST clear the old path from the grid before resetting position.
-                  // Otherwise, invisible walls (the old trail) remain if death animation was interrupted.
-                  const grid = gridRef.current;
-                  if (grid) {
-                      userAgent.path.forEach(p => {
-                          const idx = p.y * cols + p.x;
-                          if (idx >= 0 && idx < grid.length) grid[idx] = 0;
-                      });
-                      
-                      // Also ensure the spawn point itself is clear
-                      const startX = Math.floor(cols / 2);
-                      const startY = rows - 5;
-                      const spawnIdx = startY * cols + startX;
-                      if (spawnIdx >= 0 && spawnIdx < grid.length) grid[spawnIdx] = 0;
-                  }
-
-                  // Reset existing
-                  userAgent.x = Math.floor(cols / 2);
-                  userAgent.y = rows - 5;
-                  userAgent.dirIndex = 0; // Up
-                  userAgent.path = [];
-                  userAgent.alive = true;
-                  userAgent.erasing = false;
-                  userAgent.immortality = 3.0;
-                  userAgent.stepsAlive = 0;
-                  userAgent.moveAccumulator = 0;
-                  userNextDirRef.current = 0;
-                  
-              } else {
-                  // Spawn new
-                  const newAgent = spawnUser(cols, rows);
-                  // Ensure spawn area is clear for new agent
-                  const grid = gridRef.current;
-                  if (grid) {
-                      const idx = newAgent.y * cols + newAgent.x;
-                      if (idx >= 0 && idx < grid.length) grid[idx] = 0;
-                  }
-                  agentsRef.current.push(newAgent);
-              }
-              return;
-          }
-
-          // MOVEMENT
-          let dir = -1;
-          
-          if (e.code === 'Numpad8' || e.code === 'ArrowUp') dir = 0;
-          else if (e.code === 'Numpad6' || e.code === 'ArrowRight') dir = 1;
-          else if (e.code === 'Numpad5' || e.code === 'ArrowDown') dir = 2; // Numpad 5 is Down per request
-          else if (e.code === 'Numpad4' || e.code === 'ArrowLeft') dir = 3;
-
-          if (dir !== -1) {
-              userNextDirRef.current = dir;
-          }
-      };
-
-      window.addEventListener('keydown', handleKeyDown);
-      return () => window.removeEventListener('keydown', handleKeyDown);
-  }, []);
-
-  const DIRECTIONS = [
-      { x: 0, y: -1 }, // 0: Up
-      { x: 1, y: 0 },  // 1: Right
-      { x: 0, y: 1 },  // 2: Down
-      { x: -1, y: 0 }  // 3: Left
-  ];
-
   // --- COLOR GENERATION LOGIC ---
   const generateUniqueColor = (activeAgents: Agent[]): { color: string, hue: number } => {
       const BASE_HUES = [0, 30, 60, 120, 180, 240, 280, 300, 330]; 
+      // 0=Red, 30=Orange, 60=Yellow, 120=Green, 180=Cyan, 240=Blue, 280=Purple, 300=Magenta, 330=Pink
       
       const usedHues = new Set(activeAgents.map(a => a.hue));
+      
+      // 1. Try to find an unused base hue
       const freeHues = BASE_HUES.filter(h => !usedHues.has(h));
       
       if (freeHues.length > 0) {
           const hue = freeHues[Math.floor(Math.random() * freeHues.length)];
+          // Standard vibrant neon: Saturation 100%, Lightness 50%
           return { color: `hsl(${hue}, 100%, 50%)`, hue };
       }
       
+      // 2. If all bases used, allow reuse but shift Lightness/Tone
       const hue = BASE_HUES[Math.floor(Math.random() * BASE_HUES.length)];
+      // Random lightness between 60% and 80% (Pastel/Light Neon) to distinguish from base 50%
       const lightness = 60 + Math.floor(Math.random() * 25);
       return { color: `hsl(${hue}, 100%, ${lightness}%)`, hue };
   };
 
   const spawnAgent = (gridW: number, gridH: number, activeAgents: Agent[]): Agent => {
       const gates = getGateCoordinates(gridW, gridH);
+      // Pick random gate
       const gate = gates[Math.floor(Math.random() * gates.length)];
       
       const { color, hue } = generateUniqueColor(activeAgents);
@@ -237,8 +132,6 @@ const TronEffect: React.FC<TronEffectProps> = ({ config }) => {
           id: agentIdCounter.current++,
           x: gate.x,
           y: gate.y,
-          spawnX: gate.x,
-          spawnY: gate.y,
           dirIndex: gate.dir,
           color,
           hue,
@@ -249,9 +142,7 @@ const TronEffect: React.FC<TronEffectProps> = ({ config }) => {
           lastTurnStep: 0,
           moveAccumulator: 0,
           eraseAccumulator: 0,
-          path: [],
-          isUser: false,
-          immortality: 0
+          path: []
       };
   };
 
@@ -310,13 +201,13 @@ const TronEffect: React.FC<TronEffectProps> = ({ config }) => {
       if (configRef.current.showNames) {
           explosionsRef.current.push({
               x: px,
-              y: py - cellSize * 4,
+              y: py - cellSize * 4, // Start slightly above
               vx: 0,
-              vy: -0.5,
-              life: 1.5,
+              vy: -0.5, // Float up
+              life: 1.5, // Last longer
               maxLife: 1.5,
               color: color,
-              size: Math.max(10, cellSize * 3),
+              size: Math.max(10, cellSize * 3), // Font size relative to scale
               type: 'text',
               phase: 0,
               text: `${name} DELETED`
@@ -331,18 +222,14 @@ const TronEffect: React.FC<TronEffectProps> = ({ config }) => {
       grid: Uint8Array, 
       cols: number, 
       rows: number, 
-      allAgents: Agent[],
-      isImmune: boolean 
+      allAgents: Agent[]
   ): number => {
       const dir = DIRECTIONS[potentialDirIndex];
       const nextX = agent.x + dir.x;
       const nextY = agent.y + dir.y;
 
       if (nextX < 0 || nextX >= cols || nextY < 0 || nextY >= rows) return -9999;
-      
-      // If NOT immune, avoid walls. If immune, walls are passable (don't kill), but we still
-      // prefer empty space unless trapped.
-      if (!isImmune && grid[nextY * cols + nextX] === 1) return -9999;
+      if (grid[nextY * cols + nextX] === 1) return -9999;
 
       let score = 0;
 
@@ -359,8 +246,6 @@ const TronEffect: React.FC<TronEffectProps> = ({ config }) => {
       for (let i = 0; i < maxLookAhead; i++) {
           scanX += dir.x;
           scanY += dir.y;
-          // During lookahead, we treat walls as obstacles to encourage good pathfinding,
-          // even if immune, so they don't just walk into a dead end immediately.
           if (scanX < 0 || scanX >= cols || scanY < 0 || scanY >= rows || grid[scanY * cols + scanX] === 1) {
               break;
           }
@@ -459,11 +344,6 @@ const TronEffect: React.FC<TronEffectProps> = ({ config }) => {
         const rows = gridDimsRef.current.h;
         const grid = gridRef.current;
 
-        // Draw Arena Border (To visualize walls)
-        ctx.strokeStyle = `rgba(255, 255, 255, ${cfg.opacity * 0.2})`;
-        ctx.lineWidth = 1;
-        ctx.strokeRect(0, 0, w, h);
-
         // Draw Spawn Gates
         ctx.globalAlpha = cfg.opacity * 0.5;
         const gates = getGateCoordinates(cols, rows);
@@ -481,20 +361,14 @@ const TronEffect: React.FC<TronEffectProps> = ({ config }) => {
 
         // Calculate dynamic trail length
         const userTrail = cfg.trailLength !== undefined ? cfg.trailLength : 0.8;
+        // Adjust path length for size to keep trail visual length roughly similar
         const maxPathLen = Math.floor((userTrail * 400) / (scale * 0.5)) + 20;
 
-        // Spawn AI
+        // Spawn
         const maxAgents = cfg.maxAgents || 12;
         const spawnChance = cfg.spawnRate * 0.02;
-        const activeAiAgents = agentsRef.current.filter(a => !a.isUser).length;
-        if (Math.random() < spawnChance && activeAiAgents < maxAgents) {
+        if (Math.random() < spawnChance && agentsRef.current.length < maxAgents) {
             agentsRef.current.push(spawnAgent(cols, rows, agentsRef.current));
-        }
-
-        // Spawn User if missing and enabled
-        const hasUser = agentsRef.current.some(a => a.isUser && a.alive);
-        if (cfg.enableUser && !hasUser) {
-            agentsRef.current.push(spawnUser(cols, rows));
         }
 
         // --- UPDATE AGENTS ---
@@ -504,101 +378,49 @@ const TronEffect: React.FC<TronEffectProps> = ({ config }) => {
 
             // --- ERASING LOGIC (Death Animation) ---
             if (agent.erasing) {
+                // Use speed accumulator to erase at the same speed as movement
                 agent.eraseAccumulator += cfg.speed;
+                
                 while (agent.eraseAccumulator >= 1) {
                     agent.eraseAccumulator -= 1;
-                    const head = agent.path.pop();
+                    const head = agent.path.pop(); // Remove from end (head of snake)
                     if (head) {
+                        // Clear collision
                         const idx = head.y * cols + head.x;
                         if (idx >= 0 && idx < grid.length) grid[idx] = 0;
-                        
-                        // Glitch Effect during erasure
-                        if (Math.random() > 0.5) {
-                            ctx.fillStyle = agent.color;
-                            ctx.globalAlpha = 0.8;
-                            const size = cellSize * (Math.random() * 2 + 1);
-                            ctx.fillRect(
-                                head.x * cellSize + (Math.random() - 0.5) * cellSize * 4,
-                                head.y * cellSize + (Math.random() - 0.5) * cellSize * 4,
-                                size,
-                                cellSize * 0.5
-                            );
-                        }
                     }
                     if (agent.path.length === 0) {
                         agent.alive = false; 
                         break;
                     }
                 }
+                
+                // Skip movement logic
                 return;
             }
 
-            // --- MOVEMENT LOGIC ---
             agent.moveAccumulator += cfg.speed;
-            
-            // Decrease Immortality (Approximation: 60fps)
-            if (agent.immortality > 0) {
-                agent.immortality -= 0.016; 
-            }
 
             while (agent.moveAccumulator >= 1) {
                 agent.moveAccumulator -= 1;
                 
+                const currentDir = agent.dirIndex;
+                const leftDir = (currentDir + 3) % 4;
+                const rightDir = (currentDir + 1) % 4;
+
+                const options = [currentDir, leftDir, rightDir];
                 let bestOption = -1;
-                let crashed = false;
+                let maxScore = -Infinity;
 
-                if (agent.isUser) {
-                    // --- USER CONTROL LOGIC ---
-                    const inputDir = userNextDirRef.current;
-                    
-                    // Prevent 180 turns
-                    if (inputDir !== null) {
-                        const isOpposite = Math.abs(inputDir - agent.dirIndex) === 2;
-                        if (!isOpposite) {
-                            agent.dirIndex = inputDir;
-                        }
+                for (const opt of options) {
+                    const score = evaluateMove(agent, opt, grid, cols, rows, agentsRef.current);
+                    if (score > maxScore) {
+                        maxScore = score;
+                        bestOption = opt;
                     }
-                    
-                    bestOption = agent.dirIndex;
-                    const move = DIRECTIONS[agent.dirIndex];
-                    const nextX = agent.x + move.x;
-                    const nextY = agent.y + move.y;
-
-                    // Wall Check (Arena Border)
-                    if (nextX < 0 || nextX >= cols || nextY < 0 || nextY >= rows) {
-                        crashed = true;
-                    } 
-                    // Trail Check (Invisible Walls on Grid)
-                    else if (grid[nextY * cols + nextX] === 1) {
-                        if (agent.immortality <= 0) {
-                            crashed = true;
-                        }
-                    }
-
-                } else {
-                    // --- AI LOGIC ---
-                    const distPixels = Math.sqrt((agent.x - agent.spawnX)**2 + (agent.y - agent.spawnY)**2) * cellSize;
-                    const isImmune = distPixels < 100;
-
-                    const currentDir = agent.dirIndex;
-                    const leftDir = (currentDir + 3) % 4;
-                    const rightDir = (currentDir + 1) % 4;
-
-                    const options = [currentDir, leftDir, rightDir];
-                    let maxScore = -Infinity;
-
-                    for (const opt of options) {
-                        const score = evaluateMove(agent, opt, grid, cols, rows, agentsRef.current, isImmune);
-                        if (score > maxScore) {
-                            maxScore = score;
-                            bestOption = opt;
-                        }
-                    }
-                    
-                    if (maxScore <= -5000) crashed = true;
                 }
 
-                if (!crashed && bestOption !== -1) {
+                if (maxScore > -5000) {
                     if (bestOption !== agent.dirIndex) {
                         agent.lastTurnStep = agent.stepsAlive;
                     }
@@ -615,7 +437,7 @@ const TronEffect: React.FC<TronEffectProps> = ({ config }) => {
                     // Add to path
                     agent.path.push({x: agent.x, y: agent.y});
 
-                    // Trim Path
+                    // Trim Path (The Snake Logic)
                     while (agent.path.length > maxPathLen) {
                         const tail = agent.path.shift();
                         if (tail && tail.x >= 0 && tail.x < cols && tail.y >= 0 && tail.y < rows) {
@@ -625,10 +447,8 @@ const TronEffect: React.FC<TronEffectProps> = ({ config }) => {
 
                 } else {
                     // CRASH START
-                    if (agent.immortality <= 0) {
-                        agent.erasing = true; 
-                        createExplosion(agent.x, agent.y, agent.color, cellSize, agent.name);
-                    }
+                    agent.erasing = true; // Start erasing mode
+                    createExplosion(agent.x, agent.y, agent.color, cellSize, agent.name);
                 }
             }
         });
@@ -644,55 +464,34 @@ const TronEffect: React.FC<TronEffectProps> = ({ config }) => {
             for (let i = 0; i < pathLen; i++) {
                 const pt = agent.path[i];
                 let alpha = 1;
+                
+                // Fade tail
                 if (i < fadeLen) alpha = i / fadeLen;
                 
-                // Glitchy stepped flickering when erasing
-                if (agent.erasing) {
-                    const steps = 4;
-                    const noise = Math.floor(Math.random() * steps) + 1;
-                    alpha *= (noise / steps);
-                }
-                
                 ctx.fillStyle = agent.color;
+
                 ctx.globalAlpha = alpha * cfg.opacity;
                 ctx.fillRect(pt.x * cellSize, pt.y * cellSize, cellSize, cellSize);
             }
 
-            // Draw Head & Name
+            // Draw Head Highlight (Only if not erasing)
             if (!agent.erasing && pathLen > 0) {
                 const head = agent.path[pathLen - 1];
-                
-                // Immortality Blink
-                if (agent.immortality > 0 && Math.floor(Date.now() / 100) % 2 === 0) {
-                    ctx.globalAlpha = 0.5;
-                } else {
-                    ctx.globalAlpha = 1.0;
-                }
-
+                ctx.globalAlpha = 1.0;
                 ctx.fillStyle = '#ffffff';
                 const hlSize = Math.max(1, cellSize - 2);
                 const hlOffset = (cellSize - hlSize) / 2;
                 ctx.fillRect(head.x * cellSize + hlOffset, head.y * cellSize + hlOffset, hlSize, hlSize);
 
-                if (cfg.showNames !== false || agent.isUser) {
+                // DRAW NAME
+                if (cfg.showNames !== false) { // Default true
+                    ctx.fillStyle = agent.color;
+                    ctx.textAlign = 'center';
+                    // Scale font with agent size
                     const fontSize = Math.max(8, cellSize * 2);
                     ctx.font = `bold ${fontSize}px "Courier New", monospace`;
-                    const text = agent.name;
-                    const metrics = ctx.measureText(text);
-                    const bgW = metrics.width + 8;
-                    const bgH = fontSize + 4; // Used in fillRect below
-                    const textX = head.x * cellSize + cellSize/2;
-                    const textY = head.y * cellSize - cellSize;
-
-                    // Nickname Background
-                    ctx.fillStyle = 'rgba(0, 0, 0, 0.6)';
-                    ctx.textAlign = 'center';
-                    ctx.textBaseline = 'bottom';
-                    // Use bgH here
-                    ctx.fillRect(textX - bgW/2, textY - fontSize - 2, bgW, bgH);
-
-                    ctx.fillStyle = agent.color;
-                    ctx.fillText(text, textX, textY);
+                    // Position above head
+                    ctx.fillText(agent.name, head.x * cellSize + cellSize/2, head.y * cellSize - cellSize);
                 }
             }
         });
@@ -718,7 +517,7 @@ const TronEffect: React.FC<TronEffectProps> = ({ config }) => {
                 ctx.shadowBlur = 0;
 
             } else if (p.type === 'ring') {
-                p.size += 2;
+                p.size += 2; // Expand
                 p.life -= 0.04;
                 ctx.globalAlpha = p.life * cfg.opacity;
                 ctx.strokeStyle = p.life > 0.5 ? '#ffffff' : p.color;
@@ -736,7 +535,8 @@ const TronEffect: React.FC<TronEffectProps> = ({ config }) => {
                     ctx.fillRect(p.x, p.y - p.size/2, 2, p.size);
                 }
             } else if (p.type === 'text' && p.text) {
-                p.y += p.vy; 
+                // TEXT PARTICLE (Kill Feed)
+                p.y += p.vy; // Float up
                 p.life -= 0.015;
                 
                 ctx.globalAlpha = p.life * cfg.opacity;
@@ -754,6 +554,7 @@ const TronEffect: React.FC<TronEffectProps> = ({ config }) => {
             }
         }
 
+        // Clean up dead agents only when fully erased
         agentsRef.current = agentsRef.current.filter(a => a.alive);
         
         animationRef.current = requestAnimationFrame(render);

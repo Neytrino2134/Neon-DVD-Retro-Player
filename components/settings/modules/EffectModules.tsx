@@ -199,7 +199,7 @@ export const ChromaticSettings: React.FC<{ config: EffectsConfig, update: (k: ke
     );
 };
 
-// Updated VignetteSettings
+// Updated VignetteSettings (Removed Internal Toggle)
 export const VignetteSettings: React.FC<{ config: EffectsConfig['vignette'], update: (v: EffectsConfig['vignette']) => void }> = ({ config, update }) => {
     const { t } = useLanguage();
     return (
@@ -217,16 +217,6 @@ export const LightLeaksSettings: React.FC<{ config: EffectsConfig['lightLeaks'],
            <RangeControl label={t('quantity')} value={config.number} min={1} max={20} step={1} onChange={v => update({ ...config, number: v })} />
            <RangeControl label={t('intensity')} value={config.intensity} min={0.1} max={1.0} step={0.05} onChange={v => update({ ...config, intensity: v })} />
            <RangeControl label={t('speed')} value={config.speed} min={0.1} max={2.0} step={0.1} onChange={v => update({ ...config, speed: v })} />
-        </div>
-    );
-};
-
-export const LightFlickerSettings: React.FC<{ config: EffectsConfig['lightFlicker'], update: (v: EffectsConfig['lightFlicker']) => void }> = ({ config, update }) => {
-    const { t } = useLanguage();
-    return (
-        <div className="pt-2">
-           <RangeControl label={t('flicker_intensity')} value={config.intensity} min={0.1} max={1.0} step={0.05} onChange={v => update({ ...config, intensity: v })} />
-           <RangeControl label={t('flicker_speed')} value={config.speed} min={0.1} max={2.0} step={0.1} onChange={v => update({ ...config, speed: v })} />
         </div>
     );
 };

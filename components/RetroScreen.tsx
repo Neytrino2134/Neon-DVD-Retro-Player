@@ -36,7 +36,6 @@ import LightLeaksEffect from './effects/LightLeaksEffect';
 import RainEffect from './effects/RainEffect'; 
 import TronEffect from './effects/TronEffect'; // NEW
 import VignetteEffect from './effects/VignetteEffect'; // NEW
-import LightFlickerEffect from './effects/LightFlickerEffect'; // NEW
 
 // New Sub-Components
 import ScreenTopBar from './screen/ScreenTopBar';
@@ -411,7 +410,6 @@ const RetroScreen = forwardRef<HTMLDivElement, RetroScreenProps>((props, externa
                 <CyberHackEffect effects={effectsConfig} />
                 <HologramEffect effects={effectsConfig} />
                 <GeminiChatEffect effects={effectsConfig} apiKey={apiKey} />
-                <LightFlickerEffect config={effectsConfig.lightFlicker} />
                 <VignetteEffect config={effectsConfig.vignette} />
             </div>
             

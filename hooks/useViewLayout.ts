@@ -85,12 +85,7 @@ export const useViewLayout = (introState: number) => {
           setAnimSequence('exiting_mini');
           await wait(600); 
 
-          // Trigger resize
           if (ipc) ipc.send('set-full-mode');
-          
-          // CRITICAL FIX: Wait for Electron window to physically resize before asking React to render heavy components.
-          // Without this delay, React tries to render the 3D canvas while the window geometry is invalid/changing, causing a freeze.
-          await wait(150); 
           
           setViewMode('default');
           setShowLeftPanel(true);

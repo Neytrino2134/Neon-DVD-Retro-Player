@@ -52,9 +52,8 @@ export const DEFAULT_EFFECTS_CONFIG: EffectsConfig = {
     categories: { system: false, interactive: true, music: true, motivational: true, philosophy: true, space: true }
   },
   lightLeaks: { enabled: false, intensity: 0.5, speed: 0.5, number: 6 },
-  lightFlicker: { enabled: false, intensity: 0.3, speed: 0.5 }, // Default: Off, moderate intensity
   rain: { enabled: false, intensity: 0.5, speed: 1.0, size: 1.0, direction: 0, wind: 0, gustiness: 0.5, opacity: 0.5, wander: 0.1 },
-  tron: { enabled: false, opacity: 0.8, speed: 0.2, spawnRate: 5, trailLength: 0.8, size: 2, maxAgents: 6, showNames: true, enableUser: false },
+  tron: { enabled: false, opacity: 0.8, speed: 0.5, spawnRate: 5, trailLength: 0.8, size: 1, maxAgents: 12, showNames: true },
   vignette: { enabled: false, intensity: 0.5, roundness: 0.7 }
 };
 

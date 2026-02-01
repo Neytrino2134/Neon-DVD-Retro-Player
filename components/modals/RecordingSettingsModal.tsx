@@ -1,18 +1,12 @@
 
-import React, { useState, useEffect } from 'react';
-import { X, Video, Save, Film, Mic, Monitor } from 'lucide-react';
+import React, { useState } from 'react';
+import { X, Video, Save, Film, Mic } from 'lucide-react';
 import { RecorderConfig } from '../../types';
 
 interface RecordingSettingsModalProps {
   onClose: () => void;
   onSave: (config: RecorderConfig) => void;
   currentConfig: RecorderConfig;
-}
-
-interface ScreenSource {
-    id: string;
-    name: string;
-    thumbnail: string;
 }
 
 const OptionRow = ({ label, icon: Icon, children }: { label: string, icon: any, children?: React.ReactNode }) => (
@@ -26,36 +20,6 @@ const OptionRow = ({ label, icon: Icon, children }: { label: string, icon: any, 
 
 const RecordingSettingsModal: React.FC<RecordingSettingsModalProps> = ({ onClose, onSave, currentConfig }) => {
   const [config, setConfig] = useState<RecorderConfig>(currentConfig);
-  const [sources, setSources] = useState<ScreenSource[]>([]);
-  const [isElectron, setIsElectron] = useState(false);
-
-  useEffect(() => {
-      // Check for Electron and load sources
-      if ((window as any).require) {
-          try {
-              const { desktopCapturer } = (window as any).require('electron');
-              setIsElectron(true);
-              
-              desktopCapturer.getSources({ types: ['screen'], thumbnailSize: { width: 300, height: 200 } })
-                .then((inputSources: any[]) => {
-                    const mapped = inputSources.map(s => ({
-                        id: s.id,
-                        name: s.name,
-                        thumbnail: s.thumbnail.toDataURL()
-                    }));
-                    setSources(mapped);
-                    
-                    // If no source selected yet, default to first
-                    if (!config.sourceId && mapped.length > 0) {
-                        setConfig(prev => ({ ...prev, sourceId: mapped[0].id }));
-                    }
-                })
-                .catch((e: any) => console.error("Failed to get sources", e));
-          } catch (e) {
-              console.log("Not electron");
-          }
-      }
-  }, []);
 
   const handleSave = () => {
     onSave(config);
@@ -80,31 +44,8 @@ const RecordingSettingsModal: React.FC<RecordingSettingsModalProps> = ({ onClose
         </div>
 
         {/* Body */}
-        <div className="p-6 space-y-4 max-h-[70vh] overflow-y-auto custom-scrollbar">
+        <div className="p-6 space-y-4">
             
-            {/* SOURCE SELECTION (Electron Only) */}
-            {isElectron && sources.length > 0 && (
-                <OptionRow label="CAPTURE SOURCE" icon={Monitor}>
-                    <div className="grid grid-cols-2 gap-2">
-                        {sources.map(src => {
-                            const isSelected = config.sourceId === src.id;
-                            return (
-                                <div 
-                                    key={src.id}
-                                    onClick={() => setConfig({ ...config, sourceId: src.id })}
-                                    className={`relative cursor-pointer rounded overflow-hidden border-2 transition-all ${isSelected ? 'border-theme-primary shadow-[0_0_10px_var(--color-primary)] opacity-100' : 'border-transparent opacity-50 hover:opacity-80'}`}
-                                >
-                                    <img src={src.thumbnail} className="w-full h-20 object-cover" alt={src.name} />
-                                    <div className="absolute bottom-0 left-0 right-0 bg-black/70 p-1 text-center">
-                                        <span className="text-[9px] font-mono text-white font-bold">{src.name}</span>
-                                    </div>
-                                </div>
-                            );
-                        })}
-                    </div>
-                </OptionRow>
-            )}
-
             <OptionRow label="RESOLUTION" icon={Film}>
                 <div className="grid grid-cols-3 gap-2">
                     {['720p', '1080p', '4k'].map((res) => (

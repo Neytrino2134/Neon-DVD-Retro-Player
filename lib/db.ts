@@ -5,12 +5,11 @@
 import { TagMetadata } from '../types';
 
 const DB_NAME = 'NeonPlayerDB';
-const DB_VERSION = 6; // Incremented for BG Playlists
+const DB_VERSION = 5; // Incremented for Order and Tags
 const STORES = {
   TRACKS: 'tracks',
   PLAYLISTS: 'playlists',
   BACKGROUND: 'background',
-  BG_PLAYLISTS: 'bg_playlists', // New Store
   SFX: 'sfx',
   AMBIENCE: 'ambience'
 };
@@ -26,7 +25,7 @@ export const initDB = (): Promise<IDBDatabase> => {
       if (!db.objectStoreNames.contains(STORES.TRACKS)) {
         const trackStore = db.createObjectStore(STORES.TRACKS, { keyPath: 'id' });
         trackStore.createIndex('playlistId', 'playlistId', { unique: false });
-        trackStore.createIndex('order', 'order', { unique: false }); 
+        trackStore.createIndex('order', 'order', { unique: false }); // New index for sorting
       } else {
         const trackStore = transaction?.objectStore(STORES.TRACKS);
         if (trackStore) {
@@ -43,22 +42,9 @@ export const initDB = (): Promise<IDBDatabase> => {
         db.createObjectStore(STORES.PLAYLISTS, { keyPath: 'id' });
       }
 
-      // BG MEDIA STORE
       if (!db.objectStoreNames.contains(STORES.BACKGROUND)) {
-        const bgStore = db.createObjectStore(STORES.BACKGROUND, { keyPath: 'id' });
-        bgStore.createIndex('playlistId', 'playlistId', { unique: false });
-      } else {
-        const bgStore = transaction?.objectStore(STORES.BACKGROUND);
-        if (bgStore && !bgStore.indexNames.contains('playlistId')) {
-            bgStore.createIndex('playlistId', 'playlistId', { unique: false });
-        }
+        db.createObjectStore(STORES.BACKGROUND, { keyPath: 'id' });
       }
-
-      // BG PLAYLISTS STORE
-      if (!db.objectStoreNames.contains(STORES.BG_PLAYLISTS)) {
-        db.createObjectStore(STORES.BG_PLAYLISTS, { keyPath: 'id' });
-      }
-
       if (!db.objectStoreNames.contains(STORES.SFX)) {
         db.createObjectStore(STORES.SFX, { keyPath: 'id' });
       }
@@ -72,7 +58,7 @@ export const initDB = (): Promise<IDBDatabase> => {
   });
 };
 
-// --- AUDIO PLAYLIST FUNCTIONS ---
+// --- PLAYLIST FUNCTIONS ---
 
 export const savePlaylist = async (playlist: { id: string; name: string; order: number }) => {
     const db = await initDB();
@@ -218,77 +204,7 @@ export const deleteTracksBulk = async (trackIds: string[]) => {
 
 // --- BACKGROUND FUNCTIONS ---
 
-export interface StoredBackground {
-    id: string;
-    playlistId: string;
-    type: 'image' | 'video';
-    file: File;
-    order?: number;
-}
-
-export const saveBgPlaylist = async (playlist: { id: string; name: string; order: number }) => {
-    const db = await initDB();
-    return new Promise<void>((resolve, reject) => {
-        const transaction = db.transaction(STORES.BG_PLAYLISTS, 'readwrite');
-        const store = transaction.objectStore(STORES.BG_PLAYLISTS);
-        const request = store.put(playlist);
-        request.onsuccess = () => resolve();
-        request.onerror = () => reject(request.error);
-    });
-};
-
-export const getAllBgPlaylists = async (): Promise<{ id: string; name: string; order: number }[]> => {
-    const db = await initDB();
-    return new Promise((resolve, reject) => {
-        const transaction = db.transaction(STORES.BG_PLAYLISTS, 'readonly');
-        const store = transaction.objectStore(STORES.BG_PLAYLISTS);
-        const request = store.getAll();
-        request.onsuccess = () => {
-            const results = request.result || [];
-            results.sort((a, b) => a.order - b.order);
-            resolve(results);
-        };
-        request.onerror = () => reject(request.error);
-    });
-};
-
-export const deleteBgPlaylistAndFiles = async (playlistId: string) => {
-    const db = await initDB();
-    return new Promise<void>((resolve, reject) => {
-        const transaction = db.transaction([STORES.BG_PLAYLISTS, STORES.BACKGROUND], 'readwrite');
-        
-        // Delete Playlist
-        const plStore = transaction.objectStore(STORES.BG_PLAYLISTS);
-        plStore.delete(playlistId);
-
-        // Delete Backgrounds associated with playlist
-        const bgStore = transaction.objectStore(STORES.BACKGROUND);
-        // We handle migration where playlistId might be missing for old records
-        // by only deleting those that explicitly match.
-        // For complete robustness, getAll + filter + delete is safer if index is missing,
-        // but we added index in initDB.
-        try {
-            const index = bgStore.index('playlistId');
-            const range = IDBKeyRange.only(playlistId);
-            
-            index.openCursor(range).onsuccess = (e) => {
-                const cursor = (e.target as IDBRequest).result;
-                if (cursor) {
-                    cursor.delete();
-                    cursor.continue();
-                }
-            };
-        } catch (e) {
-            // Fallback if index creation failed
-            console.warn("Index lookup failed, skipping file deletion", e);
-        }
-
-        transaction.oncomplete = () => resolve();
-        transaction.onerror = () => reject(transaction.error);
-    });
-};
-
-export const saveBackground = async (media: StoredBackground) => {
+export const saveBackground = async (media: { id: string; type: 'image' | 'video'; file: File }) => {
   const db = await initDB();
   return new Promise<void>((resolve, reject) => {
     const transaction = db.transaction(STORES.BACKGROUND, 'readwrite');
@@ -310,7 +226,7 @@ export const deleteBackground = async (id: string) => {
   });
 };
 
-export const getAllBackgrounds = async (): Promise<StoredBackground[]> => {
+export const getAllBackgrounds = async (): Promise<{ id: string; type: 'image' | 'video'; file: File }[]> => {
   const db = await initDB();
   return new Promise((resolve, reject) => {
     const transaction = db.transaction(STORES.BACKGROUND, 'readonly');

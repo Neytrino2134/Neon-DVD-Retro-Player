@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useRef } from 'react';
-import { Terminal, ChevronRight, MousePointer2, Globe } from 'lucide-react';
+import { Terminal, ChevronRight, MousePointer2 } from 'lucide-react';
 import { VisualizerConfig } from '../types';
 import { useLanguage } from '../contexts/LanguageContext';
 
@@ -29,8 +29,6 @@ interface TutorialStep {
   placement?: 'left' | 'right' | 'bottom-center' | 'top-center'; // Added top-center
 }
 
-const GLITCH_CHARS = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789@#$%&*!??█▓▒░<>/[]{}-=_+";
-
 const TutorialOverlay: React.FC<TutorialOverlayProps> = ({
   onComplete,
   trackCount,
@@ -39,7 +37,7 @@ const TutorialOverlay: React.FC<TutorialOverlayProps> = ({
   // Removed unused props from destructuring to fix build errors
   presetsCount = 0
 }) => {
-  const { t, language, setLanguage } = useLanguage();
+  const { t } = useLanguage();
   const [currentStepIndex, setCurrentStepIndex] = useState(0);
   const [rect, setRect] = useState<DOMRect | null>(null);
   
@@ -63,14 +61,8 @@ const TutorialOverlay: React.FC<TutorialOverlayProps> = ({
   // Refs
   const typeIntervalRef = useRef<number>(0);
   const titleIntervalRef = useRef<number>(0);
-  const glitchIntervalRef = useRef<number>(0);
   const rafRef = useRef<number>(0);
   const timeoutsRef = useRef<number[]>([]);
-  
-  // Track previous step and language to decide animation type
-  // FIXED: Initialize to -1 so the first step (index 0) triggers the animation check
-  const prevStepIndexRef = useRef(-1);
-  const prevLanguageRef = useRef(language);
 
   const steps: TutorialStep[] = [
     // --- WELCOME (0) ---
@@ -192,7 +184,7 @@ const TutorialOverlay: React.FC<TutorialOverlayProps> = ({
     {
       id: 'observe-vis-change',
       type: 'explain',
-      targetId: 'tutorial-screen', // FIXED: Pointing to TV Screen instead of panel
+      targetId: 'tutorial-wave', // Changed from tutorial-screen
       title: t('tut_config_applied_title'),
       text: t('tut_config_applied_text'),
       // placement removed to default to 'right' (next to the settings panel)
@@ -260,44 +252,41 @@ const TutorialOverlay: React.FC<TutorialOverlayProps> = ({
   useEffect(() => {
     // Reset phase when entering welcome or finish steps
     if (currentStep.type === 'welcome' || currentStep.type === 'finish') {
-        if (currentStepIndex !== prevStepIndexRef.current) {
-            setModalPhase(0);
-            setBgOpacity(0);
-            setDisplayedText("");
-            setDisplayedTitle("");
-            setIsTitleDone(false);
-            
-            clearAllTimeouts();
+        setModalPhase(0);
+        setBgOpacity(0);
+        setDisplayedText("");
+        setDisplayedTitle("");
+        setIsTitleDone(false);
+        
+        clearAllTimeouts();
 
-            // 1. Fade In Background (Slow & Smooth)
-            schedule(() => setBgOpacity(1), 100); 
-            
-            // 2. Expand Width (Slow)
-            schedule(() => setModalPhase(1), 800); 
-            
-            // 3. Expand Height (Slow)
-            // Wait for width (1s) to mostly finish
-            schedule(() => setModalPhase(2), 1800); 
-            
-            // 4. Ready Content (Trigger typing)
-            // Wait for height (1s) to finish
-            schedule(() => setModalPhase(3), 2900); 
-        }
+        // 1. Fade In Background (Slow & Smooth)
+        schedule(() => setBgOpacity(1), 100); 
+        
+        // 2. Expand Width (Slow)
+        schedule(() => setModalPhase(1), 800); 
+        
+        // 3. Expand Height (Slow)
+        // Wait for width (1s) to mostly finish
+        schedule(() => setModalPhase(2), 1800); 
+        
+        // 4. Ready Content (Trigger typing)
+        // Wait for height (1s) to finish
+        schedule(() => setModalPhase(3), 2900); 
+
     } else {
         // --- TOOLTIP ANIMATION SEQUENCE ---
-        if (currentStepIndex !== prevStepIndexRef.current) {
-            setTooltipPhase(0);
-            setBgOpacity(0); // Ensure modal BG is gone if we are in tooltip mode
-            
-            // Small delay to allow positioning logic to run first, then expand
-            const t1 = setTimeout(() => setTooltipPhase(1), 200); // Trigger Width
-            const t2 = setTimeout(() => setTooltipPhase(2), 500); // Trigger Height
+        setTooltipPhase(0);
+        setBgOpacity(0); // Ensure modal BG is gone if we are in tooltip mode
+        
+        // Small delay to allow positioning logic to run first, then expand
+        const t1 = setTimeout(() => setTooltipPhase(1), 200); // Trigger Width
+        const t2 = setTimeout(() => setTooltipPhase(2), 500); // Trigger Height
 
-            return () => {
-                clearTimeout(t1);
-                clearTimeout(t2);
-            };
-        }
+        return () => {
+            clearTimeout(t1);
+            clearTimeout(t2);
+        };
     }
     
     return () => clearAllTimeouts();
@@ -333,127 +322,63 @@ const TutorialOverlay: React.FC<TutorialOverlayProps> = ({
     };
   }, [currentStep.targetId]); 
 
-  // --- TYPING / GLITCH EFFECT LOGIC ---
+  // --- SEQUENTIAL TYPING EFFECT ---
   useEffect(() => {
-    const isStepChange = currentStepIndex !== prevStepIndexRef.current;
-    const isLangChange = language !== prevLanguageRef.current;
-
-    prevStepIndexRef.current = currentStepIndex;
-    prevLanguageRef.current = language;
-
     // Clear previous intervals
     if (titleIntervalRef.current) clearInterval(titleIntervalRef.current);
     if (typeIntervalRef.current) clearInterval(typeIntervalRef.current);
-    if (glitchIntervalRef.current) clearInterval(glitchIntervalRef.current);
 
-    // Only start typing/glitching if window is fully open (Phase 3)
+    // Only start typing if window is fully open (Phase 3)
     if (modalPhase < 3 && (currentStep.type === 'welcome' || currentStep.type === 'finish')) {
         return;
     }
 
-    const titleTarget = currentStep.title || "";
-    const bodyTarget = currentStep.text;
-
-    // --- CASE A: LANGUAGE SWITCH (GLITCH TRANSITION) ---
-    if (isLangChange && !isStepChange) {
-        // Run Matrix Glitch Effect
-        const oldTitle = displayedTitle;
-        const oldBody = displayedText;
-        const duration = 600; 
-        const fps = 30;
-        let step = 0;
-        const maxSteps = (duration / 1000) * fps;
-
-        glitchIntervalRef.current = window.setInterval(() => {
-            step++;
-            const progress = step / maxSteps;
-            
-            if (progress >= 1) {
-                setDisplayedTitle(titleTarget);
-                setDisplayedText(bodyTarget);
-                clearInterval(glitchIntervalRef.current);
-                return;
+    // --- 1. TYPE TITLE ---
+    if (currentStep.title && !isTitleDone && (currentStep.type === 'welcome' || currentStep.type === 'finish')) {
+        let i = 0;
+        const txt = currentStep.title;
+        setDisplayedTitle("");
+        
+        titleIntervalRef.current = window.setInterval(() => {
+            setDisplayedTitle(txt.slice(0, i + 1));
+            i++;
+            if (i >= txt.length) {
+                clearInterval(titleIntervalRef.current);
+                setIsTitleDone(true); // Trigger body typing
             }
-
-            // Chaos Calculation
-            const chaos = 1 - Math.abs((progress - 0.5) * 2);
-
-            // Glitch Title
-            const titleLen = Math.round(oldTitle.length + (titleTarget.length - oldTitle.length) * progress);
-            let nextTitle = "";
-            for (let i = 0; i < titleLen; i++) {
-                if (Math.random() < chaos * 0.8) nextTitle += GLITCH_CHARS[Math.floor(Math.random() * GLITCH_CHARS.length)];
-                else nextTitle += (progress > 0.5 ? titleTarget[i] : oldTitle[i]) || "";
-            }
-            setDisplayedTitle(nextTitle);
-
-            // Glitch Body
-            const bodyLen = Math.round(oldBody.length + (bodyTarget.length - oldBody.length) * progress);
-            let nextBody = "";
-            for (let i = 0; i < bodyLen; i++) {
-                if (Math.random() < chaos * 0.5) nextBody += GLITCH_CHARS[Math.floor(Math.random() * GLITCH_CHARS.length)];
-                else nextBody += (progress > 0.5 ? bodyTarget[i] : oldBody[i]) || "";
-            }
-            setDisplayedText(nextBody);
-
-        }, 1000 / fps);
-
+        }, 40); // Slower title typing
         return;
-    }
-
-    // --- CASE B: STEP CHANGE (TYPEWRITER) ---
-    
-    // 1. TYPE TITLE
-    if (currentStep.title && (currentStep.type === 'welcome' || currentStep.type === 'finish')) {
-        if (!isStepChange && isTitleDone) {
-             // Already done (if just re-rendering)
-             setDisplayedTitle(titleTarget);
-        } else {
-            let i = 0;
-            setIsTitleDone(false);
-            setDisplayedTitle("");
-            
-            titleIntervalRef.current = window.setInterval(() => {
-                setDisplayedTitle(titleTarget.slice(0, i + 1));
-                i++;
-                if (i >= titleTarget.length) {
-                    clearInterval(titleIntervalRef.current);
-                    setIsTitleDone(true); // Trigger body typing
-                }
-            }, 40); // Slower title typing
-            return; // Exit here, body waits for isTitleDone
-        }
     } 
     // If not a modal step, show title immediately (tooltip mode)
     else if (currentStep.type !== 'welcome' && currentStep.type !== 'finish') {
-        setDisplayedTitle(titleTarget);
+        setDisplayedTitle(currentStep.title || "");
         setIsTitleDone(true);
     }
 
-    // 2. TYPE BODY
+    // --- 2. TYPE BODY ---
+    // Start body typing only if title is done (or if we are in tooltip mode)
     if (isTitleDone || (currentStep.type !== 'welcome' && currentStep.type !== 'finish')) {
         let j = 0;
+        const bodyTxt = currentStep.text;
         
-        if ((currentStep.type === 'welcome' || currentStep.type === 'finish') && isStepChange) {
+        if (currentStep.type === 'welcome' || currentStep.type === 'finish') {
              // Typing effect for Modal
-             setDisplayedText("");
              typeIntervalRef.current = window.setInterval(() => {
-                setDisplayedText(bodyTarget.slice(0, j + 1));
+                setDisplayedText(bodyTxt.slice(0, j + 1));
                 j++;
-                if (j >= bodyTarget.length) clearInterval(typeIntervalRef.current);
+                if (j >= bodyTxt.length) clearInterval(typeIntervalRef.current);
             }, 20);
         } else {
-            // Instant text for Tooltips to be snappy, or if not changing steps
-            setDisplayedText(bodyTarget);
+            // Instant text for Tooltips to be snappy
+            setDisplayedText(bodyTxt);
         }
     }
 
     return () => {
         if (titleIntervalRef.current) clearInterval(titleIntervalRef.current);
         if (typeIntervalRef.current) clearInterval(typeIntervalRef.current);
-        if (glitchIntervalRef.current) clearInterval(glitchIntervalRef.current);
     };
-  }, [currentStepIndex, currentStep.title, currentStep.text, modalPhase, isTitleDone, language]); 
+  }, [currentStepIndex, currentStep.title, currentStep.text, modalPhase, isTitleDone]); 
 
   // --- PRACTICE CHECKER ---
   useEffect(() => {
@@ -565,7 +490,7 @@ const TutorialOverlay: React.FC<TutorialOverlayProps> = ({
   if (currentStep.type === 'welcome' || currentStep.type === 'finish') {
     return (
       <div 
-        className={`fixed inset-0 z-[10000] flex items-center justify-center p-4 bg-black/90 cursor-none select-none transition-opacity duration-1000 ease-in-out ${bgOpacity < 0.1 ? 'pointer-events-none' : 'pointer-events-auto'}`}
+        className="fixed inset-0 z-[10000] flex items-center justify-center p-4 bg-black/90 cursor-none select-none transition-opacity duration-1000 ease-in-out"
         style={{ opacity: bgOpacity }}
       >
         
@@ -592,29 +517,7 @@ const TutorialOverlay: React.FC<TutorialOverlayProps> = ({
                         {currentStep.type === 'welcome' ? 'SYSTEM GUIDE' : 'COMPLETE'}
                     </span>
                 </div>
-                
-                {/* LANGUAGE SWITCHER */}
-                {currentStep.type === 'welcome' && modalPhase >= 3 && (
-                    <div className="flex items-center gap-3 animate-in fade-in duration-500">
-                        <Globe size={14} className="text-theme-primary" />
-                        <div className="flex text-[10px] font-mono font-bold">
-                            <button 
-                                onClick={() => setLanguage('en')}
-                                className={`px-1.5 py-0.5 rounded-l border border-theme-primary transition-all ${language === 'en' ? 'bg-theme-primary text-black' : 'text-theme-primary hover:bg-theme-primary/20'}`}
-                            >
-                                EN
-                            </button>
-                            <button 
-                                onClick={() => setLanguage('ru')}
-                                className={`px-1.5 py-0.5 rounded-r border border-l-0 border-theme-primary transition-all ${language === 'ru' ? 'bg-theme-primary text-black' : 'text-theme-primary hover:bg-theme-primary/20'}`}
-                            >
-                                RU
-                            </button>
-                        </div>
-                    </div>
-                )}
-
-                <div className="flex gap-1 ml-4">
+                <div className="flex gap-1">
                     <div className="w-2 h-2 bg-theme-primary"></div>
                     <div className="w-2 h-2 bg-theme-primary/50"></div>
                 </div>
