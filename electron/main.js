@@ -9,18 +9,18 @@ const __dirname = path.dirname(__filename);
 
 let mainWindow;
 // Initialize with undefined x/y to prevent crash on first restore if not set
-let lastBounds = { width: 1800, height: 1000, x: undefined, y: undefined }; 
+let lastBounds = { width: 1600, height: 800, x: undefined, y: undefined }; 
 
 // Prevent display from sleeping during playback/recording
 powerSaveBlocker.start('prevent-display-sleep');
 
 function createWindow() {
   mainWindow = new BrowserWindow({
-    width: 1800, 
-    height: 1000,
-    // UPDATED: Lower limits to allow Mini Player
-    minWidth: 340, 
-    minHeight: 500,
+    width: 1600, 
+    height: 800,
+    // UPDATED: Fixed minimum size for both modes as requested
+    minWidth: 800, 
+    minHeight: 800,
     backgroundColor: '#030712', // Critical: Matches app background to hide resize flash
     title: "Neon Retro Player",
     frame: false, 
@@ -86,39 +86,18 @@ function createWindow() {
   });
 
   // --- MINI MODE HANDLERS ---
+  // UPDATED: No longer resizes the window, just acts as a state toggle notification if needed
   ipcMain.on('set-mini-mode', () => {
     if (!mainWindow) return;
-    // Store previous bounds before shrinking
-    if (!mainWindow.isMaximized() && !mainWindow.isMinimized()) {
-        const bounds = mainWindow.getBounds();
-        // Only save if it looks like a full window (width > 500)
-        if (bounds.width > 800) {
-            lastBounds = bounds;
-        }
-    }
-    // Resize to Mini Player dimensions (Fixed 800x900 as requested)
-    mainWindow.setMinimumSize(800, 900);
-    mainWindow.setSize(800, 900, true);
-    mainWindow.setResizable(false); // Fixed size as requested ("неизменным")
+    // We allow resizing in mini mode now, so we don't lock resizable.
+    // Window size remains whatever the user set it to.
+    mainWindow.setResizable(true);
   });
 
   ipcMain.on('set-full-mode', () => {
     if (!mainWindow) return;
     mainWindow.setResizable(true);
-    mainWindow.setMinimumSize(340, 500); // Reset min limits
-    
-    // Restore bounds
-    const { width, height, x, y } = lastBounds;
-    // Ensure we don't restore to a tiny size by accident
-    const targetW = Math.max(width || 1200, 800);
-    const targetH = Math.max(height || 800, 600);
-    
-    if (x !== undefined && y !== undefined) {
-        mainWindow.setBounds({ x, y, width: targetW, height: targetH }, true);
-    } else {
-        mainWindow.setSize(targetW, targetH, true);
-        mainWindow.center();
-    }
+    // Size persists from previous state, no need to restore bounds.
   });
 
   // --- RECORDING SAVE HANDLER ---

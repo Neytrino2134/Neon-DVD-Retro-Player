@@ -146,9 +146,16 @@ export const useAppHotkeys = ({
           return;
       }
 
-      // P: Toggle Media Player (Right Panel)
+      // KeyP logic
       if (e.code === 'KeyP') {
-          toggleRightPanel();
+          if (e.shiftKey) {
+              // Shift + P: Toggle Player Focus Mode
+              setViewMode(viewMode === 'player-focus' ? 'default' : 'player-focus');
+              addNotification(viewMode === 'player-focus' ? "UI RESTORED" : "PLAYER FOCUSED", "info");
+          } else {
+              // P: Toggle Media Player (Right Panel)
+              toggleRightPanel();
+          }
           return;
       }
 

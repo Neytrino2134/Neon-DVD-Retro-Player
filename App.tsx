@@ -3,7 +3,7 @@ import { useState, useRef, useEffect } from 'react';
 import { LanguageProvider } from './contexts/LanguageContext';
 import { NotificationProvider, useNotification } from './contexts/NotificationContext';
 import { ThemeProvider, useTheme } from './contexts/ThemeContext';
-import { Settings } from 'lucide-react';
+import { Settings, Loader } from 'lucide-react';
 
 // Components - Layout & UI
 import TitleBar from './components/TitleBar';
@@ -61,8 +61,6 @@ function AppContent() {
 
   // --- SCREEN CAPTURE STATE ---
   const [screenVideo, setScreenVideo] = useState<MediaStream | null>(null);
-  const [sysAudioVolume, setSysAudioVolume] = useState(1);
-  const [sysAudioMonitor, setSysAudioMonitor] = useState(false);
   const [streamMode, setStreamMode] = useState<'bg' | 'window'>('bg');
 
   // --- REFS ---
@@ -107,19 +105,17 @@ function AppContent() {
 
   // --- INTEGRATION EFFECTS ---
 
-  // Sync audio levels
-  useEffect(() => {
-    player.updateAuxVolume(sysAudioVolume);
-  }, [sysAudioVolume, player]);
-
-  useEffect(() => {
-    player.updateAuxMonitor(sysAudioMonitor);
-  }, [sysAudioMonitor, player]);
-
-  // Initialize Screen Capture
+  // Initialize Screen/Audio Capture
   const screenCapture = useScreenCapture({
     onVideoStream: (stream: MediaStream | null) => setScreenVideo(stream),
-    onAudioStream: (stream: MediaStream) => player.connectAuxSource(stream)
+    onMicStream: (stream) => {
+        if (stream) player.connectMic(stream);
+        else player.disconnectMic();
+    },
+    onSysStream: (stream) => {
+        if (stream) player.connectSys(stream);
+        else player.disconnectSys();
+    }
   });
 
   // AUTO-LAUNCH HANDLER
@@ -223,16 +219,52 @@ function AppContent() {
   // Render Check: Center Panel
   const shouldRenderCenter = view.viewMode !== 'mini' && view.showCenterPanel;
 
+  // Determine if we are in a mode where the right panel takes 100% (Mini, Mobile, or Player Focus)
+  const isRightPanelFullWidth = view.viewMode === 'mini' || view.viewMode === 'player-focus' || !view.showCenterPanel;
+
+  const handleToggleFullscreen = () => {
+      if (!document.fullscreenElement) {
+          document.documentElement.requestFullscreen().catch(err => console.error(err));
+      } else {
+          document.exitFullscreen();
+      }
+  };
+
+  // Determine if loading overlay should be shown (During explicit load, or during exit/enter transitions)
+  const shouldShowLoader = view.animSequence === 'loading' || view.animSequence.includes('exiting') || view.animSequence.includes('entering');
+  const loaderOpacity = (view.animSequence === 'loading' || view.animSequence.includes('exiting')) ? 'opacity-100' : 'opacity-0';
+
   return (
     <div
       ref={appContainerRef}
       className="flex flex-col h-screen w-full bg-theme-bg text-theme-text overflow-hidden relative"
+      // Note: We deliberately apply masterStyle even though we have a loading overlay.
+      // This handles the scaling down animation when exiting.
       style={view.masterStyle}
       onDragOver={fileHandler.onDragOver}
       onDragEnter={fileHandler.onDragEnter}
       onDragLeave={fileHandler.onDragLeave}
       onDrop={fileHandler.onDrop}
     >
+      {/* LOADING OVERLAY (For View Transitions) */}
+      {shouldShowLoader && (
+          <div className={`fixed inset-0 z-[100000] bg-[#030712] flex items-center justify-center transition-opacity duration-500 ${loaderOpacity}`}>
+              <div className="flex flex-col items-center gap-4 text-theme-primary">
+                  <div className="relative">
+                      {/* Spinning Outer Ring */}
+                      <div className="w-16 h-16 rounded-full border-4 border-theme-primary/20 border-t-theme-primary animate-spin"></div>
+                      {/* Inner Static Dot */}
+                      <div className="absolute inset-0 flex items-center justify-center">
+                          <div className="w-2 h-2 bg-theme-primary rounded-full animate-pulse"></div>
+                      </div>
+                  </div>
+                  <span className="font-mono text-xs tracking-[0.3em] font-bold uppercase animate-pulse">
+                      LOADING...
+                  </span>
+              </div>
+          </div>
+      )}
+
       {/* GLOBAL OVERLAYS - Moved here to ensure z-index stacking works correctly */}
       <StartupOverlay
         key={system.startupKey}
@@ -307,6 +339,7 @@ function AppContent() {
       <div
         id="tutorial-main-layout"
         className="flex-1 flex flex-col md:flex-row overflow-hidden relative"
+        style={{ justifyContent: 'flex-end' }} // Ensures stacking from right to support right-alignment feel
       >
         <CustomCursor
           style={(system.introState < 2 || system.rebootPhase === 'active') ? 'system' : config.cursorStyle}
@@ -314,8 +347,8 @@ function AppContent() {
           analyser={player.analyser}
         />
 
-        {/* SIDEBAR TOGGLE TABS - Hidden in Mini Mode */}
-        {view.viewMode !== 'mini' && (
+        {/* SIDEBAR TOGGLE TABS - Hidden in Mini Mode or Player Focus Mode */}
+        {view.viewMode !== 'mini' && view.viewMode !== 'player-focus' && (
           <>
             {view.showCenterPanel && ( 
                 <>
@@ -324,8 +357,8 @@ function AppContent() {
                     isOpen={view.showLeftPanel} 
                     onClick={view.toggleLeftPanel} 
                     style={{
-                        left: view.showLeftPanel ? '460px' : '0px',
-                        transition: 'left 0.7s cubic-bezier(0.25, 1, 0.5, 1)'
+                        left: view.showLeftPanel ? `${view.leftPanelWidth}px` : '0px',
+                        transition: view.isResizing ? 'none' : 'left 0.7s cubic-bezier(0.25, 1, 0.5, 1)'
                     }}
                     />
                     <CollapseTab 
@@ -333,8 +366,8 @@ function AppContent() {
                     isOpen={view.showRightPanel} 
                     onClick={view.toggleRightPanel} 
                     style={{
-                        right: view.showRightPanel ? (view.showCenterPanel ? '580px' : '0') : '0px',
-                        transition: 'right 0.7s cubic-bezier(0.25, 1, 0.5, 1)'
+                        right: view.showRightPanel ? (view.showCenterPanel ? `${view.rightPanelWidth}px` : '0') : '0px',
+                        transition: view.isResizing ? 'none' : 'right 0.7s cubic-bezier(0.25, 1, 0.5, 1)'
                     }}
                     />
                 </>
@@ -376,10 +409,9 @@ function AppContent() {
         />
 
         {/* LEFT PANEL */}
-        {view.viewMode !== 'mini' && (
-          <div className={view.leftPanelClass}>
-            {/* Added explicit width to child to ensure content doesn't reflow during width transition */}
-            <div className="w-[460px] h-full relative">
+        {view.viewMode !== 'mini' && view.viewMode !== 'player-focus' && (
+          <div className={view.leftPanelClass} style={view.leftPanelStyle}>
+            <div className="h-full relative" style={{ width: `${view.leftPanelWidth}px` }}>
               {isEditorMode ? (
                 <EditorControls
                   instruments={musicEngine.instruments}
@@ -479,14 +511,13 @@ function AppContent() {
                   onAmbienceVolume={ambience.setVolume}
                   isVideoActive={screenCapture.isVideoActive}
                   toggleVideo={screenCapture.toggleVideoCapture}
-                  isAudioActive={screenCapture.isAudioActive}
-                  toggleAudio={screenCapture.toggleAudioCapture}
-                  audioSourceType={screenCapture.audioSourceType} 
-                  setAudioSourceType={screenCapture.setAudioSourceType} 
-                  audioVolume={sysAudioVolume}
-                  setAudioVolume={setSysAudioVolume}
-                  isMonitoring={sysAudioMonitor}
-                  setMonitoring={setSysAudioMonitor}
+                  
+                  // NEW Split Audio Props
+                  isMicActive={screenCapture.isMicActive}
+                  toggleMic={screenCapture.toggleMic}
+                  isSysAudioActive={screenCapture.isSysAudioActive}
+                  toggleSysAudio={screenCapture.toggleSysAudio}
+
                   isAdvancedMode={config.isAdvancedMode}
                   setAdvancedMode={config.setAdvancedMode}
                   useAlbumArtAsBackground={config.useAlbumArtAsBackground}
@@ -535,6 +566,16 @@ function AppContent() {
           </div>
         )}
 
+        {/* LEFT RESIZER */}
+        {view.viewMode !== 'mini' && view.viewMode !== 'player-focus' && view.showLeftPanel && view.showCenterPanel && (
+            <div 
+                className="w-4 z-30 flex items-center justify-center cursor-none custom-resizer group -ml-2 mr-0 relative touch-none"
+                onMouseDown={view.handleMouseDownLeft}
+            >
+                <div className="w-[1px] h-[92%] bg-theme-primary/40 rounded-full group-hover:bg-theme-primary group-hover:w-[2px] group-hover:shadow-[0_0_10px_var(--color-primary)] transition-all duration-300"></div>
+            </div>
+        )}
+
         {/* CENTER: RETRO SCREEN OR EDITORS */}
         {shouldRenderCenter && (
           <div className={view.screenContainerClass}>
@@ -563,7 +604,8 @@ function AppContent() {
                 bgPatternConfig={config.bgPatternConfig}
 
                 videoStream={screenVideo}
-                isSystemAudioActive={screenCapture.isAudioActive}
+                isSystemAudioActive={screenCapture.isSysAudioActive} // Pass SysAudio flag for UI indicators
+                isMicActive={screenCapture.isMicActive} // NEW: Pass Mic flag for visuals
                 streamMode={streamMode}
 
                 visualizerConfig={config.visualizerConfig}
@@ -616,11 +658,24 @@ function AppContent() {
           </div>
         )}
 
+        {/* RIGHT RESIZER */}
+        {view.viewMode !== 'mini' && view.viewMode !== 'player-focus' && view.showRightPanel && view.showCenterPanel && (
+            <div 
+                className="w-4 z-30 flex items-center justify-center cursor-none custom-resizer group -ml-0 mr-[-8px] relative touch-none"
+                onMouseDown={view.handleMouseDownRight}
+            >
+                <div className="w-[1px] h-[92%] bg-theme-primary/40 rounded-full group-hover:bg-theme-primary group-hover:w-[2px] group-hover:shadow-[0_0_10px_var(--color-primary)] transition-all duration-300"></div>
+            </div>
+        )}
+
         {/* RIGHT PANEL: CONTROLS (AND MINI PLAYER) */}
-        <div className={view.rightPanelClass}>
-          {/* Explicit width ensures inner content doesn't squeeze during animation */}
-          {/* In Mini Mode, this panel becomes the entire viewport */}
-          <div className={`${view.viewMode === 'mini' ? 'w-full h-full' : (view.showCenterPanel ? 'w-[580px]' : 'w-full')} h-full`}>
+        <div className={view.rightPanelClass} style={view.rightPanelStyle}>
+          <div 
+            className={`${isRightPanelFullWidth ? 'w-full h-full' : (view.showCenterPanel ? '' : 'w-full')} h-full`} 
+            style={{ 
+                width: isRightPanelFullWidth ? '100%' : `${view.rightPanelWidth}px` 
+            }}
+          >
             <Controls
               viewMode={view.viewMode}
               onToggleMiniMode={() => view.setViewMode(view.viewMode === 'mini' ? 'default' : 'mini')}
@@ -674,6 +729,12 @@ function AppContent() {
               // Rating
               onRateTrack={player.rateTrack}
               onSortByRating={() => { player.sortByRating(); addNotification("Sorted by Rating", "info"); }}
+              
+              // NEW PROPS FOR FOCUS AND FULLSCREEN
+              onTogglePlayerFocus={() => view.setViewMode(view.viewMode === 'player-focus' ? 'default' : 'player-focus')}
+              isPlayerFocus={view.viewMode === 'player-focus'}
+              onToggleFullscreen={handleToggleFullscreen}
+              isFullscreen={!!document.fullscreenElement}
             />
           </div>
         </div>
