@@ -21,15 +21,37 @@ export const useRecorder = (getAudioStream: () => MediaStream | null) => {
       if (config.resolution === '4k') { width = 3840; height = 2160; }
 
       // 1. Get Visual Stream (Screen Capture)
-      // We rely on getDisplayMedia which lets the user select the app window
-      const videoStream = await navigator.mediaDevices.getDisplayMedia({
-        video: {
-            width: { ideal: width },
-            height: { ideal: height },
-            frameRate: { ideal: config.fps }
-        },
-        audio: false // We mix high-quality audio separately
-      });
+      let videoStream: MediaStream;
+
+      // Check if running in Electron AND if a specific source ID is provided
+      if ((window as any).require && config.sourceId) {
+          // ELECTRON: Use getUserMedia with chromeMediaSourceId to capture the specific screen directly
+          videoStream = await navigator.mediaDevices.getUserMedia({
+              audio: false, // We mix audio separately below
+              video: {
+                  mandatory: {
+                      chromeMediaSource: 'desktop',
+                      chromeMediaSourceId: config.sourceId,
+                      minWidth: 1280,
+                      maxWidth: 3840,
+                      minHeight: 720,
+                      maxHeight: 2160,
+                      minFrameRate: config.fps,
+                      maxFrameRate: config.fps
+                  }
+              } as any // Cast 'mandatory' which is Electron/Chrome specific
+          });
+      } else {
+          // WEB / FALLBACK: Use getDisplayMedia which invokes the native picker
+          videoStream = await navigator.mediaDevices.getDisplayMedia({
+            video: {
+                width: { ideal: width },
+                height: { ideal: height },
+                frameRate: { ideal: config.fps }
+            },
+            audio: false // We mix high-quality audio separately
+          });
+      }
 
       // 2. Get Audio Stream (Web Audio API)
       const audioStream = getAudioStream();

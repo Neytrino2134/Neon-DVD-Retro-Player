@@ -1,7 +1,7 @@
 
 import React, { useState, useRef, useEffect } from 'react';
 import { Settings, HelpCircle, Power, Home } from 'lucide-react';
-import { VisualizerConfig, EffectsConfig, DvdConfig, MarqueeConfig, PatternConfig, BackgroundMedia, AppPreset, CursorStyle, WatermarkConfig, ThemeType, ControlStyle, BgTransitionType, AmbienceFile, AmbienceConfig, BgAnimationType, BackgroundPlaylist, BgHotspot } from '../../types';
+import { VisualizerConfig, EffectsConfig, DvdConfig, MarqueeConfig, PatternConfig, BackgroundMedia, AppPreset, CursorStyle, WatermarkConfig, ThemeType, ControlStyle, BgTransitionType, AmbienceFile, AmbienceConfig, BgAnimationType, BackgroundPlaylist } from '../../types';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { useTheme } from '../../contexts/ThemeContext';
 import { useNotification } from '../../contexts/NotificationContext';
@@ -19,7 +19,6 @@ import BackgroundSection from './sections/BackgroundSection';
 import SoundSection from './sections/SoundSection';
 import WaveformSection from './sections/WaveformSection';
 import ModulesSection from './sections/ModulesSection';
-import GameSection from './sections/GameSection';
 import PostProcessingSection from './sections/PostProcessingSection';
 
 // Map of Main Section ID -> Array of Child Module IDs
@@ -30,7 +29,6 @@ const SECTION_MODULES: Record<string, string[]> = {
   sfx: ['mixer', 'ambience', 'sysaudio'],
   waves: ['wave', 'reactor', 'sine'],
   mod: ['marquee', 'dvd', 'leaks', 'rain', 'hologram', 'gemini', 'scan', 'cyber', 'glitch'],
-  game: ['tron'],
   post: ['fps', 'signal', 'chromatic', 'vignette', 'flicker']
 };
 
@@ -145,8 +143,6 @@ interface SettingsPanelProps {
   toggleVideo: () => void;
   isAudioActive: boolean;
   toggleAudio: () => void;
-  audioSourceType?: 'system' | 'mic'; 
-  setAudioSourceType?: (t: 'system' | 'mic') => void;
   audioVolume: number;
   setAudioVolume: (v: number) => void;
   isMonitoring: boolean;
@@ -166,10 +162,6 @@ interface SettingsPanelProps {
 
   // Shuffle BG
   shuffleBgList?: () => void; 
-  
-  // Update BG
-  updateBg?: (id: string, newFile: File) => Promise<void>; 
-  updateBgMetadata?: (id: string, hotspots: BgHotspot[]) => Promise<void>; // New Prop
 }
 
 const SettingsPanel: React.FC<SettingsPanelProps> = ({
@@ -185,13 +177,11 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
   bgTransition, setBgTransition, bgAnimation, setBgAnimation,
   onRestartTutorial,
   ambienceFiles, ambienceConfig, onAmbienceUpload, onAmbienceDelete, onAmbienceSetActive, onAmbienceTogglePlay, onAmbienceVolume,
-  isVideoActive, toggleVideo, isAudioActive, toggleAudio, audioSourceType, setAudioSourceType,
+  isVideoActive, toggleVideo, isAudioActive, toggleAudio,
   isAdvancedMode, setAdvancedMode,
   useAlbumArtAsBackground = false, setUseAlbumArtAsBackground = () => {},
   streamMode, setStreamMode,
-  shuffleBgList,
-  updateBg = async () => {}, 
-  updateBgMetadata = async () => {} 
+  shuffleBgList
 }) => {
   // Module Expansion State
   const [expandedState, setExpandedState] = useState<Record<string, boolean>>({});
@@ -203,7 +193,6 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
       sfx: true,
       waves: true, 
       mod: true,
-      game: true,
       post: true
   });
 
@@ -220,18 +209,18 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
   const startPageY = useRef(0); 
   const wasDragged = useRef(false); 
 
-  const toggleExpand = (id: string, isAdditive: boolean, forceOpen?: boolean) => {
+  const toggleExpand = (id: string, isAdditive: boolean) => {
     if (wasDragged.current) return;
     
     setExpandedState(prev => {
         const isCurrentlyOpen = prev[id];
         let newState = { ...prev };
 
-        if (isAdditive && forceOpen === undefined) {
+        if (isAdditive) {
             // Shift click: Toggle target, leave others alone
             newState[id] = !isCurrentlyOpen;
         } else {
-            // Normal click OR Force Open: Accordion behavior within the section
+            // Normal click: Accordion behavior within the section
             
             // 1. Identify which section this module belongs to
             let groupIds: string[] = [];
@@ -249,8 +238,8 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
                 }
             });
 
-            // 3. Toggle or Force Open the target module
-            newState[id] = forceOpen !== undefined ? forceOpen : !isCurrentlyOpen;
+            // 3. Toggle the target module
+            newState[id] = !isCurrentlyOpen;
         }
         
         return newState;
@@ -290,23 +279,34 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
       setOpenSections(prev => {
           const isCurrentlyOpen = prev[sectionId];
           let newState: Record<string, boolean> = { ...prev };
-          
-          // GOAL 1: Collapse all inner panels when switching tabs (opening a new section)
-          // If we are opening a section (either via additive or exclusive), reset inner state
-          if (!isCurrentlyOpen) {
-              setExpandedState({});
-          }
+          const sectionsClosing: string[] = [];
 
           if (isAdditive) {
               newState[sectionId] = !isCurrentlyOpen;
+              if (isCurrentlyOpen) sectionsClosing.push(sectionId);
           } else {
-              // Exclusive open: close others
               Object.keys(prev).forEach(key => {
                   if (key !== sectionId && prev[key]) {
                       newState[key] = false;
+                      sectionsClosing.push(key);
                   }
               });
               newState[sectionId] = true;
+          }
+
+          if (sectionsClosing.length > 0) {
+              setExpandedState(prevExpanded => {
+                  const nextExpanded = { ...prevExpanded };
+                  sectionsClosing.forEach(closedSecId => {
+                      const modules = SECTION_MODULES[closedSecId];
+                      if (modules) {
+                          modules.forEach(modId => {
+                              nextExpanded[modId] = false;
+                          });
+                      }
+                  });
+                  return nextExpanded;
+              });
           }
           
           return newState;
@@ -367,8 +367,7 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
           if (e.code === 'Digit3') handleSectionToggle('sfx', false);
           if (e.code === 'Digit4') handleSectionToggle('waves', false);
           if (e.code === 'Digit5') handleSectionToggle('mod', false);
-          if (e.code === 'Digit6') handleSectionToggle('game', false);
-          if (e.code === 'Digit7') handleSectionToggle('post', false);
+          if (e.code === 'Digit6') handleSectionToggle('post', false);
       };
 
       window.addEventListener('keydown', handleKeyDown);
@@ -487,7 +486,7 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
             <BackgroundSection 
                 expandedState={expandedState} toggleExpand={toggleExpand}
                 bgAnimation={bgAnimation} setBgAnimation={setBgAnimation} bgTransition={bgTransition} setBgTransition={setBgTransition}
-                bgMedia={bgMedia} bgList={bgList} currentBgIndex={currentBgIndex} onRemoveBg={onRemoveBg} onMoveBg={onMoveBg} onSelectBg={onSelectBg} onClearBgMedia={onClearBgMedia} shuffleBgList={shuffleBgList} onBgMediaUpload={onBgMediaUpload} onUpdateBg={updateBg} onUpdateMetadata={updateBgMetadata}
+                bgMedia={bgMedia} bgList={bgList} currentBgIndex={currentBgIndex} onRemoveBg={onRemoveBg} onMoveBg={onMoveBg} onSelectBg={onSelectBg} onClearBgMedia={onClearBgMedia} shuffleBgList={shuffleBgList} onBgMediaUpload={onBgMediaUpload}
                 bgAutoplayInterval={bgAutoplayInterval} setBgAutoplayInterval={setBgAutoplayInterval} useAlbumArtAsBackground={useAlbumArtAsBackground} setUseAlbumArtAsBackground={setUseAlbumArtAsBackground}
                 bgColor={bgColor} setBgColor={setBgColor} bgPattern={bgPattern} setBgPattern={setBgPattern} bgPatternConfig={bgPatternConfig} setBgPatternConfig={setBgPatternConfig} onDeselectBg={onDeselectBg}
                 isVideoActive={isVideoActive} toggleVideo={toggleVideo} streamMode={streamMode} setStreamMode={setStreamMode}
@@ -506,7 +505,7 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
                 expandedState={expandedState} toggleExpand={toggleExpand}
                 crossfadeDuration={crossfadeDuration} setCrossfadeDuration={setCrossfadeDuration} sfxVolume={sfxVolume} setSfxVolume={setSfxVolume} smoothStart={smoothStart} setSmoothStart={setSmoothStart}
                 ambienceFiles={ambienceFiles} ambienceConfig={ambienceConfig} onAmbienceUpload={onAmbienceUpload} onAmbienceDelete={onAmbienceDelete} onAmbienceSetActive={onAmbienceSetActive} onAmbienceTogglePlay={onAmbienceTogglePlay} onAmbienceVolume={onAmbienceVolume}
-                isAudioActive={isAudioActive} toggleAudio={toggleAudio} audioSourceType={audioSourceType} setAudioSourceType={setAudioSourceType}
+                isAudioActive={isAudioActive} toggleAudio={toggleAudio}
             />
         </SettingsSection>
 
@@ -541,24 +540,11 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
         </SettingsSection>
 
         <SettingsSection 
-            id="game" 
-            title={<><span className="text-theme-muted opacity-50 font-normal mr-2">6 //</span> GAME MODULES</>} 
-            isOpen={openSections['game']} 
-            onToggle={(isAdditive) => handleSectionToggle('game', isAdditive)}
-            stickyTop="180px"
-        >
-            <GameSection 
-                expandedState={expandedState} toggleExpand={toggleExpand} safeAction={safeAction}
-                effectsConfig={effectsConfig} updateEffect={updateEffect}
-            />
-        </SettingsSection>
-
-        <SettingsSection 
             id="post" 
-            title={<><span className="text-theme-muted opacity-50 font-normal mr-2">7 //</span> <TranslatedText k="cat_screen_effects" /></>} 
+            title={<><span className="text-theme-muted opacity-50 font-normal mr-2">6 //</span> <TranslatedText k="cat_screen_effects" /></>} 
             isOpen={openSections['post']} 
             onToggle={(isAdditive) => handleSectionToggle('post', isAdditive)}
-            stickyTop="216px"
+            stickyTop="180px"
         >
             <PostProcessingSection 
                 expandedState={expandedState} toggleExpand={toggleExpand} safeAction={safeAction}

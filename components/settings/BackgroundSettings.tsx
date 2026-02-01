@@ -1,14 +1,13 @@
 
-import React, { useState, useRef, useMemo } from 'react';
-import { List, ChevronDown, ChevronUp, Timer, Trash2, RefreshCw, Disc, Upload, Power, Shuffle, Plus, X, Play, Image as ImageIcon, Video, Wand2 } from 'lucide-react';
-import { BackgroundMedia, PatternConfig, BgTransitionType, BgAnimationType, BackgroundPlaylist, BgHotspot } from '../../types';
+import React, { useState, useRef } from 'react';
+import { List, ChevronDown, ChevronUp, Timer, Trash2, RefreshCw, Disc, Upload, Power, Shuffle, Plus, X, Play } from 'lucide-react';
+import { BackgroundMedia, PatternConfig, BgTransitionType, BgAnimationType, BackgroundPlaylist } from '../../types';
 import RangeControl from './RangeControl';
 import CustomSelect from './CustomSelect';
 import ToggleSwitch from './ToggleSwitch';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { Tooltip } from '../ui/Tooltip';
 import { useTheme } from '../../contexts/ThemeContext';
-import BackgroundEditorModal from '../modals/BackgroundEditorModal';
 
 // SHARED CONSTANTS
 const PALETTE_OPTIONS = [
@@ -112,8 +111,6 @@ interface BgResourceModuleProps {
   onClearBgMedia: () => void;
   onShuffleBg: () => void;
   onBgMediaUpload: (files: FileList) => void;
-  onUpdateBg: (id: string, newFile: File) => Promise<void>; 
-  onUpdateMetadata?: (id: string, hotspots: BgHotspot[]) => Promise<void>; // New Prop
   bgAutoplayInterval: number;
   setBgAutoplayInterval: (val: number) => void;
   useAlbumArtAsBackground: boolean;
@@ -124,17 +121,17 @@ export const BgResourceModule: React.FC<BgResourceModuleProps> = ({
   bgList, bgPlaylists = [], activeBgPlaylistId, playingBgPlaylistId,
   setActiveBgPlaylistId, setPlayingBgPlaylistId, addBgPlaylist, removeBgPlaylist, renameBgPlaylist,
   currentBgIndex, onRemoveBg, onMoveBg, onSelectBg,
-  onClearBgMedia, onShuffleBg, onBgMediaUpload, onUpdateBg, onUpdateMetadata,
+  onClearBgMedia, onShuffleBg, onBgMediaUpload,
   bgAutoplayInterval, setBgAutoplayInterval,
   useAlbumArtAsBackground, setUseAlbumArtAsBackground
 }) => {
   const { t } = useLanguage();
   const fileInputRef = useRef<HTMLInputElement>(null);
   
+  // By default expanded in module view
   const [showBgList, setShowBgList] = useState(true);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editingName, setEditingName] = useState("");
-  const [showEditor, setShowEditor] = useState(false);
 
   const isTimerOn = bgAutoplayInterval > 0;
   
@@ -157,11 +154,6 @@ export const BgResourceModule: React.FC<BgResourceModuleProps> = ({
       }
       setEditingId(null);
   };
-
-  // Filter images for editor
-  const imagesForEditor = useMemo(() => {
-      return bgList.filter(item => item.type === 'image');
-  }, [bgList]);
 
   return (
     <div className="pt-2 space-y-3">
@@ -274,6 +266,7 @@ export const BgResourceModule: React.FC<BgResourceModuleProps> = ({
                               </button>
                           </div>
                           
+                          {/* Timer Toggle */}
                           <Tooltip content={isTimerOn ? "DISABLE TIMER" : "ENABLE TIMER"} position="top">
                               <button 
                                   onClick={toggleTimer}
@@ -285,7 +278,7 @@ export const BgResourceModule: React.FC<BgResourceModuleProps> = ({
                       </div>
                   </div>
 
-                  {/* Controls: Load, Editor, Shuffle, Clear */}
+                  {/* Load, Shuffle, Clear Buttons */}
                   <div className="p-2 border-b border-theme-border flex gap-2">
                       <Tooltip content="ADD IMAGES OR VIDEO" position="top" className="flex-1">
                           <button 
@@ -296,17 +289,6 @@ export const BgResourceModule: React.FC<BgResourceModuleProps> = ({
                               <span>LOAD BG</span>
                           </button>
                       </Tooltip>
-                      
-                      {imagesForEditor.length > 0 && (
-                          <Tooltip content="BACKGROUND EDITOR" position="top">
-                              <button 
-                                  onClick={() => setShowEditor(true)}
-                                  className="px-3 py-2 bg-theme-panel border border-theme-border rounded text-theme-muted hover:text-theme-primary hover:border-theme-primary transition-all flex items-center justify-center group"
-                              >
-                                  <Wand2 size={14} className="group-hover:rotate-12 transition-transform" />
-                              </button>
-                          </Tooltip>
-                      )}
                       
                       <Tooltip content="SHUFFLE BACKGROUNDS" position="top">
                           <button 
@@ -335,9 +317,10 @@ export const BgResourceModule: React.FC<BgResourceModuleProps> = ({
                           </div>
                       )}
                       {bgList.map((bg, index) => {
+                          // Is active if:
+                          // 1. We are viewing the playlist that is currently playing
+                          // 2. This item is the current index
                           const isPlayingThisItem = activeBgPlaylistId === playingBgPlaylistId && index === currentBgIndex;
-                          const isVideo = bg.type === 'video';
-                          const hasHotspots = bg.hotspots && bg.hotspots.length > 0;
                           
                           return (
                           <div 
@@ -351,12 +334,8 @@ export const BgResourceModule: React.FC<BgResourceModuleProps> = ({
                               onClick={() => onSelectBg(index)}
                           >
                               <div className="flex items-center gap-2 overflow-hidden">
-                                  <div className="shrink-0 text-theme-muted opacity-70">
-                                      {isVideo ? <Video size={10} /> : <ImageIcon size={10} />}
-                                  </div>
-                                  <div className={`w-1 h-3 rounded-full ${isPlayingThisItem ? 'bg-theme-primary shadow-[0_0_5px_var(--color-primary)]' : 'bg-gray-700'}`}></div>
+                                  <div className={`w-1.5 h-1.5 rounded-full ${isPlayingThisItem ? 'bg-theme-primary shadow-[0_0_5px_var(--color-primary)]' : 'bg-gray-600'}`}></div>
                                   <span className="truncate max-w-[120px] font-mono">{bg.file.name}</span>
-                                  {hasHotspots && <span className="text-[8px] text-theme-accent">*</span>}
                               </div>
                               <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                                   <button 
@@ -407,14 +386,6 @@ export const BgResourceModule: React.FC<BgResourceModuleProps> = ({
           accept="image/*,video/*" 
           multiple
           className="hidden" 
-        />
-
-        <BackgroundEditorModal 
-            isOpen={showEditor}
-            onClose={() => setShowEditor(false)}
-            images={imagesForEditor}
-            onUpdateBg={onUpdateBg}
-            onUpdateMetadata={onUpdateMetadata}
         />
     </div>
   );

@@ -1,6 +1,6 @@
 
 import React from 'react';
-import { Power, HelpCircle, List, Minimize, Maximize, Circle, Square, Lock } from 'lucide-react';
+import { Power, HelpCircle, List, Minimize, Maximize, Circle, Square } from 'lucide-react';
 import { Tooltip } from '../ui/Tooltip';
 import { useLanguage } from '../../contexts/LanguageContext';
 
@@ -21,9 +21,6 @@ interface ScreenTopBarProps {
   isRecording?: boolean;
   onStartRecording?: () => void;
   onStopRecording?: () => void;
-
-  // Lock Prop
-  isPlaylistLocked?: boolean;
 }
 
 const formatTime = (seconds: number) => {
@@ -48,18 +45,13 @@ const ScreenTopBar: React.FC<ScreenTopBarProps> = ({
   setFocusMode,
   isRecording,
   onStartRecording,
-  onStopRecording,
-  isPlaylistLocked
+  onStopRecording
 }) => {
   const { t } = useLanguage();
   const isElectron = typeof navigator !== 'undefined' && /Electron/.test(navigator.userAgent);
 
-  // Check if reboot is scheduled (waiting for track end)
-  const isRebootWaiting = rebootPhase === 'waiting';
-
-  // In Focus Mode (Big Screen), hide interface unless hovered.
-  // EXCEPTION: If reboot is scheduled (waiting), keep interface visible to show the timer.
-  const containerClass = (focusMode && !isRebootWaiting)
+  // In Focus Mode (Big Screen), hide interface unless hovered
+  const containerClass = focusMode 
     ? "opacity-0 hover:opacity-100 transition-opacity duration-500" 
     : "opacity-100";
 
@@ -69,7 +61,7 @@ const ScreenTopBar: React.FC<ScreenTopBarProps> = ({
             but we handle parent opacity hover for "Big Screen" effect */}
         
         {/* TOP LEFT CONTROLS */}
-        <div className="absolute top-4 left-4 flex gap-2 pointer-events-auto items-center">
+        <div className="absolute top-4 left-4 flex gap-2 pointer-events-auto">
             <Tooltip content={t('reboot')} position="right">
             <button 
                 onClick={onScheduleReload} 
@@ -78,12 +70,6 @@ const ScreenTopBar: React.FC<ScreenTopBarProps> = ({
                 <Power size={20} />
             </button>
             </Tooltip>
-
-            {isPlaylistLocked && (
-                <div className="bg-gray-500/10 border border-gray-500 p-1.5 rounded-full text-gray-500">
-                    <Lock size={14} />
-                </div>
-            )}
         </div>
 
         {/* TOP RIGHT CONTROLS & STATUS */}

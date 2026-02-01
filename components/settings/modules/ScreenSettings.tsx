@@ -3,7 +3,7 @@ import React from 'react';
 import { Video, Cast, Mic, MicOff, AlertTriangle } from 'lucide-react';
 import ToggleSwitch from '../ToggleSwitch';
 import { useLanguage } from '../../../contexts/LanguageContext';
-import CustomSelect from '../CustomSelect'; 
+import CustomSelect from '../CustomSelect'; // Import CustomSelect
 
 // Full interface for reference/parent usage
 interface ScreenSettingsProps {
@@ -15,8 +15,6 @@ interface ScreenSettingsProps {
   setAudioVolume: (v: number) => void;
   isMonitoring: boolean;
   setMonitoring: (v: boolean) => void;
-  audioSourceType?: 'system' | 'mic';
-  setAudioSourceType?: (t: 'system' | 'mic') => void;
 }
 
 // Additional props for video module
@@ -26,51 +24,26 @@ interface ScreenVideoModuleProps extends Pick<ScreenSettingsProps, 'isVideoActiv
 }
 
 // Sub-component for System Audio settings
-export const SystemAudioModule: React.FC<Pick<ScreenSettingsProps, 'isAudioActive' | 'toggleAudio' | 'audioSourceType' | 'setAudioSourceType'>> = ({ 
-    isAudioActive, toggleAudio, audioSourceType, setAudioSourceType
+export const SystemAudioModule: React.FC<Pick<ScreenSettingsProps, 'isAudioActive' | 'toggleAudio'>> = ({ 
+    isAudioActive, toggleAudio 
 }) => {
     const { t } = useLanguage();
     
     // Check if running in Electron.
     const isElectron = typeof navigator !== 'undefined' && /Electron/.test(navigator.userAgent);
     
-    const sourceOptions = [
-        { value: 'system', label: 'SYSTEM AUDIO (LOOPBACK)' },
-        { value: 'mic', label: 'MICROPHONE INPUT' }
-    ];
-
-    // Disable if using System Audio AND not electron/desktop (since getDisplayMedia audio is strict on mobile/web)
-    // Actually, getDisplayMedia audio works on Desktop Chrome without Electron, but for "System Audio" typically needs Tab sharing.
-    // Let's just assume we allow mic everywhere, but system is strict.
-    const canUseSystem = isElectron; 
-    const isSystemSelected = audioSourceType === 'system';
-    
-    // Disable toggle if system selected but not available?
-    // Or just show warning. The hook handles the error gracefully anyway.
-    const isDisabled = isSystemSelected && !canUseSystem;
-
     return (
         <div className="pt-2 space-y-4">
-            
-            {setAudioSourceType && (
-                <CustomSelect 
-                    label="INPUT SOURCE" 
-                    value={audioSourceType || 'system'} 
-                    options={sourceOptions} 
-                    onChange={(v) => setAudioSourceType(v as 'system' | 'mic')} 
-                />
-            )}
-
             <ToggleSwitch 
                 label={t('capture_audio')} 
                 icon={isAudioActive ? Mic : MicOff} 
                 value={isAudioActive} 
                 onChange={toggleAudio} 
                 color="green"
-                disabled={isDisabled}
+                disabled={!isElectron}
             />
             
-            {isDisabled && (
+            {!isElectron && (
                 <div className="bg-red-500/10 border border-red-500/30 p-2 rounded flex items-center gap-2">
                     <AlertTriangle size={14} className="text-red-500 shrink-0" />
                     <p className="text-[9px] text-red-400 font-mono leading-tight">

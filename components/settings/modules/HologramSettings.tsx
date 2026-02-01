@@ -1,6 +1,6 @@
 
 import React from 'react';
-import { Square, CheckSquare, Zap, Target } from 'lucide-react';
+import { Square, CheckSquare, Zap } from 'lucide-react';
 import RangeControl from '../RangeControl';
 import CustomSelect from '../CustomSelect';
 import ToggleSwitch from '../ToggleSwitch';
@@ -68,18 +68,7 @@ const HologramSettings: React.FC<HologramSettingsProps> = ({ config, update }) =
           />
        </div>
 
-       {/* 3. Interactive Hotspots Toggle (NEW) */}
-       <div className="mb-4">
-          <ToggleSwitch 
-              label={t('show_hotspots')} 
-              icon={Target} 
-              value={config.showHotspots !== false} 
-              onChange={(v) => update({ ...config, showHotspots: v })} 
-              color="green"
-          />
-       </div>
-
-       {/* 4. Style / Color (Moved below) */}
+       {/* 3. Style / Color (Moved below) */}
        <div className="mb-4 pt-2 border-t border-theme-border">
            <CustomSelect 
               label={t('hologram_color')}

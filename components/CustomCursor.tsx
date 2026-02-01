@@ -1,6 +1,5 @@
 
 import React, { useEffect, useRef } from 'react';
-import { createPortal } from 'react-dom';
 import { CursorStyle } from '../types';
 import { useTheme } from '../contexts/ThemeContext';
 
@@ -36,8 +35,7 @@ const mouseState = {
     isHovering: false,
     isScreenHover: false,
     hideCrosshair: false,
-    isOut: false,
-    isPanelHover: false
+    isOut: false 
 };
 
 let listenersAttached = false;
@@ -62,10 +60,9 @@ interface Particle {
 interface CustomCursorProps {
   style?: CursorStyle;
   retroScreenStyle?: CursorStyle; // New Prop
-  analyser?: AnalyserNode | null; // Added analyser prop
 }
 
-const CustomCursor: React.FC<CustomCursorProps> = ({ style = 'default', retroScreenStyle = 'crosshair', analyser }) => {
+const CustomCursor: React.FC<CustomCursorProps> = ({ style = 'default', retroScreenStyle = 'crosshair' }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const cursorRef = useRef<HTMLDivElement>(null);
   const dosCursorRef = useRef<HTMLDivElement>(null);
@@ -83,9 +80,6 @@ const CustomCursor: React.FC<CustomCursorProps> = ({ style = 'default', retroScr
   const particlesRef = useRef<Particle[]>([]);
   const frameRef = useRef(0);
   const lastMousePos = useRef({ x: 0, y: 0 });
-  
-  // Audio Data Ref
-  const dataArrayRef = useRef<Uint8Array | null>(null);
 
   // --- 1. GLOBAL INPUT TRACKER ---
   useEffect(() => {
@@ -100,6 +94,8 @@ const CustomCursor: React.FC<CustomCursorProps> = ({ style = 'default', retroScr
           const target = e.target as HTMLElement;
           let forceSystem = false;
 
+          // Only force system cursor if explicit class is present.
+          // Removed automatic scrollbar detection logic.
           if (target.closest && target.closest('.system-cursor')) {
               forceSystem = true;
           } 
@@ -137,10 +133,6 @@ const CustomCursor: React.FC<CustomCursorProps> = ({ style = 'default', retroScr
           
           const isScreen = target.closest('.cursor-target-screen');
           mouseState.isScreenHover = !!isScreen;
-
-          // Detect panels for special cursor logic
-          const isPanel = target.closest('.bg-theme-panel') || target.closest('.player-chassis') || target.closest('.bg-black\\/90');
-          mouseState.isPanelHover = !!isPanel;
       };
 
       window.addEventListener('pointermove', handleMove, { passive: true });
@@ -171,7 +163,7 @@ const CustomCursor: React.FC<CustomCursorProps> = ({ style = 'default', retroScr
     return () => document.body.classList.remove('force-system-cursor');
   }, [style]);
 
-  // --- 3. CANVAS RESIZE ---
+  // --- 3. CANVAS RESIZE (For Default & Music Style) ---
   useEffect(() => {
       const canvas = canvasRef.current;
       if (!canvas) return;
@@ -190,37 +182,19 @@ const CustomCursor: React.FC<CustomCursorProps> = ({ style = 'default', retroScr
       const canvas = canvasRef.current;
       const ctx = canvas ? canvas.getContext('2d') : null;
 
-      // Init audio array
-      if (analyser && !dataArrayRef.current) {
-          dataArrayRef.current = new Uint8Array(analyser.frequencyBinCount);
-      }
-
       const loop = () => {
-          const { x, y, forceSystemCursor, isOut, isHovering, isClicked, isScreenHover, isPanelHover } = mouseState;
+          const { x, y, forceSystemCursor, isOut, isHovering, isClicked, isScreenHover } = mouseState;
           const isAppDragging = document.body.classList.contains('app-dragging');
           const shouldHide = forceSystemCursor || isOut;
 
-          // CALCULATE AUDIO LEVEL
-          let audioLevel = 0;
-          if (analyser && dataArrayRef.current) {
-              // Cast to any to fix TS Uint8Array mismatch between dom/web-audio types
-              analyser.getByteFrequencyData(dataArrayRef.current as any);
-              
-              // Sample a portion for performance
-              let sum = 0;
-              const step = 4;
-              const len = dataArrayRef.current.length;
-              for(let i = 0; i < len; i += step) {
-                  sum += dataArrayRef.current[i];
-              }
-              // Normalize (0.0 to 1.0)
-              audioLevel = (sum / (len / step)) / 255;
-          }
-
+          // DETERMINE ACTIVE STYLE
+          // Special Logic: If Music Flow is active, we force it to stay active even on screen 
+          // (to keep particles) but we will swap the pointer icon inside the block.
           let activeStyle = (isScreenHover) ? retroScreenStyle : style;
           if (style === 'music-flow') activeStyle = 'music-flow';
 
           if (activeStyle === 'system') {
+              // Hide everything if active style is system
               if (canvas) ctx?.clearRect(0, 0, canvas.width, canvas.height);
               if (cursorRef.current) cursorRef.current.style.opacity = '0';
               if (dosCursorRef.current) dosCursorRef.current.style.opacity = '0';
@@ -230,27 +204,24 @@ const CustomCursor: React.FC<CustomCursorProps> = ({ style = 'default', retroScr
 
           // --- MUSIC FLOW MODE ---
           if (activeStyle === 'music-flow' && ctx && canvas) {
+              // Ensure other cursors are managed (music flow uses SVG cursor + canvas particles)
               if (dosCursorRef.current) dosCursorRef.current.style.opacity = '0';
               if (cursorRef.current) {
                   const scale = isClicked ? 0.9 : 1;
                   cursorRef.current.style.transform = `translate(${x}px, ${y}px) scale(${scale})`;
                   cursorRef.current.style.opacity = shouldHide ? '0' : '1';
                   
+                  // Icon Switch Logic for Music Flow
                   let showArrow = !shouldHide;
-                  // Default to showing crosshair in Music Flow
-                  let showCrosshair = !shouldHide; 
                   let showHand = isHovering && !shouldHide;
-
-                  // Overrides for Music Flow: Hide arrow if over panel
-                  if (isPanelHover || isHovering) {
-                      showArrow = false;
-                      showHand = false; // Hide hand too, keep only crosshair as requested
-                  }
+                  let showCrosshair = isScreenHover && !shouldHide;
 
                   if (isScreenHover) {
                       showArrow = false;
-                      showHand = false;
-                  } 
+                      showHand = false; // Force crosshair even if hovering interactive on screen
+                  } else if (isHovering) {
+                      showArrow = false;
+                  }
 
                   if (isAppDragging) {
                       showArrow = false;
@@ -258,16 +229,17 @@ const CustomCursor: React.FC<CustomCursorProps> = ({ style = 'default', retroScr
                       showCrosshair = false;
                   }
 
+                  // Apply Opacity
                   if (arrowRef.current) arrowRef.current.style.opacity = showArrow ? '1' : '0';
                   if (handRef.current) handRef.current.style.opacity = showHand ? '1' : '0';
                   
-                  // Forced Small White Crosshair
+                  // Apply specific style for the Music Flow Crosshair
                   if (crosshairRef.current) {
-                      crosshairRef.current.style.opacity = showCrosshair ? '0.8' : '0'; 
-                      // Fixed small scale for music mode
-                      crosshairRef.current.style.transform = `translate(-12px, -12px) scale(0.5)`; 
+                      crosshairRef.current.style.opacity = showCrosshair ? '0.5' : '0'; // Small transparent crosshair
+                      crosshairRef.current.style.transform = `translate(-12px, -12px) scale(${showCrosshair ? 0.6 : 1})`; // Small scale
                   }
 
+                  // Hide others
                   if (grabRef.current) grabRef.current.style.opacity = isAppDragging ? '1' : '0';
                   if (roundedRef.current) roundedRef.current.style.opacity = '0';
               }
@@ -277,22 +249,20 @@ const CustomCursor: React.FC<CustomCursorProps> = ({ style = 'default', retroScr
               ctx.clearRect(0, 0, canvas.width, canvas.height);
 
               if (!shouldHide && x > 0) {
+                  // Calculate movement delta to prevent clumping when still
                   const dx = x - lastMousePos.current.x;
                   const dy = y - lastMousePos.current.y;
                   const dist = Math.sqrt(dx*dx + dy*dy);
                   lastMousePos.current = { x, y };
 
-                  const spawnChance = isClicked ? 0.9 : (dist > 2 ? 0.6 : 0.05);
+                  // Spawn particles based on movement or random chance
+                  const spawnChance = isClicked ? 0.8 : (dist > 2 ? 0.6 : 0.05);
                   
                   if (Math.random() < spawnChance) {
-                      // Reduced Count: 1 minimum, add more based on audio volume
-                      const count = isClicked ? 1 + Math.floor(audioLevel * 2) : 1;
-                      
-                      // Audio-reactive velocity multiplier
-                      const velocityMult = 1.0 + (audioLevel * 3.0);
-
+                      const count = isClicked ? 3 : 1;
                       for(let i=0; i<count; i++) {
                           const char = MUSIC_SYMBOLS[Math.floor(Math.random() * MUSIC_SYMBOLS.length)];
+                          // Pick from theme colors or white
                           const colorChoice = Math.random();
                           let color = '#fff';
                           if (colorChoice < 0.4) color = colorMapRef.current.global.primary;
@@ -301,15 +271,13 @@ const CustomCursor: React.FC<CustomCursorProps> = ({ style = 'default', retroScr
                           particles.push({
                               x: x + (Math.random() - 0.5) * 10,
                               y: y + (Math.random() - 0.5) * 10,
-                              // Reduced initial speed: Factor 0.5 instead of 1.5
-                              vx: ((Math.random() - 0.5) * 0.5 * velocityMult) - (dx * 0.05),
-                              vy: ((Math.random() - 0.5) * 0.5 * velocityMult) - 0.5,
+                              vx: (Math.random() - 0.5) * 1.5 - (dx * 0.05), // Drift opposite to movement
+                              vy: (Math.random() - 0.5) * 1.5 - 0.5, // Slight upward drift preference
                               life: 1.0,
-                              decay: Math.random() * 0.02 + 0.02, 
+                              decay: Math.random() * 0.01 + 0.005, // Slower decay for smooth flow
                               color: color,
                               char: char,
-                              // Increased size: 20-35px
-                              size: Math.floor(Math.random() * 15) + 20,
+                              size: Math.floor(Math.random() * 12) + 10,
                               isBlock: false,
                               updateTimer: 0,
                               rotation: Math.random() * Math.PI * 2,
@@ -319,6 +287,7 @@ const CustomCursor: React.FC<CustomCursorProps> = ({ style = 'default', retroScr
                   }
               }
 
+              // Update & Draw Music Particles
               for (let i = particles.length - 1; i >= 0; i--) {
                   const p = particles[i];
                   p.x += p.vx;
@@ -343,6 +312,7 @@ const CustomCursor: React.FC<CustomCursorProps> = ({ style = 'default', retroScr
 
           // --- CANVAS (DEFAULT / GLITCH) MODE ---
           else if (activeStyle === 'default' && ctx && canvas) {
+              // Ensure other cursors hidden
               if (cursorRef.current) cursorRef.current.style.opacity = '0';
               if (dosCursorRef.current) dosCursorRef.current.style.opacity = '0';
 
@@ -354,7 +324,7 @@ const CustomCursor: React.FC<CustomCursorProps> = ({ style = 'default', retroScr
 
               if (!shouldHide && x > 0) {
                   const chance = isClicked ? 1.0 : 0.4;
-                  const count = isClicked ? 3 : 1; // Slightly reduced
+                  const count = isClicked ? 5 : 1;
                   if (Math.random() < chance) {
                       for(let i = 0; i < count; i++) {
                           const angle = Math.floor(Math.random() * 4) * (Math.PI / 2); 
@@ -420,6 +390,7 @@ const CustomCursor: React.FC<CustomCursorProps> = ({ style = 'default', retroScr
                   ctx.lineWidth = 2;
                   const gap = isHovering ? 15 : 5;
                   const len = isHovering ? 15 : 10;
+                  // Crosshair logic
                   ctx.beginPath(); ctx.moveTo(x - gap - len, y); ctx.lineTo(x - gap, y); ctx.stroke();
                   ctx.beginPath(); ctx.moveTo(x + gap, y); ctx.lineTo(x + gap + len, y); ctx.stroke();
                   ctx.beginPath(); ctx.moveTo(x, y - gap - len); ctx.lineTo(x, y - gap); ctx.stroke();
@@ -427,16 +398,23 @@ const CustomCursor: React.FC<CustomCursorProps> = ({ style = 'default', retroScr
                   if (!isHovering && !isClicked) {
                       ctx.fillStyle = '#fff'; ctx.fillRect(x - 1, y - 1, 2, 2);
                   }
+                  if (isHovering) {
+                      ctx.save(); ctx.translate(x, y); ctx.rotate(frameRef.current * 0.05);
+                      ctx.strokeStyle = '#bc13fe'; ctx.strokeRect(-8, -8, 16, 16); ctx.restore();
+                  }
               }
           }
           
+          // --- DOS TERMINAL MODE ---
           else if (activeStyle === 'dos-terminal' && dosCursorRef.current) {
               if (canvas) ctx?.clearRect(0, 0, canvas.width, canvas.height);
               if (cursorRef.current) cursorRef.current.style.opacity = '0';
+              
               dosCursorRef.current.style.transform = `translate(${x}px, ${y}px)`;
               dosCursorRef.current.style.opacity = shouldHide ? '0' : '1';
           }
 
+          // --- DOM / SVG MODE ---
           else if (cursorRef.current) {
               if (canvas) ctx?.clearRect(0, 0, canvas.width, canvas.height);
               if (dosCursorRef.current) dosCursorRef.current.style.opacity = '0';
@@ -449,6 +427,7 @@ const CustomCursor: React.FC<CustomCursorProps> = ({ style = 'default', retroScr
                   cursorRef.current.style.display = 'block';
               }
 
+              // Determine Visibility of internal SVGs
               let showArrow = false;
               let showHand = false;
               let showGrab = false;
@@ -464,11 +443,14 @@ const CustomCursor: React.FC<CustomCursorProps> = ({ style = 'default', retroScr
               } else if (activeStyle === 'rounded') {
                   showRounded = true;
               } else {
+                  // For normal modes, arrow is shown by default if not hovering/dragging
                   showArrow = true;
               }
 
+              // Ensure crosshair scale is reset if we are not in music-flow special mode
               if (crosshairRef.current) {
                   crosshairRef.current.style.transform = `translate(-12px, -12px) scale(1)`; 
+                  // Opacity handled below
               }
 
               if (arrowRef.current) arrowRef.current.style.opacity = showArrow ? '1' : '0';
@@ -483,17 +465,18 @@ const CustomCursor: React.FC<CustomCursorProps> = ({ style = 'default', retroScr
       
       loop();
       return () => { cancelAnimationFrame(rAF); };
-  }, [style, retroScreenStyle, analyser]); 
+  }, [style, retroScreenStyle]); 
 
-  // --- Determine Colors ---
+  // --- Determine Colors for SVG Mode ---
+  
   const getColorsForStyle = (s: string) => {
       if (s === 'theme-sync' || s === 'music-flow') return { primary: colors.primary, secondary: colors.secondary };
       if (s === 'classic-blue') return { primary: '#00f3ff', secondary: '#4d79ff' };
       if (s === 'classic-warm') return { primary: '#ffd700', secondary: '#ff8c00' };
       if (s === 'classic-ocean') return { primary: '#70C6D6', secondary: '#4B8CA8' };
-      if (s === 'crosshair') return { primary: colors.primary, secondary: colors.secondary }; 
-      if (s === 'rounded') return { primary: colors.primary, secondary: colors.secondary }; 
-      return { primary: '#ffffff', secondary: '#808080' }; 
+      if (s === 'crosshair') return { primary: colors.primary, secondary: colors.secondary }; // ADAPTIVE CROSSHAIR
+      if (s === 'rounded') return { primary: colors.primary, secondary: colors.secondary }; // ADAPTIVE ROUNDED
+      return { primary: '#ffffff', secondary: '#808080' }; // Default/White
   };
 
   const globalColors = getColorsForStyle(style);
@@ -511,19 +494,15 @@ const CustomCursor: React.FC<CustomCursorProps> = ({ style = 'default', retroScr
           const activeStyle = isScreenHover ? retroScreenStyle : style;
           
           if (activeStyle !== 'default' && activeStyle !== 'dos-terminal' && activeStyle !== 'system' && cursorRef.current) {
+              const pal = isScreenHover ? colorMapRef.current.retro : colorMapRef.current.global;
               
-              if (activeStyle === 'music-flow') {
-                  // Special override for music flow crosshair to remain white
-                  if (crosshairRef.current) crosshairRef.current.style.color = '#ffffff';
-              } else {
-                  const pal = isScreenHover ? colorMapRef.current.retro : colorMapRef.current.global;
-                  const targets = [arrowRef.current, handRef.current, grabRef.current, crosshairRef.current, roundedRef.current];
-                  targets.forEach(svg => {
-                      if (svg) {
-                          svg.style.color = pal.primary;
-                      }
-                  });
-              }
+              // Apply colors to SVGs directly
+              const targets = [arrowRef.current, handRef.current, grabRef.current, crosshairRef.current, roundedRef.current];
+              targets.forEach(svg => {
+                  if (svg) {
+                      svg.style.color = pal.primary;
+                  }
+              });
           }
           requestAnimationFrame(loop);
       };
@@ -531,7 +510,7 @@ const CustomCursor: React.FC<CustomCursorProps> = ({ style = 'default', retroScr
       return () => cancelAnimationFrame(id);
   }, [style, retroScreenStyle]); 
 
-  return createPortal(
+  return (
     <>
         {/* CANVAS */}
         <canvas 
@@ -554,31 +533,39 @@ const CustomCursor: React.FC<CustomCursorProps> = ({ style = 'default', retroScr
             className="fixed top-0 left-0 pointer-events-none z-[999999] will-change-transform"
             style={{ marginTop: '-2px', marginLeft: '-2px', opacity: 0 }}
         >
+            {/* 1. ARROW (Standard) */}
             <svg ref={arrowRef} width="24" height="24" viewBox="0 0 24 24" className="absolute top-0 left-0 transition-opacity duration-200" style={{ overflow: 'visible' }}>
                 <path d="M2 2 L14 14 L9 14 L12 20 L9 21 L6 15 L2 19 Z" fill="black" stroke="currentColor" strokeWidth="2" strokeLinejoin="round" />
             </svg>
 
+            {/* 2. HAND (Link/Hover) */}
             <svg ref={handRef} width="24" height="24" viewBox="0 0 24 24" className="absolute top-0 left-0 transition-opacity duration-200 opacity-0" style={{ transform: 'translate(-2px, -1px)', overflow: 'visible' }}>
+                {/* Changed fill to dark theme background (#030712) instead of white */}
                 <path d={HAND_PATH_D} fill="#030712" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round" />
             </svg>
 
+            {/* 3. GRAB (App Dragging) */}
+            {/* Updated ViewBox and Path for new Grab Icon */}
             <svg ref={grabRef} width="32" height="32" viewBox="0 0 24 24" className="absolute top-0 left-0 transition-opacity duration-200 opacity-0" style={{ transform: 'translate(-12px, -12px)', overflow: 'visible' }}>
                 <path d={GRAB_PATH_D} stroke="currentColor" strokeWidth="2" strokeLinejoin="round" fill="#030712" />
             </svg>
 
+            {/* 4. CROSSHAIR (Retro Screen Alt) */}
             <svg ref={crosshairRef} width="24" height="24" viewBox="0 0 24 24" className="absolute top-0 left-0 transition-opacity duration-200 opacity-0" style={{ transform: 'translate(-12px, -12px)', overflow: 'visible' }}>
-                {/* Standard Crosshair without Circle */}
-                <line x1="12" y1="4" x2="12" y2="20" stroke="currentColor" strokeWidth="2" />
-                <line x1="4" y1="12" x2="20" y2="12" stroke="currentColor" strokeWidth="2" />
+                <circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" strokeWidth="2" />
+                <line x1="12" y1="2" x2="12" y2="8" stroke="currentColor" strokeWidth="2" />
+                <line x1="12" y1="16" x2="12" y2="22" stroke="currentColor" strokeWidth="2" />
+                <line x1="2" y1="12" x2="8" y2="12" stroke="currentColor" strokeWidth="2" />
+                <line x1="16" y1="12" x2="22" y2="12" stroke="currentColor" strokeWidth="2" />
                 <circle cx="12" cy="12" r="1.5" fill="currentColor" />
             </svg>
 
+            {/* 5. ROUNDED (New Style) */}
             <svg ref={roundedRef} width="24" height="24" viewBox="0 0 24 24" className="absolute top-0 left-0 transition-opacity duration-200 opacity-0" style={{ overflow: 'visible' }}>
                 <path d={ROUNDED_PATH_D} fill="#030712" stroke="currentColor" strokeWidth="2" strokeLinejoin="round" />
             </svg>
         </div>
-    </>,
-    document.body
+    </>
   );
 };
 

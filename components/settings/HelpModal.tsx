@@ -107,19 +107,6 @@ const HelpModal: React.FC<HelpModalProps> = ({ onClose, onRestartTutorial, onUnl
             
             {/* Main Content */}
             <div className="p-6 space-y-6 overflow-y-auto custom-scrollbar flex-1 bg-theme-bg/50">
-                
-                {/* Tutorial Restart */}
-                <div>
-                   <button 
-                     onClick={handleRestart}
-                     className="w-full py-3 bg-theme-primary/10 border border-theme-primary text-theme-primary font-mono font-bold rounded hover:bg-theme-primary hover:text-black transition-all flex items-center justify-center gap-2"
-                   >
-                      <Terminal size={16} /> {isRu ? "ЗАПУСТИТЬ ОБУЧЕНИЕ" : "START TUTORIAL"}
-                   </button>
-                </div>
-
-                <div className="h-px bg-theme-border"></div>
-
                 {/* Hotkeys */}
                 <div>
                     <h4 className="text-theme-text font-mono text-xs uppercase opacity-70 mb-3 flex items-center gap-2">
@@ -171,6 +158,18 @@ const HelpModal: React.FC<HelpModalProps> = ({ onClose, onRestartTutorial, onUnl
                         <span className="text-green-500 text-xs font-mono font-bold tracking-wider">ADVANCED MODE ACTIVE</span>
                     </div>
                 )}
+
+                <div className="h-px bg-theme-border"></div>
+
+                {/* Tutorial Restart */}
+                <div>
+                   <button 
+                     onClick={handleRestart}
+                     className="w-full py-3 bg-theme-primary/10 border border-theme-primary text-theme-primary font-mono font-bold rounded hover:bg-theme-primary hover:text-black transition-all flex items-center justify-center gap-2"
+                   >
+                      <Terminal size={16} /> {isRu ? "ЗАПУСТИТЬ ОБУЧЕНИЕ" : "START TUTORIAL"}
+                   </button>
+                </div>
             </div>
 
             {/* Footer: Info */}

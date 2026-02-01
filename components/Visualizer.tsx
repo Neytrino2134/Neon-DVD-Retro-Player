@@ -21,26 +21,16 @@ const Visualizer: React.FC<VisualizerProps> = ({ analyser, isPlaying, config, fp
   const prevBarsRef = useRef<Float32Array | null>(null);
   // Храним высоту "верхушек" (tips)
   const tipBarsRef = useRef<Float32Array | null>(null);
-  
-  // Persistent data array to avoid reallocation
-  const dataArrayRef = useRef<Uint8Array | null>(null);
 
   // SMOOTHING REFS FOR CONFIG TRANSITIONS
   const smoothVolRef = useRef<number>(1);
   const smoothNormRef = useRef({ bass: 1, mid: 1, treb: 1 });
 
-  // --- STABLE REFS FOR PROPS ---
-  // Store dynamic props in refs so the render loop can access latest values 
-  // without triggering a useEffect restart.
-  const configRef = useRef(config);
-  const isPlayingRef = useRef(isPlaying);
-  const volumeRef = useRef(volume);
-  const colorsRef = useRef(colors);
-
-  useEffect(() => { configRef.current = config; }, [config]);
-  useEffect(() => { isPlayingRef.current = isPlaying; }, [isPlaying]);
-  useEffect(() => { volumeRef.current = volume; }, [volume]);
-  useEffect(() => { colorsRef.current = colors; }, [colors]);
+  // Store theme colors in ref to access in animate loop
+  const themeColorsRef = useRef(colors);
+  useEffect(() => {
+      themeColorsRef.current = colors;
+  }, [colors]);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -50,16 +40,11 @@ const Visualizer: React.FC<VisualizerProps> = ({ analyser, isPlaying, config, fp
     const ctx = canvas.getContext('2d', { alpha: true });
     if (!ctx) return;
 
+    let dataArray: Uint8Array | null = null;
     lastDrawTimeRef.current = 0;
 
     const render = (timestamp: number) => {
       animationRef.current = requestAnimationFrame(render);
-
-      // Access latest props via refs
-      const cfg = configRef.current;
-      const playing = isPlayingRef.current;
-      const vol = volumeRef.current;
-      const themeColors = colorsRef.current;
 
       // FPS Throttling
       const interval = 1000 / fps;
@@ -82,9 +67,9 @@ const Visualizer: React.FC<VisualizerProps> = ({ analyser, isPlaying, config, fp
       ctx.clearRect(0, 0, WIDTH, HEIGHT);
 
       // Инициализация массивов при первом запуске или изменении количества баров
-      if (!prevBarsRef.current || prevBarsRef.current.length !== cfg.barCount) {
-         prevBarsRef.current = new Float32Array(cfg.barCount).fill(0);
-         tipBarsRef.current = new Float32Array(cfg.barCount).fill(0);
+      if (!prevBarsRef.current || prevBarsRef.current.length !== config.barCount) {
+         prevBarsRef.current = new Float32Array(config.barCount).fill(0);
+         tipBarsRef.current = new Float32Array(config.barCount).fill(0);
       }
       const prevBars = prevBarsRef.current;
       const tipBars = tipBarsRef.current!;
@@ -97,21 +82,19 @@ const Visualizer: React.FC<VisualizerProps> = ({ analyser, isPlaying, config, fp
          } catch (e) { console.warn(e); }
 
          const bufferLength = analyser.frequencyBinCount;
-         if (!dataArrayRef.current || dataArrayRef.current.length !== bufferLength) {
-             dataArrayRef.current = new Uint8Array(bufferLength);
+         if (!dataArray || dataArray.length !== bufferLength) {
+             dataArray = new Uint8Array(bufferLength);
          }
 
-         if (playing) {
+         if (isPlaying) {
             // Если играет музыка - берем данные с частот
             // Cast to any to avoid TS lib mismatch for Uint8Array types
-            analyser.getByteFrequencyData(dataArrayRef.current as any);
+            analyser.getByteFrequencyData(dataArray as any);
          } else {
-            // Если пауза - заполняем нулями
-            if (dataArrayRef.current) dataArrayRef.current.fill(0);
+            // Если пауза - заполняем нулями, но продолжаем цикл анимации, чтобы столбики упали
+            dataArray.fill(0);
          }
       }
-
-      const dataArray = dataArrayRef.current;
 
       // Переменная для отслеживания, есть ли еще "энергия" в визуализации (не упали ли столбики)
       let maxActivity = 0;
@@ -135,7 +118,7 @@ const Visualizer: React.FC<VisualizerProps> = ({ analyser, isPlaying, config, fp
         const midEnd = Math.floor(2000 / binSize);   
 
         // Вычисляем максимумы только если играет музыка, иначе скейлинг не важен (вход 0)
-        if (playing) {
+        if (isPlaying) {
             for (let i = 0; i < bufferLength; i++) {
                 const val = dataArray[i];
                 if (i < bassEnd) maxBass = Math.max(maxBass, val);
@@ -151,7 +134,7 @@ const Visualizer: React.FC<VisualizerProps> = ({ analyser, isPlaying, config, fp
         
         // 1. VOLUME SMOOTHING
         // Target is 1.0 if ignoring volume, else actual volume
-        const targetVolFactor = cfg.preventVolumeScaling ? 1.0 : vol;
+        const targetVolFactor = config.preventVolumeScaling ? 1.0 : volume;
         smoothVolRef.current += (targetVolFactor - smoothVolRef.current) * 0.1; // 10% per frame
 
         // 2. NORMALIZE SMOOTHING
@@ -159,7 +142,7 @@ const Visualizer: React.FC<VisualizerProps> = ({ analyser, isPlaying, config, fp
         let targetMidScale = 1;
         let targetTrebScale = 1;
 
-        if (cfg.normalize) {
+        if (config.normalize) {
             targetBassScale = 255 / Math.max(150, maxBass); 
             targetMidScale = 255 / Math.max(100, maxMid);    
             targetTrebScale = 255 / Math.max(80, maxTreb);
@@ -171,11 +154,11 @@ const Visualizer: React.FC<VisualizerProps> = ({ analyser, isPlaying, config, fp
         smoothNormRef.current.treb += (targetTrebScale - smoothNormRef.current.treb) * normLerp;
 
 
-        const barCount = cfg.barCount;
+        const barCount = config.barCount;
         
         // --- FREQUENCY MAPPING ---
-        const minHz = 20 + (cfg.minFrequency * 40); 
-        const maxHz = minHz + 500 + (cfg.maxFrequency * 180);
+        const minHz = 20 + (config.minFrequency * 40); 
+        const maxHz = minHz + 500 + (config.maxFrequency * 180);
 
         const logMin = Math.log10(minHz);
         const logMax = Math.log10(maxHz);
@@ -230,7 +213,7 @@ const Visualizer: React.FC<VisualizerProps> = ({ analyser, isPlaying, config, fp
 
             // 3. Восстанавливаем амплитуду и применяем Sensitivity
             // Так как мы "прижали" сигнал, нужно немного компенсировать общую высоту (x1.2)
-            ratio *= (cfg.sensitivity * 1.2);
+            ratio *= (config.sensitivity * 1.2);
 
             // 4. Легкий буст высоких частот, чтобы правая часть не проваливалась совсем,
             // но гораздо меньше чем раньше (0.8 -> 0.3), чтобы не было "стены".
@@ -238,18 +221,15 @@ const Visualizer: React.FC<VisualizerProps> = ({ analyser, isPlaying, config, fp
 
             // 5. Вычисляем финальную высоту с мягким клиппингом (tanh)
             // tanh позволяет сигналу "насыщаться" у верха экрана, не обрезаясь жестко
-            // If CIRCLE, max height should be limited to radius/screen size
-            const maxDrawHeight = cfg.position === 'circle' ? (Math.min(WIDTH, HEIGHT) / 3) : HEIGHT;
+            let barHeight = HEIGHT * Math.tanh(ratio);
             
-            let barHeight = maxDrawHeight * Math.tanh(ratio);
-            
-            if (barHeight < 2 && cfg.strokeEnabled && scaledValue > 5) barHeight = 2; // Min height for visibility
+            if (barHeight < 2 && config.strokeEnabled && scaledValue > 5) barHeight = 2; // Min height for visibility
             if (scaledValue < 5) barHeight = 0; // Noise gate
 
             // 4. ФИЗИКА БАРА (Attack / Decay)
             // Dynamic Decay based on barGravity config (0-10)
             // Default (5) -> 0.73. High Gravity (10) -> 0.48 (Fast). Low Gravity (0) -> 0.98 (Slow).
-            const gravityInput = cfg.barGravity ?? 5;
+            const gravityInput = config.barGravity ?? 5;
             const baseDecay = Math.max(0.1, 0.98 - (gravityInput * 0.05));
             
             const decay = Math.pow(baseDecay, fpsRatio);
@@ -264,12 +244,12 @@ const Visualizer: React.FC<VisualizerProps> = ({ analyser, isPlaying, config, fp
             barHeight = finalValue;
 
             // --- ФИЗИКА ВЕРХУШКИ ---
-            if (cfg.showTips) {
+            if (config.showTips) {
                 let tipH = tipBars[i];
                 if (barHeight > tipH) {
                     tipH = barHeight;
                 } else {
-                    const gravityBase = (cfg.tipSpeed || 15) / 1000;
+                    const gravityBase = (config.tipSpeed || 15) / 1000;
                     const gravity = (HEIGHT * gravityBase) * fpsRatio; 
                     tipH -= gravity;
                 }
@@ -282,31 +262,23 @@ const Visualizer: React.FC<VisualizerProps> = ({ analyser, isPlaying, config, fp
             maxActivity = Math.max(maxActivity, barHeight);
 
             // Если высота 0, не рисуем этот бар
-            if (barHeight < 0.5 && (!cfg.showTips || tipBars[i] < 0.5)) continue;
+            if (barHeight < 0.5 && (!config.showTips || tipBars[i] < 0.5)) continue;
 
             // --- DRAWING POSITION ---
             let barWidth = 0;
             let startX = 0;
 
-            if (cfg.mirror && cfg.position !== 'circle') {
-                barWidth = (WIDTH / 2) / cfg.barCount;
+            if (config.mirror) {
+                barWidth = (WIDTH / 2) / config.barCount;
                 startX = WIDTH / 2;
-            } else if (cfg.position === 'circle') {
-                // Circle specific width calc done inside drawing loop below if needed, 
-                // but generally circle bars are drawn with fixed width or angular width.
-                // We use standard width logic, but drawn radially.
-                // Circumference = 2 * PI * Radius.
-                const radius = Math.min(WIDTH, HEIGHT) / 4;
-                const circumference = 2 * Math.PI * radius;
-                barWidth = circumference / cfg.barCount; 
             } else {
-                barWidth = WIDTH / cfg.barCount;
+                barWidth = WIDTH / config.barCount;
                 startX = 0;
             }
 
             let y = 0;
             const getY = (h: number) => {
-                switch (cfg.position) {
+                switch (config.position) {
                     case 'top': return 0;
                     case 'bottom': return HEIGHT - h;
                     case 'center': return (HEIGHT / 2) - (h / 2);
@@ -317,34 +289,26 @@ const Visualizer: React.FC<VisualizerProps> = ({ analyser, isPlaying, config, fp
 
              // Color Logic
             let color: string | CanvasGradient = '#fff';
-            switch (cfg.style) {
+            switch (config.style) {
               case 'blue': color = '#00f3ff'; break;
               case 'pink': color = '#ff00ff'; break;
               case 'warm': color = '#fbbf24'; break; // Amber
               case 'gray': color = '#d4d4d4'; break; // Neutral Gray
               case 'ocean': color = '#4B8CA8'; break; // Ocean Teal
               case 'theme-blue': color = '#3b82f6'; break; // Royal Blue
-              case 'theme-sync': color = themeColors.primary; break; // NEW: Theme Sync
+              case 'theme-sync': color = themeColorsRef.current.primary; break; // NEW: Theme Sync
               case 'neon-gradient':
                  // Per-bar gradient relative to height
-                 if (cfg.position === 'center') {
+                 if (config.position === 'center') {
                      // Blue (Top) -> Pink (Center) -> Blue (Bottom)
                      const gradient = ctx.createLinearGradient(0, y, 0, y + barHeight);
                      gradient.addColorStop(0, '#00f3ff');
                      gradient.addColorStop(0.5, '#ff00ff');
                      gradient.addColorStop(1, '#00f3ff');
                      color = gradient;
-                 } else if (cfg.position === 'top') {
+                 } else if (config.position === 'top') {
                      // Pink (Base/Top) -> Blue (Tip/Bottom)
                      const gradient = ctx.createLinearGradient(0, 0, 0, barHeight);
-                     gradient.addColorStop(0, '#ff00ff');
-                     gradient.addColorStop(1, '#00f3ff');
-                     color = gradient;
-                 } else if (cfg.position === 'circle') {
-                     // Gradient from center out
-                     // We create generic vertical gradient that gets rotated
-                     const radius = Math.min(WIDTH, HEIGHT) / 4;
-                     const gradient = ctx.createLinearGradient(0, radius, 0, radius + barHeight);
                      gradient.addColorStop(0, '#ff00ff');
                      gradient.addColorStop(1, '#00f3ff');
                      color = gradient;
@@ -373,7 +337,7 @@ const Visualizer: React.FC<VisualizerProps> = ({ analyser, isPlaying, config, fp
                 break;
             }
 
-            const gap = cfg.barGap;
+            const gap = config.barGap;
             const drawWidth = Math.max(0.5, barWidth - gap);
 
             // --- DRAW BAR HELPER ---
@@ -381,9 +345,9 @@ const Visualizer: React.FC<VisualizerProps> = ({ analyser, isPlaying, config, fp
                  if (bh <= 0) return;
                  ctx.fillStyle = color;
                  
-                 if (cfg.segmented) {
-                     const segHeight = cfg.segmentHeight || 4; 
-                     const segGap = cfg.segmentGap || 2;       
+                 if (config.segmented) {
+                     const segHeight = config.segmentHeight || 4; 
+                     const segGap = config.segmentGap || 2;       
                      const unit = segHeight + segGap;
                      const segments = Math.floor(bh / unit);
                      
@@ -391,7 +355,7 @@ const Visualizer: React.FC<VisualizerProps> = ({ analyser, isPlaying, config, fp
 
                      const drawSegment = (sy: number, isLast: boolean) => {
                         // Apply Highlighting logic for last brick
-                        if (isLast && cfg.highlightLastBrick) {
+                        if (isLast && config.highlightLastBrick) {
                             ctx.fillStyle = '#ffffff'; // White for highlight
                             ctx.globalAlpha = 1.0;
                             ctx.shadowBlur = 5;
@@ -403,27 +367,27 @@ const Visualizer: React.FC<VisualizerProps> = ({ analyser, isPlaying, config, fp
                             }
                         } else {
                             ctx.fillStyle = color;
-                            ctx.globalAlpha = cfg.fillOpacity;
+                            ctx.globalAlpha = config.fillOpacity;
                             ctx.shadowBlur = 0;
                         }
 
                         ctx.fillRect(bx, sy, bw, segHeight);
                         
-                        if (cfg.strokeEnabled && (!isLast || !cfg.highlightLastBrick)) {
+                        if (config.strokeEnabled && (!isLast || !config.highlightLastBrick)) {
                             ctx.strokeStyle = color;
                             ctx.lineWidth = 1;
-                            ctx.globalAlpha = cfg.strokeOpacity;
+                            ctx.globalAlpha = config.strokeOpacity;
                             ctx.strokeRect(bx, sy, bw, segHeight);
                         }
                      };
 
-                     if (cfg.position === 'bottom') {
+                     if (config.position === 'bottom') {
                          for (let s = 0; s < segments; s++) {
                              const sy = HEIGHT - segHeight - (s * unit);
                              const isLast = s === segments - 1;
                              drawSegment(sy, isLast);
                          }
-                     } else if (cfg.position === 'center') {
+                     } else if (config.position === 'center') {
                          const mid = HEIGHT / 2;
                          const halfSegments = Math.ceil(segments / 2);
                          for (let s = 0; s < halfSegments; s++) {
@@ -436,15 +400,6 @@ const Visualizer: React.FC<VisualizerProps> = ({ analyser, isPlaying, config, fp
                              const isLast = s === halfSegments - 1;
                              drawSegment(sy, isLast);
                          }
-                     } else if (cfg.position === 'circle') {
-                         // CIRCLE SEGMENTS
-                         // We are already rotated, so 'by' is start Y (radius)
-                         // We draw outwards
-                         for (let s = 0; s < segments; s++) {
-                             const sy = by + (s * unit);
-                             const isLast = s === segments - 1;
-                             drawSegment(sy, isLast);
-                         }
                      } else {
                          // TOP
                          for (let s = 0; s < segments; s++) {
@@ -455,59 +410,19 @@ const Visualizer: React.FC<VisualizerProps> = ({ analyser, isPlaying, config, fp
                  } else {
                      // NORMAL BAR
                      ctx.fillStyle = color;
-                     ctx.globalAlpha = cfg.fillOpacity;
+                     ctx.globalAlpha = config.fillOpacity;
                      ctx.fillRect(bx, by, bw, bh);
-                     if (cfg.strokeEnabled) {
+                     if (config.strokeEnabled) {
                         ctx.strokeStyle = color;
                         ctx.lineWidth = 1;
-                        ctx.globalAlpha = cfg.strokeOpacity;
+                        ctx.globalAlpha = config.strokeOpacity;
                         ctx.strokeRect(bx, by, bw, bh);
                      }
                  }
             };
 
             // --- RENDER BARS ---
-            if (cfg.position === 'circle') {
-                const centerX = WIDTH / 2;
-                const centerY = HEIGHT / 2;
-                const radius = Math.min(WIDTH, HEIGHT) / 4;
-                const angle = (i / barCount) * (Math.PI * 2) - (Math.PI / 2); // Start top (-90deg)
-
-                ctx.save();
-                ctx.translate(centerX, centerY);
-                ctx.rotate(angle);
-                
-                // Draw bar radiating out from radius
-                drawBar(-drawWidth / 2, radius, drawWidth, barHeight);
-
-                // --- RENDER TIPS (CIRCLE) ---
-                if (cfg.showTips) {
-                    const tipH = tipBars[i];
-                    if (tipH > 2) {
-                        const tipThickness = cfg.tipHeight || 2; 
-                        const tipColorMap: Record<string, string> = {
-                            white: '#ffffff', blue: '#00f3ff', pink: '#ff00ff',
-                            green: '#00ff00', purple: '#bc13fe', yellow: '#f9f871', red: '#ff3333'
-                        };
-                        const selectedColor = tipColorMap[cfg.tipColor || 'white'] || '#ffffff';
-                        
-                        ctx.fillStyle = selectedColor; 
-                        ctx.globalAlpha = Math.min(1, cfg.fillOpacity + 0.4);
-                        if (cfg.tipGlow) {
-                            ctx.shadowBlur = 10;
-                            ctx.shadowColor = selectedColor;
-                        } else {
-                            ctx.shadowBlur = 0;
-                        }
-
-                        const tipY = radius + tipH + 2; 
-                        ctx.fillRect(-drawWidth / 2, tipY, drawWidth, tipThickness);
-                        ctx.shadowBlur = 0;
-                    }
-                }
-                ctx.restore();
-
-            } else if (cfg.mirror) {
+            if (config.mirror) {
                 const xRight = startX + (i * barWidth) + (gap / 2);
                 drawBar(xRight, y, drawWidth, barHeight);
                 const xLeft = startX - ((i + 1) * barWidth) + (gap / 2);
@@ -517,11 +432,11 @@ const Visualizer: React.FC<VisualizerProps> = ({ analyser, isPlaying, config, fp
                 drawBar(x, y, drawWidth, barHeight);
             }
 
-            // --- RENDER TIPS (LINEAR) ---
-            if (cfg.showTips && cfg.position !== 'circle') {
+            // --- RENDER TIPS ---
+            if (config.showTips) {
                 const tipH = tipBars[i];
                 if (tipH > 2) {
-                    const tipThickness = cfg.tipHeight || 2; 
+                    const tipThickness = config.tipHeight || 2; 
                     
                     // TIP COLOR & GLOW LOGIC
                     const tipColorMap: Record<string, string> = {
@@ -533,12 +448,12 @@ const Visualizer: React.FC<VisualizerProps> = ({ analyser, isPlaying, config, fp
                         yellow: '#f9f871',
                         red: '#ff3333'
                     };
-                    const selectedColor = tipColorMap[cfg.tipColor || 'white'] || '#ffffff';
+                    const selectedColor = tipColorMap[config.tipColor || 'white'] || '#ffffff';
                     
                     ctx.fillStyle = selectedColor; 
-                    ctx.globalAlpha = Math.min(1, cfg.fillOpacity + 0.4);
+                    ctx.globalAlpha = Math.min(1, config.fillOpacity + 0.4);
 
-                    if (cfg.tipGlow) {
+                    if (config.tipGlow) {
                         ctx.shadowBlur = 10;
                         ctx.shadowColor = selectedColor;
                     } else {
@@ -547,14 +462,14 @@ const Visualizer: React.FC<VisualizerProps> = ({ analyser, isPlaying, config, fp
 
                     // Tip Position Calculation
                     let tipY = 0;
-                    if (cfg.position === 'bottom') tipY = HEIGHT - tipH - tipThickness - 1; 
-                    else if (cfg.position === 'top') tipY = tipH + 1;
-                    else if (cfg.position === 'center') {
+                    if (config.position === 'bottom') tipY = HEIGHT - tipH - tipThickness - 1; 
+                    else if (config.position === 'top') tipY = tipH + 1;
+                    else if (config.position === 'center') {
                          const center = HEIGHT / 2;
                          const topTipY = center - (tipH / 2) - tipThickness - 1;
                          const bottomTipY = center + (tipH / 2) + 1;
                          
-                         if (cfg.mirror) {
+                         if (config.mirror) {
                             const xRight = startX + (i * barWidth) + (gap / 2);
                             const xLeft = startX - ((i + 1) * barWidth) + (gap / 2);
                             ctx.fillRect(xRight, topTipY, drawWidth, tipThickness);
@@ -570,7 +485,7 @@ const Visualizer: React.FC<VisualizerProps> = ({ analyser, isPlaying, config, fp
                         continue;
                     }
 
-                    if (cfg.mirror) {
+                    if (config.mirror) {
                         const xRight = startX + (i * barWidth) + (gap / 2);
                         const xLeft = startX - ((i + 1) * barWidth) + (gap / 2);
                         ctx.fillRect(xRight, tipY, drawWidth, tipThickness);
@@ -587,20 +502,14 @@ const Visualizer: React.FC<VisualizerProps> = ({ analyser, isPlaying, config, fp
       }
 
       // 3. IDLE LINE
-      if (!playing && maxActivity < 2) {
+      if (!isPlaying && maxActivity < 2) {
         ctx.beginPath();
-        if (cfg.position === 'circle') {
-            const centerX = WIDTH / 2;
-            const centerY = HEIGHT / 2;
-            const radius = Math.min(WIDTH, HEIGHT) / 4;
-            ctx.arc(centerX, centerY, radius, 0, Math.PI * 2);
-        } else {
-            let yLine = HEIGHT / 2;
-            if (cfg.position === 'top') yLine = 10;
-            if (cfg.position === 'bottom') yLine = HEIGHT - 10;
-            ctx.moveTo(0, yLine);
-            ctx.lineTo(WIDTH, yLine);
-        }
+        let yLine = HEIGHT / 2;
+        if (config.position === 'top') yLine = 10;
+        if (config.position === 'bottom') yLine = HEIGHT - 10;
+
+        ctx.moveTo(0, yLine);
+        ctx.lineTo(WIDTH, yLine);
         ctx.strokeStyle = 'rgba(255, 255, 255, 0.2)';
         ctx.lineWidth = 1;
         ctx.stroke();
@@ -619,7 +528,7 @@ const Visualizer: React.FC<VisualizerProps> = ({ analyser, isPlaying, config, fp
         cancelAnimationFrame(animationRef.current);
       }
     };
-  }, [analyser, fps]); // Depend ONLY on analyzer (ref) and fps (static)
+  }, [analyser, isPlaying, config, fps, volume, colors]);
 
   return (
     <canvas 

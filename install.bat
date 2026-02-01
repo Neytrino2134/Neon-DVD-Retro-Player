@@ -21,7 +21,7 @@ echo [2/2] Installing dependencies (npm install)...
 echo This might take a few minutes.
 echo.
 
-call npm install --legacy-peer-deps
+call npm install
 
 if %errorlevel% neq 0 (
     color 0c

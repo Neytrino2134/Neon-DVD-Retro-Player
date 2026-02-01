@@ -8,16 +8,7 @@ export interface TronConfig {
   size: number; // NEW: Thickness of agent (1-4)
   maxAgents: number; // NEW: Maximum players on map (4-20)
   showNames: boolean; // NEW: Show player nicknames
-  showLeaderboard: boolean; // NEW: Show Holographic Leaderboard
   enableUser: boolean; // NEW: User playable character
-  enableDummies: boolean; // NEW: Spawn stupid bots
-  glowEnabled: boolean; // NEW: Enable glow effect
-  glowIntensity: number; // NEW: Intensity of glow
-  bgEnabled: boolean; // NEW: Background pattern toggle
-  bgPattern: 'grid' | 'iso' | 'hex' | 'dots'; // NEW: Pattern type
-  erasureSpeed?: number; // NEW: Multiplier for line erasure speed
-  speedVariance?: number; // NEW: Random speed difference between agents (0-1)
-  roundMode?: boolean; // NEW: Enable competitive round mode linked to track time
 }
 
 export interface EffectsConfig {
@@ -60,7 +51,6 @@ export interface EffectsConfig {
     scale: number;
     color?: string; // NEW: Specific color for hologram
     enableIcons: boolean; // NEW: Enable graphical icons
-    showHotspots: boolean; // NEW: Show interactive background hotspots
     categories: Record<HologramCategory, boolean>;
   };
   geminiChat: GeminiChatConfig; // NEW
@@ -94,7 +84,6 @@ export interface AudioTrack {
   artworkUrl?: string; // NEW: Album art blob URL
   tags?: TagMetadata; // NEW: ID3 Tags
   order?: number; // Added order property for sorting
-  rating?: number; // NEW: Track Rating
 }
 
 export interface TagMetadata {
@@ -113,17 +102,6 @@ export interface Playlist {
   tracks: AudioTrack[];
 }
 
-// NEW: Interactive Background Hotspots
-export type HotspotType = 'error' | 'decrypt' | 'target' | 'scan' | 'secure' | 'link';
-
-export interface BgHotspot {
-  id: string;
-  x: number; // Percentage 0-100
-  y: number; // Percentage 0-100
-  type: HotspotType;
-  label?: string; // Optional custom text
-}
-
 export interface BackgroundMedia {
   id: string;
   playlistId: string; // NEW: Link to BG Playlist
@@ -131,7 +109,6 @@ export interface BackgroundMedia {
   url: string;
   file: File;
   order?: number;
-  hotspots?: BgHotspot[]; // NEW: Interactive points
 }
 
 export interface BackgroundPlaylist {
@@ -162,6 +139,7 @@ export interface RecorderConfig {
   fps: 30 | 60;
   videoBitrate: number; // bps
   audioBitrate: number; // bps
+  sourceId?: string; // NEW: Electron Screen Source ID
 }
 
 // NEW: System Audio Configuration
@@ -209,7 +187,7 @@ export const NEON_COLORS = [
 ];
 
 export type VisualizerStyle = 'retro' | 'blue' | 'pink' | 'matrix' | 'inferno' | 'warm' | 'gray' | 'ocean' | 'theme-blue' | 'theme-sync' | 'neon-gradient';
-export type VisualizerPosition = 'center' | 'top' | 'bottom' | 'circle';
+export type VisualizerPosition = 'center' | 'top' | 'bottom';
 export type TipColor = 'white' | 'blue' | 'pink' | 'green' | 'purple' | 'yellow' | 'red';
 export type CursorStyle = 'default' | 'music-flow' | 'classic-blue' | 'classic-warm' | 'classic-white' | 'classic-ocean' | 'theme-sync' | 'dos-terminal' | 'system' | 'crosshair' | 'rounded';
 

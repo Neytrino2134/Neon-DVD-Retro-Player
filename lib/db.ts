@@ -2,7 +2,7 @@
 /**
  * Simple IndexedDB wrapper for storing File/Blob objects
  */
-import { TagMetadata, BgHotspot } from '../types';
+import { TagMetadata } from '../types';
 
 const DB_NAME = 'NeonPlayerDB';
 const DB_VERSION = 6; // Incremented for BG Playlists
@@ -136,7 +136,6 @@ export interface StoredTrack {
     file: File;
     order: number;
     tags?: TagMetadata;
-    rating?: number; // NEW: Rating
 }
 
 export const saveTrack = async (track: StoredTrack) => {
@@ -225,7 +224,6 @@ export interface StoredBackground {
     type: 'image' | 'video';
     file: File;
     order?: number;
-    hotspots?: BgHotspot[]; // NEW: Persist interactive points
 }
 
 export const saveBgPlaylist = async (playlist: { id: string; name: string; order: number }) => {
@@ -265,6 +263,10 @@ export const deleteBgPlaylistAndFiles = async (playlistId: string) => {
 
         // Delete Backgrounds associated with playlist
         const bgStore = transaction.objectStore(STORES.BACKGROUND);
+        // We handle migration where playlistId might be missing for old records
+        // by only deleting those that explicitly match.
+        // For complete robustness, getAll + filter + delete is safer if index is missing,
+        // but we added index in initDB.
         try {
             const index = bgStore.index('playlistId');
             const range = IDBKeyRange.only(playlistId);
@@ -277,6 +279,7 @@ export const deleteBgPlaylistAndFiles = async (playlistId: string) => {
                 }
             };
         } catch (e) {
+            // Fallback if index creation failed
             console.warn("Index lookup failed, skipping file deletion", e);
         }
 

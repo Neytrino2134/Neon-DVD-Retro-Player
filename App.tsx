@@ -47,9 +47,6 @@ function AppContent() {
   const [isTagEditorMode, setIsTagEditorMode] = useState(false);
   const [devSkip, setDevSkip] = useState(false);
   const [showRecModal, setShowRecModal] = useState(false);
-  
-  // --- GLOBAL PLAYLIST LOCK STATE ---
-  const [isPlaylistLocked, setPlaylistLocked] = useState(false);
 
   // --- RECORDING STATE ---
   const [recorderConfig, setRecorderConfig] = useState<RecorderConfig>({
@@ -164,6 +161,8 @@ function AppContent() {
   };
 
   const handleUpdateTrackTags = (_id: string, _updates: Partial<AudioTrack> & { tags?: TagMetadata }) => {
+    // Note: The logic to actually persist tags to IndexedDB would go here.
+    // For now, it's a visual feedback stub as per requirements.
     addNotification("Track Updated (Visual)", "success");
   };
 
@@ -187,7 +186,6 @@ function AppContent() {
     if (defaults.cursorStyle) config.setCursorStyle(defaults.cursorStyle);
     if (defaults.retroScreenCursorStyle) config.setRetroScreenCursorStyle(defaults.retroScreenCursorStyle);
     if (defaults.bgTransition) config.setBgTransition(defaults.bgTransition);
-    if (defaults.bgAnimation) config.setBgAnimation(defaults.bgAnimation); // Added missing reset
     if (defaults.theme) setTheme(defaults.theme);
     if (defaults.controlStyle) setControlStyle(defaults.controlStyle);
     addNotification("System Reset to Factory", "success");
@@ -212,16 +210,10 @@ function AppContent() {
     isRecording: recorder.isRecording,
     startRecording: recorder.startRecording,
     stopRecording: recorder.stopRecording,
-    introState: system.introState,
-    // Lock Props
-    isPlaylistLocked,
-    setPlaylistLocked
+    introState: system.introState
   });
 
   const playbackPercentage = (player.duration > 0) ? (player.currentTime / player.duration) * 100 : 0;
-
-  // Render Check: Center Panel
-  const shouldRenderCenter = view.viewMode !== 'mini' && view.showCenterPanel;
 
   return (
     <div
@@ -233,52 +225,7 @@ function AppContent() {
       onDragLeave={fileHandler.onDragLeave}
       onDrop={fileHandler.onDrop}
     >
-      {/* GLOBAL OVERLAYS - Moved here to ensure z-index stacking works correctly */}
-      <StartupOverlay
-        key={system.startupKey}
-        onFadeOut={() => system.setIntroState(2)}
-        onComplete={system.handleBootComplete}
-        onPlaySfx={playSFX}
-        onStopSfx={stopAllSFX}
-        apiKey={config.apiKey}
-        setApiKey={config.setApiKey}
-        forceSkip={devSkip}
-        onAutoLaunch={() => {
-          autoLaunchRef.current = true;
-          recorder.startRecording(recorderConfig);
-        }}
-      />
-
-      <ShutdownOverlay
-        active={system.rebootPhase === 'active'}
-        onPlayRebootSfx={() => playSFX('SFX_REBOOT.mp3')}
-        onCancel={system.handleCancelReboot}
-        isRecording={recorder.isRecording}
-        stopRecording={recorder.stopRecording}
-      />
-
-      {system.showTutorial && !devSkip && (
-        <TutorialOverlay
-          onComplete={() => {
-            system.setShowTutorial(false);
-            localStorage.setItem('neon_tutorial_complete', 'true');
-            addNotification("TUTORIAL COMPLETE", "success");
-          }}
-          trackCount={player.tracks.length}
-          isPlaying={player.isPlaying}
-          visualizerConfig={config.visualizerConfig}
-          setVisualizerConfig={config.setVisualizerConfig}
-          setShowVisualizer={config.setShowVisualizer}
-          isSettingsOpen={view.showLeftPanel}
-          presetsCount={config.savedPresets.length}
-        />
-      )}
-
-      {/* 
-          Standard TitleBar is only shown in default mode.
-          Mini mode has its own header built into Controls component.
-      */}
-      {!view.isFullscreen && view.viewMode !== 'mini' && (
+      {!view.isFullscreen && (
         <TitleBar
           viewMode={view.viewMode}
           onRestore={() => view.setViewMode('default')}
@@ -309,37 +256,72 @@ function AppContent() {
         className="flex-1 flex flex-col md:flex-row overflow-hidden relative"
       >
         <CustomCursor
-          style={(system.introState < 2 || system.rebootPhase === 'active') ? 'system' : config.cursorStyle}
+          style={system.introState < 2 ? 'dos-terminal' : config.cursorStyle}
           retroScreenStyle={config.retroScreenCursorStyle}
-          analyser={player.analyser}
         />
 
-        {/* SIDEBAR TOGGLE TABS - Hidden in Mini Mode */}
+        {/* SIDEBAR TOGGLE TABS */}
         {view.viewMode !== 'mini' && (
           <>
-            {view.showCenterPanel && ( 
-                <>
-                    <CollapseTab 
-                    side="left" 
-                    isOpen={view.showLeftPanel} 
-                    onClick={view.toggleLeftPanel} 
-                    style={{
-                        left: view.showLeftPanel ? '460px' : '0px',
-                        transition: 'left 0.7s cubic-bezier(0.25, 1, 0.5, 1)'
-                    }}
-                    />
-                    <CollapseTab 
-                    side="right" 
-                    isOpen={view.showRightPanel} 
-                    onClick={view.toggleRightPanel} 
-                    style={{
-                        right: view.showRightPanel ? (view.showCenterPanel ? '580px' : '0') : '0px',
-                        transition: 'right 0.7s cubic-bezier(0.25, 1, 0.5, 1)'
-                    }}
-                    />
-                </>
-            )}
+            <CollapseTab 
+              side="left" 
+              isOpen={view.showLeftPanel} 
+              onClick={view.toggleLeftPanel} 
+              style={{
+                  left: view.showLeftPanel ? '460px' : '0px',
+                  transition: 'left 0.7s cubic-bezier(0.25, 1, 0.5, 1)'
+              }}
+            />
+            <CollapseTab 
+              side="right" 
+              isOpen={view.showRightPanel} 
+              onClick={view.toggleRightPanel} 
+              style={{
+                  right: view.showRightPanel ? '580px' : '0px',
+                  transition: 'right 0.7s cubic-bezier(0.25, 1, 0.5, 1)'
+              }}
+            />
           </>
+        )}
+
+        <StartupOverlay
+          key={system.startupKey}
+          onFadeOut={() => system.setIntroState(2)}
+          onComplete={system.handleBootComplete}
+          onPlaySfx={playSFX}
+          onStopSfx={stopAllSFX}
+          apiKey={config.apiKey}
+          setApiKey={config.setApiKey}
+          forceSkip={devSkip}
+          onAutoLaunch={() => {
+            autoLaunchRef.current = true;
+            recorder.startRecording(recorderConfig);
+          }}
+        />
+
+        <ShutdownOverlay
+          active={system.rebootPhase === 'active'}
+          onPlayRebootSfx={() => playSFX('SFX_REBOOT.mp3')}
+          onCancel={system.handleCancelReboot}
+          isRecording={recorder.isRecording}
+          stopRecording={recorder.stopRecording}
+        />
+
+        {system.showTutorial && !devSkip && (
+          <TutorialOverlay
+            onComplete={() => {
+              system.setShowTutorial(false);
+              localStorage.setItem('neon_tutorial_complete', 'true');
+              addNotification("TUTORIAL COMPLETE", "success");
+            }}
+            trackCount={player.tracks.length}
+            isPlaying={player.isPlaying}
+            visualizerConfig={config.visualizerConfig}
+            setVisualizerConfig={config.setVisualizerConfig}
+            setShowVisualizer={config.setShowVisualizer}
+            isSettingsOpen={view.showLeftPanel}
+            presetsCount={config.savedPresets.length}
+          />
         )}
 
         <audio
@@ -349,7 +331,7 @@ function AppContent() {
               player.setIsPlaying(false);
               system.setRebootPhase('active');
             } else {
-              player.nextTrack(true);
+              player.nextTrack();
             }
           } : undefined}
           onTimeUpdate={player.activeDeck === 'A' ? (e) => player.handleTimeUpdate(e, system.rebootPhase === 'waiting') : undefined}
@@ -365,7 +347,7 @@ function AppContent() {
               player.setIsPlaying(false);
               system.setRebootPhase('active');
             } else {
-              player.nextTrack(true);
+              player.nextTrack();
             }
           } : undefined}
           onTimeUpdate={player.activeDeck === 'B' ? (e) => player.handleTimeUpdate(e, system.rebootPhase === 'waiting') : undefined}
@@ -378,8 +360,7 @@ function AppContent() {
         {/* LEFT PANEL */}
         {view.viewMode !== 'mini' && (
           <div className={view.leftPanelClass}>
-            {/* Added explicit width to child to ensure content doesn't reflow during width transition */}
-            <div className="w-[460px] h-full relative">
+            <div className="w-full h-full relative">
               {isEditorMode ? (
                 <EditorControls
                   instruments={musicEngine.instruments}
@@ -481,8 +462,6 @@ function AppContent() {
                   toggleVideo={screenCapture.toggleVideoCapture}
                   isAudioActive={screenCapture.isAudioActive}
                   toggleAudio={screenCapture.toggleAudioCapture}
-                  audioSourceType={screenCapture.audioSourceType} 
-                  setAudioSourceType={screenCapture.setAudioSourceType} 
                   audioVolume={sysAudioVolume}
                   setAudioVolume={setSysAudioVolume}
                   isMonitoring={sysAudioMonitor}
@@ -494,7 +473,6 @@ function AppContent() {
                   streamMode={streamMode}
                   setStreamMode={setStreamMode}
                   shuffleBgList={config.shuffleBgList}
-                  updateBg={config.updateBg} 
                 />
               )}
 
@@ -536,7 +514,7 @@ function AppContent() {
         )}
 
         {/* CENTER: RETRO SCREEN OR EDITORS */}
-        {shouldRenderCenter && (
+        {view.viewMode !== 'mini' && (
           <div className={view.screenContainerClass}>
             {isEditorMode ? (
               <MusicEditor
@@ -600,7 +578,6 @@ function AppContent() {
 
                 onPlaySfx={playSFX}
                 volume={player.volume}
-                onVolumeChange={player.setVolume} // Pass volume handler to screen
                 apiKey={config.apiKey}
                 useAlbumArtAsBackground={config.useAlbumArtAsBackground}
                 bgAnimation={config.bgAnimation}
@@ -608,19 +585,14 @@ function AppContent() {
                 isRecording={recorder.isRecording}
                 onStartRecording={() => recorder.startRecording(recorderConfig)}
                 onStopRecording={recorder.stopRecording}
-                
-                isResizing={view.isResizing}
-                isPlaylistLocked={isPlaylistLocked}
               />
             )}
           </div>
         )}
 
-        {/* RIGHT PANEL: CONTROLS (AND MINI PLAYER) */}
+        {/* RIGHT PANEL: CONTROLS */}
         <div className={view.rightPanelClass}>
-          {/* Explicit width ensures inner content doesn't squeeze during animation */}
-          {/* In Mini Mode, this panel becomes the entire viewport */}
-          <div className={`${view.viewMode === 'mini' ? 'w-full h-full' : (view.showCenterPanel ? 'w-[580px]' : 'w-full')} h-full`}>
+          <div className={`w-full h-full ${view.viewMode === 'mini' ? '' : 'md:w-[580px]'}`}>
             <Controls
               viewMode={view.viewMode}
               onToggleMiniMode={() => view.setViewMode(view.viewMode === 'mini' ? 'default' : 'mini')}
@@ -646,7 +618,6 @@ function AppContent() {
               onFilesInserted={player.insertAudioFiles}
               onClearPlaylist={() => { player.clearPlaylist(); addNotification("Playlist cleared", "warning"); }}
               onSort={() => { player.sortTracks(); addNotification("Playlist sorted A-Z", "info"); }}
-              onSortByTrackNumber={() => { player.sortTracksByNumber(); addNotification("Sorted by Track #", "info"); }}
               onShuffle={() => { player.shuffleTracks(); addNotification("Playlist shuffled", "info"); }}
               onAddPlaylist={player.addPlaylist}
               onRemovePlaylist={player.removePlaylist}
@@ -660,20 +631,6 @@ function AppContent() {
               onNewPlaylistWithFiles={player.createPlaylistFromFiles}
               analyser={player.analyser}
               visualizerConfig={config.visualizerConfig}
-              // Lock Props
-              isPlaylistLocked={isPlaylistLocked}
-              onToggleLock={() => {
-                  setPlaylistLocked(!isPlaylistLocked);
-                  addNotification(isPlaylistLocked ? "PLAYLIST UNLOCKED" : "PLAYLIST LOCKED", "info");
-              }}
-              // Playback Modes
-              isShuffle={player.isShuffle}
-              setIsShuffle={player.setIsShuffle}
-              isAutoNextPlaylist={player.isAutoNextPlaylist}
-              setIsAutoNextPlaylist={player.setIsAutoNextPlaylist}
-              // Rating
-              onRateTrack={player.rateTrack}
-              onSortByRating={() => { player.sortByRating(); addNotification("Sorted by Rating", "info"); }}
             />
           </div>
         </div>

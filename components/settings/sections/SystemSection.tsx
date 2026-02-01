@@ -13,7 +13,7 @@ import { AppPreset, ThemeType, CursorStyle, ControlStyle, WatermarkConfig, Effec
 
 interface SystemSectionProps {
   expandedState: Record<string, boolean>;
-  toggleExpand: (id: string, isAdditive: boolean, forceOpen?: boolean) => void;
+  toggleExpand: (id: string, isAdditive: boolean) => void;
   // Props for sub-modules
   onBgMediaUpload: (files: FileList) => void;
   onAudioUpload: (files: FileList) => void;

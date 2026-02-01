@@ -13,7 +13,7 @@ import DvdLogo from './DvdLogo';
 import Visualizer from './Visualizer';
 import Visualizer3D from './Visualizer3D'; 
 import VisualizerSpectrum3D from './VisualizerSpectrum3D'; 
-import SineWave from './SineWave'; 
+import SineWave from './SineWave'; // NEW
 import MediaRenderer from './MediaRenderer';
 import NoiseOverlay from './NoiseOverlay';
 import PatternOverlay from './PatternOverlay';
@@ -21,7 +21,7 @@ import Marquee from './Marquee';
 import ProgressBar from './ProgressBar';
 import NotificationOverlay from './ui/NotificationOverlay';
 import HologramHelp from './ui/HologramHelp'; 
-import FpsCounter from './ui/FpsCounter'; 
+import FpsCounter from './ui/FpsCounter'; // NEW
 
 // Effects
 import ScanlineEffect from './effects/ScanlineEffect';
@@ -34,9 +34,9 @@ import HologramEffect from './effects/HologramEffect';
 import GeminiChatEffect from './effects/GeminiChatEffect';
 import LightLeaksEffect from './effects/LightLeaksEffect';
 import RainEffect from './effects/RainEffect'; 
-import TronEffect from './effects/TronEffect'; 
-import VignetteEffect from './effects/VignetteEffect'; 
-import LightFlickerEffect from './effects/LightFlickerEffect'; 
+import TronEffect from './effects/TronEffect'; // NEW
+import VignetteEffect from './effects/VignetteEffect'; // NEW
+import LightFlickerEffect from './effects/LightFlickerEffect'; // NEW
 
 // New Sub-Components
 import ScreenTopBar from './screen/ScreenTopBar';
@@ -50,7 +50,7 @@ interface RetroScreenProps {
   currentTrack: AudioTrack | undefined;
   tracks: AudioTrack[];
   onTrackSelect: (index: number) => void;
-  bgMedia: { type: 'image' | 'video', url: string, hotspots?: any[] } | null;
+  bgMedia: { type: 'image' | 'video', url: string } | null;
   bgColor: string;
   bgPattern?: string;
   bgPatternConfig?: PatternConfig;
@@ -63,11 +63,11 @@ interface RetroScreenProps {
   setVisualizerConfig?: (c: VisualizerConfig) => void; 
   reactorConfig?: VisualizerConfig; 
   setReactorConfig?: (c: VisualizerConfig) => void; 
-  sineWaveConfig?: VisualizerConfig; 
+  sineWaveConfig?: VisualizerConfig; // NEW
   
   showVisualizer: boolean;
   showVisualizer3D?: boolean; 
-  showSineWave?: boolean; 
+  showSineWave?: boolean; // NEW
   
   dvdConfig: DvdConfig;
   showDvd: boolean;
@@ -93,7 +93,6 @@ interface RetroScreenProps {
 
   onPlaySfx?: (name: string) => void;
   volume: number; 
-  onVolumeChange?: (vol: number) => void; // Added onVolumeChange prop
   apiKey?: string; 
   useAlbumArtAsBackground?: boolean;
   bgAnimation?: BgAnimationType;
@@ -102,12 +101,6 @@ interface RetroScreenProps {
   isRecording?: boolean;
   onStartRecording?: () => void;
   onStopRecording?: () => void;
-
-  // Resizing State
-  isResizing?: boolean;
-
-  // Lock State
-  isPlaylistLocked?: boolean;
 }
 
 const RetroScreen = forwardRef<HTMLDivElement, RetroScreenProps>((props, externalRef) => {
@@ -119,12 +112,10 @@ const RetroScreen = forwardRef<HTMLDivElement, RetroScreenProps>((props, externa
     focusMode, setFocusMode, isDragging,
     onDragOver, onDragEnter, onDragLeave, onDrop,
     onScheduleReload, rebootPhase,
-    onPlaySfx, volume, onVolumeChange, apiKey,
+    onPlaySfx, volume, apiKey,
     useAlbumArtAsBackground = false,
     bgAnimation = 'none',
-    isRecording, onStartRecording, onStopRecording,
-    isResizing = false,
-    isPlaylistLocked = false
+    isRecording, onStartRecording, onStopRecording
   } = props;
   
   const { notifications, addNotification } = useNotification();
@@ -136,7 +127,7 @@ const RetroScreen = forwardRef<HTMLDivElement, RetroScreenProps>((props, externa
   const internalRef = useRef<HTMLDivElement>(null);
   const containerRef = (externalRef as React.RefObject<HTMLDivElement>) || internalRef;
   const signalLayerRef = useRef<HTMLDivElement>(null);
-  const imageLayerRef = useRef<HTMLDivElement>(null); 
+  const imageLayerRef = useRef<HTMLDivElement>(null); // New Ref for Shaking Images
   const shakeRef = useRef<HTMLDivElement>(null);
   
   // --- HOOKS ---
@@ -146,19 +137,6 @@ const RetroScreen = forwardRef<HTMLDivElement, RetroScreenProps>((props, externa
       setVisualizerConfig,
       setShowHelp
   });
-
-  // Mouse Wheel Volume Control
-  const handleWheel = (e: React.WheelEvent) => {
-      // Avoid conflict with internal scrollable elements (like playlist or logs)
-      if ((e.target as HTMLElement).closest('.custom-scrollbar')) return;
-
-      if (onVolumeChange) {
-          const step = 0.05;
-          const direction = e.deltaY > 0 ? -1 : 1;
-          const newVol = Math.max(0, Math.min(1, volume + (step * direction)));
-          onVolumeChange(newVol);
-      }
-  };
 
   const { baseMedia, overlayMedia, isCrossfading, transitionPhase, bgTransition, activeStream } = useMediaTransition({
       bgMedia,
@@ -172,6 +150,7 @@ const RetroScreen = forwardRef<HTMLDivElement, RetroScreenProps>((props, externa
     onDoubleTap: () => { setFocusMode(!focusMode); },
   });
 
+  // Derived effective values based on enabled flags
   const isSignalEnabled = effectsConfig.signalEnabled;
   const isChromaticEnabled = effectsConfig.chromaticEnabled;
   
@@ -180,7 +159,7 @@ const RetroScreen = forwardRef<HTMLDivElement, RetroScreenProps>((props, externa
   const effectiveVhsJitter = isSignalEnabled ? effectsConfig.vhsJitter : 0;
   const effectiveChromatic = isChromaticEnabled ? (effectsConfig.chromaticAberration || 0) : 0;
 
-  // Screen Shake Loop
+  // Screen Shake Loop (Only for Glitch)
   useEffect(() => {
     let aid: number;
     const loop = () => {
@@ -195,6 +174,7 @@ const RetroScreen = forwardRef<HTMLDivElement, RetroScreenProps>((props, externa
         y += (Math.random() - 0.5) * shakeIntensity;
       }
       
+      // APPLY SHAKE ONLY TO THE IMAGE LAYER
       if (imageLayerRef.current) {
         imageLayerRef.current.style.transform = `translate3d(${x}px, ${y}px, 0)`;
       }
@@ -207,7 +187,7 @@ const RetroScreen = forwardRef<HTMLDivElement, RetroScreenProps>((props, externa
   // --- PLAYLIST HOTKEY (L) ---
   useEffect(() => {
       const handleKeyDown = (e: KeyboardEvent) => {
-          if (e.code === 'KeyL' && !e.ctrlKey && !e.altKey && !e.metaKey && !e.shiftKey) { // Ensure shift is not pressed (Shift+L is lock)
+          if (e.code === 'KeyL' && !e.ctrlKey && !e.altKey && !e.metaKey) {
               const target = e.target as HTMLElement;
               if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA') return;
               
@@ -250,16 +230,23 @@ const RetroScreen = forwardRef<HTMLDivElement, RetroScreenProps>((props, externa
     const gl = `${r()}${r()}${r()}`;
 
     if (isSystemAudioActive) {
-        return `STREAM AUDIO ACTIVE  ${dots}  LIVE SIGNAL DETECTED  ${dots}  ${brand}  ${dots}  ${gl}  ${dots} `;
+        return `SYSTEM AUDIO CAPTURE ACTIVE  ${dots}  STREAMING MODE  ${dots}  ${brand}  ${dots}  LIVE SIGNAL DETECTED  ${dots}  ${gl}  ${dots} `;
     }
 
     if (currentTrack) {
+        // --- EXTRACT METADATA ---
         const t = currentTrack.tags || {};
+        
+        // Parts
         const trackNum = t.trackNumber ? `[#${t.trackNumber}]` : "";
         const title = t.title ? t.title.toUpperCase() : currentTrack.name.toUpperCase();
         const artist = t.artist ? t.artist.toUpperCase() : "UNKNOWN ARTIST";
         const album = t.album ? `// ${t.album.toUpperCase()}` : "";
+
+        // Construct Info String
+        // Example: [#01] ARTIST - TITLE // ALBUM
         const trackInfo = `${trackNum} ${artist} — ${title} ${album}`.trim();
+
         return `NOW PLAYING: ${trackInfo}  ${dots}  ${brand}  ${dots}  ${gl}  ${dots}  ${trackInfo}  ${dots} `;
     }
 
@@ -269,24 +256,27 @@ const RetroScreen = forwardRef<HTMLDivElement, RetroScreenProps>((props, externa
   const watermarkAnimClass = (watermarkConfig?.flashIntensity || 0) > 0 ? "animate-text-flash" : "";
   const watermarkAnimStyle: any = { animationDuration: watermarkConfig?.flashIntensity ? `${21 - (watermarkConfig.flashIntensity * 20)}s` : '0s' };
 
+  // Separate config for transition leaks to prevent conflict with ambient settings
   const transitionLeaksConfig = React.useMemo(() => {
       const active = isCrossfading && bgTransition === 'leaks';
       return { 
           enabled: active, 
           intensity: 1.0, 
-          speed: 3.0, 
-          number: 20 
+          speed: 3.0, // Fast movement for transition
+          number: 20  // Dense cloud
       };
   }, [isCrossfading, bgTransition]);
 
   const animClass = (bgAnimation && bgAnimation !== 'none' && !activeStream) ? `bg-anim-${bgAnimation}` : '';
   
+  // Transition Timing Logic
   let transitionDuration = '2.0s';
   if (bgTransition === 'leaks') transitionDuration = '1.0s'; 
   else if (bgTransition === 'glitch') transitionDuration = '1.2s';
 
   const overlayTransitionStyle = `opacity ${transitionDuration} ease-in-out`;
 
+  // Override config passed to MediaRenderer to respect signal toggle
   const mediaEffectsConfig = React.useMemo(() => ({
       ...effectsConfig,
       pixelation: effectivePixelation
@@ -299,7 +289,6 @@ const RetroScreen = forwardRef<HTMLDivElement, RetroScreenProps>((props, externa
         ref={shakeRef}
         onDoubleClick={() => setFocusMode(!focusMode)} 
         onMouseMove={handleMouseMove}
-        onWheel={handleWheel} // Added wheel handler
         {...gestureHandlers} 
         className={`cursor-hide-center cursor-target-screen relative w-full h-full bg-gray-900 transition-all duration-700 ${focusMode ? 'rounded-none border-0' : 'rounded-xl border-2'} ${isDragging ? 'border-neon-blue shadow-[0_0_30px_#00f3ff]' : 'border-theme-border shadow-md'} overflow-hidden group touch-action-manipulation`}
         onDragOver={onDragOver}
@@ -325,9 +314,9 @@ const RetroScreen = forwardRef<HTMLDivElement, RetroScreenProps>((props, externa
                 isRecording={isRecording}
                 onStartRecording={onStartRecording}
                 onStopRecording={onStopRecording}
-                isPlaylistLocked={isPlaylistLocked}
             />
 
+            {/* FPS Counter Overlay */}
             {effectsConfig.showFps && <FpsCounter />}
 
             <ChromaticAberration intensity={effectiveChromatic} />
@@ -337,14 +326,13 @@ const RetroScreen = forwardRef<HTMLDivElement, RetroScreenProps>((props, externa
                 className="absolute inset-0 w-full h-full"
                 style={effectiveChromatic > 0 ? { filter: 'url(#chromatic-aberration-filter)' } : undefined}
             >
-                {/* IMAGE LAYER */}
+                {/* IMAGE LAYER - SHAKES INDEPENDENTLY */}
                 <div ref={imageLayerRef} className="absolute inset-0 w-full h-full will-change-transform">
                     <div className="absolute inset-0 w-full h-full transition-colors duration-700 ease-in-out" style={{ backgroundColor: resolvedBgColor }}></div>
 
                     {/* MEDIA LAYERS */}
                     <div className={`absolute inset-0 w-full h-full ${animClass}`}>
                         <div className="absolute inset-0 w-full h-full" style={{ opacity: 1, zIndex: 0 }}>
-                            {/* Keep Media Rendering even during resize to prevent white flash */}
                             {(activeStream || baseMedia) && (
                                 <MediaRenderer type={baseMedia ? baseMedia.type : 'video'} url={baseMedia?.url} stream={activeStream} bgColor={'transparent'} effects={mediaEffectsConfig} />
                             )}
@@ -357,47 +345,35 @@ const RetroScreen = forwardRef<HTMLDivElement, RetroScreenProps>((props, externa
                     </div>
                 </div>
                 
-                {/* 
-                    HEAVY EFFECTS - DISABLED DURING RESIZE
-                    This prevents WebGL context loss and freezing during rapid window geometry changes
-                */}
-                {!isResizing && (
-                    <>
-                        <PatternOverlay pattern={bgPattern} config={bgPatternConfig} />
-                        <TransitionEffect phase={transitionPhase} mode={bgTransition} />
-                        <RainEffect config={effectsConfig.rain} />
-                        <TronEffect 
-                            config={effectsConfig.tron} 
-                            analyser={analyser} 
-                            isPlaying={isPlaying} 
-                            visualizerConfig={visualizerConfig} 
-                            volume={volume}
-                            currentTime={currentTime}
-                            duration={duration}
-                        />
-                        
-                        <LightLeaksEffect config={effectsConfig.lightLeaks} />
-                        <LightLeaksEffect config={transitionLeaksConfig} />
+                {/* OVERLAYS - STATIC RELATIVE TO SHAKE (BUT AFFECTED BY CHROMATIC ABERRATION) */}
+                <PatternOverlay pattern={bgPattern} config={bgPatternConfig} />
+                <TransitionEffect phase={transitionPhase} mode={bgTransition} />
+                <RainEffect config={effectsConfig.rain} />
+                <TronEffect config={effectsConfig.tron} />
+                
+                {/* Independent Light Leaks Layers */}
+                {/* 1. Ambient (Settings) */}
+                <LightLeaksEffect config={effectsConfig.lightLeaks} />
+                {/* 2. Transition (Burst) */}
+                <LightLeaksEffect config={transitionLeaksConfig} />
 
-                        {showVisualizer && (
-                            <Visualizer analyser={analyser} isPlaying={isPlaying} config={visualizerConfig} fps={120} volume={volume} />
-                        )}
-
-                        {showVisualizer3D && reactorConfig && (
-                            reactorConfig.threeDMode === 'spectrum' ? (
-                                <VisualizerSpectrum3D analyser={analyser} isPlaying={isPlaying} config={reactorConfig} volume={volume} />
-                            ) : (
-                                <Visualizer3D analyser={analyser} isPlaying={isPlaying} config={reactorConfig} volume={volume} />
-                            )
-                        )}
-
-                        {showSineWave && sineWaveConfig && (
-                            <SineWave analyser={analyser} isPlaying={isPlaying} config={sineWaveConfig} volume={volume} />
-                        )}
-                        
-                        {showDvd && <DvdLogo containerRef={containerRef} fps={effectsConfig.fps} effectsConfig={effectsConfig} config={dvdConfig} onPlaySfx={onPlaySfx} />}
-                    </>
+                {showVisualizer && (
+                    <Visualizer analyser={analyser} isPlaying={isPlaying} config={visualizerConfig} fps={120} volume={volume} />
                 )}
+
+                {showVisualizer3D && reactorConfig && (
+                    reactorConfig.threeDMode === 'spectrum' ? (
+                        <VisualizerSpectrum3D analyser={analyser} isPlaying={isPlaying} config={reactorConfig} volume={volume} />
+                    ) : (
+                        <Visualizer3D analyser={analyser} isPlaying={isPlaying} config={reactorConfig} volume={volume} />
+                    )
+                )}
+
+                {showSineWave && sineWaveConfig && (
+                    <SineWave analyser={analyser} isPlaying={isPlaying} config={sineWaveConfig} volume={volume} />
+                )}
+                
+                {showDvd && <DvdLogo containerRef={containerRef} fps={effectsConfig.fps} effectsConfig={effectsConfig} config={dvdConfig} onPlaySfx={onPlaySfx} />}
                 
                 <ProgressBar 
                     progress={progress} 
@@ -421,7 +397,6 @@ const RetroScreen = forwardRef<HTMLDivElement, RetroScreenProps>((props, externa
                     onTrackSelect={onTrackSelect}
                     onClose={() => setShowPlaylist(false)}
                     marqueeColor={marqueeColor}
-                    isLocked={isPlaylistLocked}
                 />
 
                 <ScreenQuickSettings 
@@ -432,20 +407,15 @@ const RetroScreen = forwardRef<HTMLDivElement, RetroScreenProps>((props, externa
                     setVisualizerConfig={setVisualizerConfig}
                 />
 
-                {!isResizing && (
-                    <>
-                        <GlitchEffect effects={effectsConfig} />
-                        <CyberHackEffect effects={effectsConfig} />
-                        <HologramEffect effects={effectsConfig} bgMedia={baseMedia} />
-                        <GeminiChatEffect effects={effectsConfig} apiKey={apiKey} />
-                        <LightFlickerEffect config={effectsConfig.lightFlicker} />
-                    </>
-                )}
-                
+                <GlitchEffect effects={effectsConfig} />
+                <CyberHackEffect effects={effectsConfig} />
+                <HologramEffect effects={effectsConfig} />
+                <GeminiChatEffect effects={effectsConfig} apiKey={apiKey} />
+                <LightFlickerEffect config={effectsConfig.lightFlicker} />
                 <VignetteEffect config={effectsConfig.vignette} />
             </div>
             
-            {!isResizing && <DebugConsoleEffect effects={effectsConfig} />}
+            <DebugConsoleEffect effects={effectsConfig} />
             <NoiseOverlay opacity={effectiveNoise} pixelation={effectivePixelation} />
             <ScanlineEffect config={effectsConfig} />
             
@@ -463,6 +433,7 @@ const RetroScreen = forwardRef<HTMLDivElement, RetroScreenProps>((props, externa
             />
          </div>
          
+         {/* WATERMARK - Position Adjusted to prevent clipping in constrained layouts */}
          <div 
             className="absolute bottom-16 right-16 z-50 flex flex-col items-end pointer-events-none select-none mix-blend-screen whitespace-nowrap"
             style={{

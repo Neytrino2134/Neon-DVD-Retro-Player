@@ -1,6 +1,6 @@
 
 import React, { useEffect, useState, useRef } from 'react';
-import { Music, X, Lock } from 'lucide-react';
+import { Music, X } from 'lucide-react';
 import { AudioTrack } from '../../types';
 
 interface ScreenPlaylistProps {
@@ -10,10 +10,9 @@ interface ScreenPlaylistProps {
   onTrackSelect: (index: number) => void;
   onClose: () => void;
   marqueeColor: string;
-  isLocked?: boolean;
 }
 
-const ScreenPlaylist: React.FC<ScreenPlaylistProps> = ({ visible, tracks, currentTrack, onTrackSelect, onClose, marqueeColor, isLocked }) => {
+const ScreenPlaylist: React.FC<ScreenPlaylistProps> = ({ visible, tracks, currentTrack, onTrackSelect, onClose, marqueeColor }) => {
   // Animation Phases: 0: Init, 1: Line(Width), 2: Window(Height), 3: Content
   const [phase, setPhase] = useState(0);
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -92,11 +91,7 @@ const ScreenPlaylist: React.FC<ScreenPlaylistProps> = ({ visible, tracks, curren
                 }}
             >
                 <div className="flex items-center gap-2">
-                    {isLocked ? (
-                        <Lock size={16} className="text-red-500 animate-pulse" />
-                    ) : (
-                        <Music size={16} style={{ color: baseColor }} className="animate-pulse" />
-                    )}
+                    <Music size={16} style={{ color: baseColor }} className="animate-pulse" />
                     <span className="font-mono text-xs font-bold tracking-widest uppercase" style={{ color: baseColor }}>
                         PLAYLIST // {tracks.length}
                     </span>
@@ -122,16 +117,12 @@ const ScreenPlaylist: React.FC<ScreenPlaylistProps> = ({ visible, tracks, curren
                         <div 
                             key={track.id}
                             data-active={isPlaying}
-                            onClick={() => { if (!isLocked) onTrackSelect(i); }}
+                            onClick={() => { onTrackSelect(i); }}
                             className={`
-                                group flex items-center gap-3 p-2 rounded transition-all border
+                                group flex items-center gap-3 p-2 rounded cursor-pointer transition-all border
                                 ${isPlaying 
                                     ? 'bg-white/10 border-current shadow-[inset_0_0_10px_rgba(255,255,255,0.1)]' 
-                                    : 'border-transparent'
-                                }
-                                ${isLocked 
-                                    ? 'cursor-not-allowed opacity-70' 
-                                    : 'cursor-pointer hover:bg-white/5 hover:border-white/10'
+                                    : 'border-transparent hover:bg-white/5 hover:border-white/10'
                                 }
                             `}
                             style={{ 
