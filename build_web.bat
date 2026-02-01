@@ -1,3 +1,4 @@
+
 @echo off
 title Neon Player - Build Web
 color 0b
@@ -20,10 +21,7 @@ if %errorlevel% neq 0 (
     echo ==================================================
     echo      BUILD FAILED
     echo ==================================================
-    echo.
-    echo AI Prompt: "Поправить ошибки сборки"
-    echo.
-    pause >nul
+    pause
     exit
 )
 

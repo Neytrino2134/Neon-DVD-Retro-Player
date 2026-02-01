@@ -16,7 +16,7 @@ interface ThemeColors {
   toggleBg: string; // New: Unified toggle background color
 }
 
-export const THEMES: Record<ThemeType, ThemeColors> = {
+const THEMES: Record<ThemeType, ThemeColors> = {
   'neon-retro': {
     primary: '#00f3ff',
     secondary: '#bc13fe',
@@ -96,8 +96,6 @@ export const THEMES: Record<ThemeType, ThemeColors> = {
     toggleBg: '#00E5FF',
   }
 };
-
-export const THEME_KEYS = Object.keys(THEMES) as ThemeType[];
 
 interface ThemeContextType {
   currentTheme: ThemeType;

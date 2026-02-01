@@ -1,21 +1,29 @@
 
-import { useRef, useEffect } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { LanguageProvider } from './contexts/LanguageContext';
 import { NotificationProvider, useNotification } from './contexts/NotificationContext';
 import { ThemeProvider, useTheme } from './contexts/ThemeContext';
+import { Settings, Loader } from 'lucide-react';
 
 // Components - Layout & UI
 import TitleBar from './components/TitleBar';
+import StartupOverlay from './components/StartupOverlay';
+import ShutdownOverlay from './components/ShutdownOverlay';
+import TutorialOverlay from './components/TutorialOverlay';
 import ContextMenu from './components/ContextMenu';
 import CustomCursor from './components/CustomCursor';
 import StreamWindow from './components/ui/StreamWindow';
+import RecordingSettingsModal from './components/modals/RecordingSettingsModal';
 import CollapseTab from './components/ui/CollapseTab';
-import GlobalOverlays from './components/GlobalOverlays';
 
-// Panels
-import LeftPanel from './components/panels/LeftPanel';
-import CenterPanel from './components/panels/CenterPanel';
+// Components - Main Modules
+import SettingsPanel from './components/settings/SettingsPanel';
 import Controls from './components/Controls';
+import RetroScreen from './components/RetroScreen';
+import MusicEditor from './components/editor/MusicEditor';
+import EditorControls from './components/editor/EditorControls';
+import TagEditor from './components/tags/TagEditor';
+import TagControls from './components/tags/TagControls';
 
 // Hooks
 import { useAudioPlayer } from './hooks/useAudioPlayer';
@@ -26,64 +34,160 @@ import { useScreenCapture } from './hooks/useScreenCapture';
 import { useAppHotkeys } from './hooks/useAppHotkeys';
 import { useMusicEngine } from './hooks/useMusicEngine';
 import { useRecorder } from './hooks/useRecorder';
+
+// NEW Modular Hooks
 import { useViewLayout } from './hooks/useViewLayout';
 import { useSystemCycle } from './hooks/useSystemCycle';
 import { useFileHandler } from './hooks/useFileHandler';
-import { useAppState } from './hooks/useAppState';
+import { AudioTrack, TagMetadata, RecorderConfig } from './types';
 
 function AppContent() {
+  // --- UI LOCAL STATE ---
+  const [isEditorMode, setIsEditorMode] = useState(false);
+  const [isTagEditorMode, setIsTagEditorMode] = useState(false);
+  const [devSkip, setDevSkip] = useState(false);
+  const [showRecModal, setShowRecModal] = useState(false);
+  
+  // --- GLOBAL PLAYLIST LOCK STATE ---
+  const [isPlaylistLocked, setPlaylistLocked] = useState(false);
+
+  // --- RECORDING STATE ---
+  const [recorderConfig, setRecorderConfig] = useState<RecorderConfig>({
+    resolution: '1080p',
+    fps: 60,
+    videoBitrate: 8000000,
+    audioBitrate: 192000
+  });
+
+  // --- SCREEN CAPTURE STATE ---
+  const [screenVideo, setScreenVideo] = useState<MediaStream | null>(null);
+  const [streamMode, setStreamMode] = useState<'bg' | 'window'>('bg');
+
   // --- REFS ---
   const appContainerRef = useRef<HTMLDivElement>(null);
+
+  // Ref to track if we are in an auto-launch sequence
   const autoLaunchRef = useRef(false);
 
-  // --- CONTEXTS ---
+  // --- CONTEXTS & CORE HOOKS ---
   const { addNotification } = useNotification();
   const { currentTheme, setTheme, controlStyle, setControlStyle } = useTheme();
 
-  // --- HOOKS ---
-  const appState = useAppState();
   const player = useAudioPlayer();
   const config = useAppConfig();
   const { playSFX, handleZipUpload, stopAllSFX, sfxMap, sfxVolume, setSfxVolume } = useSFX();
   const ambience = useAmbience();
   const musicEngine = useMusicEngine();
 
-  // Modular Hooks
+  // --- NEW Modular Hooks ---
+
+  // 1. System Lifecycle (Boot, Reboot, Tutorial)
   const system = useSystemCycle({
     player,
-    setDevSkip: appState.setDevSkip,
-    setIsEditorMode: (v) => { appState.setIsEditorMode(v); if (v) appState.setIsTagEditorMode(false); },
+    setDevSkip,
+    setIsEditorMode: (v) => { setIsEditorMode(v); if (v) setIsTagEditorMode(false); },
     stopAllSFX
   });
 
+  // 2. View & Layout (Animations, Panels, Modes)
   const view = useViewLayout(system.introState);
 
+  // 3. File Handling (Drag & Drop)
   const fileHandler = useFileHandler({
     player,
-    config: { ...config, setTheme, setControlStyle },
+    config: { ...config, setTheme, setControlStyle }, // Inject theme setters for config imports
     containerRef: appContainerRef,
     handleZipUpload
   });
 
+  // 4. Recording Hook
   const recorder = useRecorder(player.getAudioStream);
 
+  // --- INTEGRATION EFFECTS ---
+
+  // Initialize Screen/Audio Capture
   const screenCapture = useScreenCapture({
-    onVideoStream: (stream) => appState.setScreenVideo(stream),
-    onMicStream: (stream) => stream ? player.connectMic(stream) : player.disconnectMic(),
-    onSysStream: (stream) => stream ? player.connectSys(stream) : player.disconnectSys()
+    onVideoStream: (stream: MediaStream | null) => setScreenVideo(stream),
+    onMicStream: (stream) => {
+        if (stream) player.connectMic(stream);
+        else player.disconnectMic();
+    },
+    onSysStream: (stream) => {
+        if (stream) player.connectSys(stream);
+        else player.disconnectSys();
+    }
   });
 
-  // --- EFFECTS ---
-  // Auto-Launch Sequence
+  // AUTO-LAUNCH HANDLER
   useEffect(() => {
     if (system.introState === 2 && autoLaunchRef.current) {
       view.toggleFocusMode(true);
       setTimeout(() => {
-        if (!player.isPlaying) player.togglePlay();
+        if (!player.isPlaying) {
+          player.togglePlay();
+        }
       }, 500);
       autoLaunchRef.current = false;
     }
   }, [system.introState, view, player]);
+
+  // Handle Editor Toggle
+  const handleToggleEditor = () => {
+    if (isEditorMode) {
+      if (musicEngine.isPlaying) musicEngine.togglePlay();
+      setIsEditorMode(false);
+      addNotification("EDITOR CLOSED", "info");
+    } else {
+      if (player.isPlaying) player.stop();
+      setIsEditorMode(true);
+      setIsTagEditorMode(false);
+      if (!view.showLeftPanel) view.setShowLeftPanel(true);
+      addNotification("MUSIC STUDIO INITIALIZED", "success");
+    }
+  };
+
+  // Handle Tag Editor Toggle
+  const handleToggleTagEditor = () => {
+    if (isTagEditorMode) {
+      setIsTagEditorMode(false);
+      addNotification("TAG EDITOR CLOSED", "info");
+    } else {
+      setIsTagEditorMode(true);
+      setIsEditorMode(false);
+      if (!view.showLeftPanel) view.setShowLeftPanel(true);
+      addNotification("TAG EDITOR INITIALIZED", "success");
+    }
+  };
+
+  const handleUpdateTrackTags = (_id: string, _updates: Partial<AudioTrack> & { tags?: TagMetadata }) => {
+    addNotification("Track Updated (Visual)", "success");
+  };
+
+  const handleResetDefault = () => {
+    const defaults = config.resetDefaultPreset();
+    config.setVisualizerConfig(defaults.visualizerConfig);
+    if (defaults.reactorConfig && config.setReactorConfig) config.setReactorConfig(defaults.reactorConfig);
+    if (defaults.sineWaveConfig && config.setSineWaveConfig) config.setSineWaveConfig(defaults.sineWaveConfig);
+    config.setDvdConfig(defaults.dvdConfig);
+    config.setEffectsConfig(defaults.effectsConfig);
+    config.setMarqueeConfig(defaults.marqueeConfig);
+    if (defaults.watermarkConfig && config.setWatermarkConfig) config.setWatermarkConfig(defaults.watermarkConfig);
+    config.setBgColor(defaults.bgColor);
+    config.setBgPattern(defaults.bgPattern);
+    config.setBgPatternConfig(defaults.bgPatternConfig);
+    config.setShowVisualizer(defaults.showVisualizer);
+    if (config.setShowVisualizer3D && defaults.showVisualizer3D !== undefined) config.setShowVisualizer3D(defaults.showVisualizer3D);
+    if (config.setShowSineWave && defaults.showSineWave !== undefined) config.setShowSineWave(defaults.showSineWave);
+    config.setShowDvd(defaults.showDvd);
+    config.setBgAutoplayInterval(defaults.bgAutoplayInterval);
+    if (defaults.cursorStyle) config.setCursorStyle(defaults.cursorStyle);
+    if (defaults.retroScreenCursorStyle) config.setRetroScreenCursorStyle(defaults.retroScreenCursorStyle);
+    if (defaults.bgTransition) config.setBgTransition(defaults.bgTransition);
+    if (defaults.bgAnimation) config.setBgAnimation(defaults.bgAnimation); // Added missing reset
+    if (defaults.theme) setTheme(defaults.theme);
+    if (defaults.controlStyle) setControlStyle(defaults.controlStyle);
+    addNotification("System Reset to Factory", "success");
+  };
 
   // Hotkeys Hook
   useAppHotkeys({
@@ -93,7 +197,7 @@ function AppContent() {
     toggleFocusMode: view.toggleFocusMode,
     handleScheduleReload: system.handleScheduleReload,
     stopAllSFX,
-    setDevSkip: appState.setDevSkip,
+    setDevSkip,
     setIntroState: system.setIntroState,
     setShowTutorial: system.setShowTutorial,
     toggleLeftPanel: view.toggleLeftPanel,
@@ -105,12 +209,17 @@ function AppContent() {
     startRecording: recorder.startRecording,
     stopRecording: recorder.stopRecording,
     introState: system.introState,
-    isPlaylistLocked: appState.isPlaylistLocked,
-    setPlaylistLocked: appState.setPlaylistLocked
+    // Lock Props
+    isPlaylistLocked,
+    setPlaylistLocked
   });
 
-  // Render Check
+  const playbackPercentage = (player.duration > 0) ? (player.currentTime / player.duration) * 100 : 0;
+
+  // Render Check: Center Panel
   const shouldRenderCenter = view.viewMode !== 'mini' && view.showCenterPanel;
+
+  // Determine if we are in a mode where the right panel takes 100% (Mini, Mobile, or Player Focus)
   const isRightPanelFullWidth = view.viewMode === 'mini' || view.viewMode === 'player-focus' || !view.showCenterPanel;
 
   const handleToggleFullscreen = () => {
@@ -121,29 +230,86 @@ function AppContent() {
       }
   };
 
+  // Determine if loading overlay should be shown (During explicit load, or during exit/enter transitions)
+  const shouldShowLoader = view.animSequence === 'loading' || view.animSequence.includes('exiting') || view.animSequence.includes('entering');
+  const loaderOpacity = (view.animSequence === 'loading' || view.animSequence.includes('exiting')) ? 'opacity-100' : 'opacity-0';
+
   return (
     <div
       ref={appContainerRef}
       className="flex flex-col h-screen w-full bg-theme-bg text-theme-text overflow-hidden relative"
+      // Note: We deliberately apply masterStyle even though we have a loading overlay.
+      // This handles the scaling down animation when exiting.
       style={view.masterStyle}
       onDragOver={fileHandler.onDragOver}
       onDragEnter={fileHandler.onDragEnter}
       onDragLeave={fileHandler.onDragLeave}
       onDrop={fileHandler.onDrop}
     >
-      <GlobalOverlays 
-        system={system} 
-        view={view} 
-        recorder={recorder} 
-        config={config} 
-        player={player}
-        appState={appState}
-        playSFX={playSFX}
-        stopAllSFX={stopAllSFX}
-        autoLaunchRef={autoLaunchRef}
-        addNotification={addNotification}
+      {/* LOADING OVERLAY (For View Transitions) */}
+      {shouldShowLoader && (
+          <div className={`fixed inset-0 z-[100000] bg-[#030712] flex items-center justify-center transition-opacity duration-500 ${loaderOpacity}`}>
+              <div className="flex flex-col items-center gap-4 text-theme-primary">
+                  <div className="relative">
+                      {/* Spinning Outer Ring */}
+                      <div className="w-16 h-16 rounded-full border-4 border-theme-primary/20 border-t-theme-primary animate-spin"></div>
+                      {/* Inner Static Dot */}
+                      <div className="absolute inset-0 flex items-center justify-center">
+                          <div className="w-2 h-2 bg-theme-primary rounded-full animate-pulse"></div>
+                      </div>
+                  </div>
+                  <span className="font-mono text-xs tracking-[0.3em] font-bold uppercase animate-pulse">
+                      LOADING...
+                  </span>
+              </div>
+          </div>
+      )}
+
+      {/* GLOBAL OVERLAYS - Moved here to ensure z-index stacking works correctly */}
+      <StartupOverlay
+        key={system.startupKey}
+        onFadeOut={() => system.setIntroState(2)}
+        onComplete={system.handleBootComplete}
+        onPlaySfx={playSFX}
+        onStopSfx={stopAllSFX}
+        apiKey={config.apiKey}
+        setApiKey={config.setApiKey}
+        forceSkip={devSkip}
+        onAutoLaunch={() => {
+          autoLaunchRef.current = true;
+          recorder.startRecording(recorderConfig);
+        }}
       />
 
+      <ShutdownOverlay
+        active={system.rebootPhase === 'active'}
+        onPlayRebootSfx={() => playSFX('SFX_REBOOT.mp3')}
+        onCancel={system.handleCancelReboot}
+        isRecording={recorder.isRecording}
+        stopRecording={recorder.stopRecording}
+      />
+
+      {system.showTutorial && !devSkip && (
+        <TutorialOverlay
+          onComplete={() => {
+            system.setShowTutorial(false);
+            localStorage.setItem('neon_tutorial_complete', 'true');
+            addNotification("TUTORIAL COMPLETE", "success");
+          }}
+          trackCount={player.tracks.length}
+          isPlaying={player.isPlaying}
+          visualizerConfig={config.visualizerConfig}
+          setVisualizerConfig={config.setVisualizerConfig}
+          setShowVisualizer={config.setShowVisualizer}
+          isSettingsOpen={view.showLeftPanel}
+          presetsCount={config.savedPresets.length}
+        />
+      )}
+
+      {/* 
+          Standard TitleBar is only shown in default mode.
+          Mini mode has its own header built into Controls component.
+      */}
       {!view.isFullscreen && view.viewMode !== 'mini' && (
         <TitleBar
           viewMode={view.viewMode}
@@ -152,17 +318,28 @@ function AppContent() {
         />
       )}
 
-      {appState.screenVideo && appState.streamMode === 'window' && (
+      {screenVideo && streamMode === 'window' && (
         <StreamWindow
-          stream={appState.screenVideo}
+          stream={screenVideo}
           onClose={screenCapture.toggleVideoCapture}
+        />
+      )}
+
+      {showRecModal && (
+        <RecordingSettingsModal
+          currentConfig={recorderConfig}
+          onClose={() => setShowRecModal(false)}
+          onSave={(newConfig) => {
+            setRecorderConfig(newConfig);
+            addNotification("Recording config saved", "success");
+          }}
         />
       )}
 
       <div
         id="tutorial-main-layout"
         className="flex-1 flex flex-col md:flex-row overflow-hidden relative"
-        style={{ justifyContent: 'flex-end' }}
+        style={{ justifyContent: 'flex-end' }} // Ensures stacking from right to support right-alignment feel
       >
         <CustomCursor
           style={(system.introState < 2 || system.rebootPhase === 'active') ? 'system' : config.cursorStyle}
@@ -170,73 +347,334 @@ function AppContent() {
           analyser={player.analyser}
         />
 
-        {/* --- SIDEBAR TOGGLE TABS --- */}
-        {view.viewMode !== 'mini' && view.viewMode !== 'player-focus' && view.showCenterPanel && (
+        {/* SIDEBAR TOGGLE TABS - Hidden in Mini Mode or Player Focus Mode */}
+        {view.viewMode !== 'mini' && view.viewMode !== 'player-focus' && (
           <>
-            <CollapseTab 
-              side="left" 
-              isOpen={view.showLeftPanel} 
-              onClick={view.toggleLeftPanel} 
-              style={{
-                  left: view.showLeftPanel ? `${view.leftPanelWidth}px` : '0px',
-                  transition: view.isResizing ? 'none' : 'left 0.7s cubic-bezier(0.25, 1, 0.5, 1)'
-              }}
-            />
-            <CollapseTab 
-              side="right" 
-              isOpen={view.showRightPanel} 
-              onClick={view.toggleRightPanel} 
-              style={{
-                  right: view.showRightPanel ? `${view.rightPanelWidth}px` : '0px',
-                  transition: view.isResizing ? 'none' : 'right 0.7s cubic-bezier(0.25, 1, 0.5, 1)'
-              }}
-            />
+            {view.showCenterPanel && ( 
+                <>
+                    <CollapseTab 
+                    side="left" 
+                    isOpen={view.showLeftPanel} 
+                    onClick={view.toggleLeftPanel} 
+                    style={{
+                        left: view.showLeftPanel ? `${view.leftPanelWidth}px` : '0px',
+                        transition: view.isResizing ? 'none' : 'left 0.7s cubic-bezier(0.25, 1, 0.5, 1)'
+                    }}
+                    />
+                    <CollapseTab 
+                    side="right" 
+                    isOpen={view.showRightPanel} 
+                    onClick={view.toggleRightPanel} 
+                    style={{
+                        right: view.showRightPanel ? (view.showCenterPanel ? `${view.rightPanelWidth}px` : '0') : '0px',
+                        transition: view.isResizing ? 'none' : 'right 0.7s cubic-bezier(0.25, 1, 0.5, 1)'
+                    }}
+                    />
+                </>
+            )}
           </>
         )}
 
-        <audio ref={player.audioRefA} onEnded={player.activeDeck === 'A' ? () => { if (system.rebootPhase === 'waiting') { player.setIsPlaying(false); system.setRebootPhase('active'); } else { player.nextTrack(true); } } : undefined} onTimeUpdate={player.activeDeck === 'A' ? (e) => player.handleTimeUpdate(e, system.rebootPhase === 'waiting') : undefined} onLoadedMetadata={player.activeDeck === 'A' ? (e) => player.handleTimeUpdate(e, system.rebootPhase === 'waiting') : undefined} onPlay={player.onAudioPlay} onPause={player.onAudioPause} crossOrigin="anonymous" />
-        <audio ref={player.audioRefB} onEnded={player.activeDeck === 'B' ? () => { if (system.rebootPhase === 'waiting') { player.setIsPlaying(false); system.setRebootPhase('active'); } else { player.nextTrack(true); } } : undefined} onTimeUpdate={player.activeDeck === 'B' ? (e) => player.handleTimeUpdate(e, system.rebootPhase === 'waiting') : undefined} onLoadedMetadata={player.activeDeck === 'B' ? (e) => player.handleTimeUpdate(e, system.rebootPhase === 'waiting') : undefined} onPlay={player.onAudioPlay} onPause={player.onAudioPause} crossOrigin="anonymous" />
+        <audio
+          ref={player.audioRefA}
+          onEnded={player.activeDeck === 'A' ? () => {
+            if (system.rebootPhase === 'waiting') {
+              player.setIsPlaying(false);
+              system.setRebootPhase('active');
+            } else {
+              player.nextTrack(true);
+            }
+          } : undefined}
+          onTimeUpdate={player.activeDeck === 'A' ? (e) => player.handleTimeUpdate(e, system.rebootPhase === 'waiting') : undefined}
+          onLoadedMetadata={player.activeDeck === 'A' ? (e) => player.handleTimeUpdate(e, system.rebootPhase === 'waiting') : undefined}
+          onPlay={player.onAudioPlay}
+          onPause={player.onAudioPause}
+          crossOrigin="anonymous"
+        />
+        <audio
+          ref={player.audioRefB}
+          onEnded={player.activeDeck === 'B' ? () => {
+            if (system.rebootPhase === 'waiting') {
+              player.setIsPlaying(false);
+              system.setRebootPhase('active');
+            } else {
+              player.nextTrack(true);
+            }
+          } : undefined}
+          onTimeUpdate={player.activeDeck === 'B' ? (e) => player.handleTimeUpdate(e, system.rebootPhase === 'waiting') : undefined}
+          onLoadedMetadata={player.activeDeck === 'B' ? (e) => player.handleTimeUpdate(e, system.rebootPhase === 'waiting') : undefined}
+          onPlay={player.onAudioPlay}
+          onPause={player.onAudioPause}
+          crossOrigin="anonymous"
+        />
 
-        {/* --- LEFT PANEL --- */}
+        {/* LEFT PANEL */}
         {view.viewMode !== 'mini' && view.viewMode !== 'player-focus' && (
-          <LeftPanel 
-            view={view} appState={appState} config={config} player={player} system={system}
-            ambience={ambience} screenCapture={screenCapture} musicEngine={musicEngine}
-            fileHandler={fileHandler} currentTheme={currentTheme} controlStyle={controlStyle}
-            setTheme={setTheme} setControlStyle={setControlStyle} sfxMap={sfxMap}
-            sfxVolume={sfxVolume} setSfxVolume={setSfxVolume} handleZipUpload={handleZipUpload}
-            addNotification={addNotification}
-          />
+          <div className={view.leftPanelClass} style={view.leftPanelStyle}>
+            <div className="h-full relative" style={{ width: `${view.leftPanelWidth}px` }}>
+              {isEditorMode ? (
+                <EditorControls
+                  instruments={musicEngine.instruments}
+                  bpm={musicEngine.bpm}
+                  setBpm={musicEngine.setBpm}
+                  isPlaying={musicEngine.isPlaying}
+                  onTogglePlay={musicEngine.togglePlay}
+                  onSetVolume={musicEngine.setInstrumentVolume}
+                  onClearPattern={musicEngine.clearPattern}
+                  onExit={handleToggleEditor}
+                />
+              ) : isTagEditorMode ? (
+                <TagControls
+                  onExit={handleToggleTagEditor}
+                  onSaveAll={() => addNotification("All tags saved", "success")}
+                />
+              ) : (
+                <SettingsPanel
+                  showVisualizer={config.showVisualizer} setShowVisualizer={config.setShowVisualizer}
+                  showVisualizer3D={config.showVisualizer3D} setShowVisualizer3D={config.setShowVisualizer3D}
+                  showSineWave={config.showSineWave} setShowSineWave={config.setShowSineWave}
+                  showDvd={config.showDvd} setShowDvd={config.setShowDvd}
+                  marqueeConfig={config.marqueeConfig} setMarqueeConfig={config.setMarqueeConfig}
+                  visualizerConfig={config.visualizerConfig} setVisualizerConfig={config.setVisualizerConfig}
+                  reactorConfig={config.reactorConfig} setReactorConfig={config.setReactorConfig}
+                  sineWaveConfig={config.sineWaveConfig} setSineWaveConfig={config.setSineWaveConfig}
+                  dvdConfig={config.dvdConfig} setDvdConfig={config.setDvdConfig}
+                  effectsConfig={config.effectsConfig} setEffectsConfig={config.setEffectsConfig}
+                  watermarkConfig={config.watermarkConfig} setWatermarkConfig={config.setWatermarkConfig}
+                  bgColor={config.bgColor} setBgColor={config.setBgColor}
+                  bgPattern={config.bgPattern} setBgPattern={config.setBgPattern}
+                  bgPatternConfig={config.bgPatternConfig} setBgPatternConfig={config.setBgPatternConfig}
+                  onBgMediaUpload={(f: FileList) => { config.handleBgUpload(f); addNotification(`${f.length} backgrounds added`, "success"); }}
+                  bgMedia={config.bgMedia}
+                  bgList={config.bgList}
+                  bgPlaylists={config.bgPlaylists}
+                  activeBgPlaylistId={config.activeBgPlaylistId}
+                  playingBgPlaylistId={config.playingBgPlaylistId}
+                  setActiveBgPlaylistId={config.setActiveBgPlaylistId}
+                  setPlayingBgPlaylistId={config.setPlayingBgPlaylistId}
+                  addBgPlaylist={config.addBgPlaylist}
+                  removeBgPlaylist={config.removeBgPlaylist}
+                  renameBgPlaylist={config.renameBgPlaylist}
+                  currentBgIndex={config.currentBgIndex}
+                  onRemoveBg={config.removeBg}
+                  onMoveBg={config.moveBg}
+                  onSelectBg={config.selectBg}
+                  onDeselectBg={config.deselectBg}
+                  onClearBgMedia={config.handleClearBg}
+                  onExportConfig={() => config.exportConfig(currentTheme, controlStyle)}
+                  bgAutoplayInterval={config.bgAutoplayInterval}
+                  setBgAutoplayInterval={config.setBgAutoplayInterval}
+                  onScheduleReload={system.handleScheduleReload}
+                  onGoHome={system.handleGoHome}
+                  onAudioUpload={fileHandler.handleFilesSelected}
+                  crossfadeDuration={player.crossfadeDuration}
+                  setCrossfadeDuration={player.setCrossfadeDuration}
+                  smoothStart={player.smoothStart}
+                  setSmoothStart={player.setSmoothStart}
+                  savedPresets={config.savedPresets}
+                  activePresetId={config.activePresetId}
+                  savePreset={(n: string) => { config.savePreset(n, currentTheme, controlStyle); addNotification(`Preset "${n}" saved`, "success"); }}
+                  overwritePreset={config.overwritePreset}
+                  loadPreset={(id: string) => {
+                    const loaded = config.loadPreset(id);
+                    if (loaded) {
+                      if (loaded.theme) setTheme(loaded.theme);
+                      if (loaded.controlStyle) setControlStyle(loaded.controlStyle);
+                      if (loaded.ambienceConfig) ambience.importConfig(loaded.ambienceConfig);
+                      addNotification("Preset loaded", "success");
+                    }
+                  }}
+                  deletePreset={config.deletePreset}
+                  renamePreset={config.renamePreset}
+                  onResetDefault={handleResetDefault}
+                  onSfxUpload={handleZipUpload}
+                  sfxMap={sfxMap}
+                  sfxVolume={sfxVolume}
+                  setSfxVolume={setSfxVolume}
+                  cursorStyle={config.cursorStyle}
+                  setCursorStyle={config.setCursorStyle}
+                  retroScreenCursorStyle={config.retroScreenCursorStyle}
+                  setRetroScreenCursorStyle={config.setRetroScreenCursorStyle}
+                  apiKey={config.apiKey}
+                  setApiKey={config.setApiKey}
+                  bgTransition={config.bgTransition}
+                  setBgTransition={config.setBgTransition}
+                  bgAnimation={config.bgAnimation}
+                  setBgAnimation={config.setBgAnimation}
+                  onRestartTutorial={() => system.setShowTutorial(true)}
+                  ambienceFiles={ambience.files}
+                  ambienceConfig={ambience.config}
+                  onAmbienceUpload={ambience.handleUpload}
+                  onAmbienceDelete={ambience.handleDelete}
+                  onAmbienceSetActive={ambience.setActive}
+                  onAmbienceTogglePlay={ambience.togglePlay}
+                  onAmbienceVolume={ambience.setVolume}
+                  isVideoActive={screenCapture.isVideoActive}
+                  toggleVideo={screenCapture.toggleVideoCapture}
+                  
+                  // NEW Split Audio Props
+                  isMicActive={screenCapture.isMicActive}
+                  toggleMic={screenCapture.toggleMic}
+                  isSysAudioActive={screenCapture.isSysAudioActive}
+                  toggleSysAudio={screenCapture.toggleSysAudio}
+
+                  isAdvancedMode={config.isAdvancedMode}
+                  setAdvancedMode={config.setAdvancedMode}
+                  useAlbumArtAsBackground={config.useAlbumArtAsBackground}
+                  setUseAlbumArtAsBackground={config.setUseAlbumArtAsBackground}
+                  streamMode={streamMode}
+                  setStreamMode={setStreamMode}
+                  shuffleBgList={config.shuffleBgList}
+                  updateBg={config.updateBg} 
+                />
+              )}
+
+              {!isEditorMode && !isTagEditorMode && (
+                <div className="absolute bottom-0 left-0 right-0 z-50 bg-theme-bg border-t border-theme-border p-3">
+                  <div className="flex items-center justify-between px-1 gap-2">
+                    <span className="text-[9px] font-mono text-theme-muted tracking-widest opacity-40 select-none">
+                      EXPANSION
+                    </span>
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => setShowRecModal(true)}
+                        className="px-3 py-1.5 bg-gray-900 border border-gray-700 rounded text-[10px] font-mono text-gray-400 hover:text-white hover:border-theme-primary hover:bg-gray-800 transition-all flex items-center gap-2 group shadow-sm"
+                        title="Recording Settings"
+                      >
+                        <Settings size={12} className="group-hover:text-theme-primary transition-colors" />
+                        <span>Rec Setup</span>
+                      </button>
+
+                      <button
+                        onClick={handleToggleTagEditor}
+                        className="px-3 py-1.5 bg-gray-900 border border-gray-700 rounded text-[10px] font-mono text-gray-400 hover:text-white hover:border-gray-500 hover:bg-gray-800 transition-all flex items-center gap-2 group shadow-sm"
+                      >
+                        <span>Tag Editor</span>
+                      </button>
+                      <button
+                        onClick={handleToggleEditor}
+                        className="px-3 py-1.5 bg-gray-900 border border-gray-700 rounded text-[10px] font-mono text-gray-400 hover:text-white hover:border-gray-500 hover:bg-gray-800 transition-all flex items-center gap-2 group shadow-sm"
+                      >
+                        <span>Studio</span>
+                        <span className="text-[9px] text-yellow-600 group-hover:text-yellow-500 transition-colors opacity-80">(Alpha)</span>
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
         )}
 
         {/* LEFT RESIZER */}
         {view.viewMode !== 'mini' && view.viewMode !== 'player-focus' && view.showLeftPanel && view.showCenterPanel && (
-            <div className="w-4 z-30 flex items-center justify-center cursor-none custom-resizer group -ml-2 mr-0 relative touch-none" onMouseDown={view.handleMouseDownLeft}>
+            <div 
+                className="w-4 z-30 flex items-center justify-center cursor-none custom-resizer group -ml-2 mr-0 relative touch-none"
+                onMouseDown={view.handleMouseDownLeft}
+            >
                 <div className="w-[1px] h-[92%] bg-theme-primary/40 rounded-full group-hover:bg-theme-primary group-hover:w-[2px] group-hover:shadow-[0_0_10px_var(--color-primary)] transition-all duration-300"></div>
             </div>
         )}
 
-        {/* --- CENTER PANEL --- */}
+        {/* CENTER: RETRO SCREEN OR EDITORS */}
         {shouldRenderCenter && (
-          <CenterPanel 
-            view={view} appState={appState} musicEngine={musicEngine} player={player} config={config}
-            screenCapture={screenCapture} system={system} fileHandler={fileHandler} recorder={recorder}
-            playSFX={playSFX} addNotification={addNotification}
-          />
+          <div className={view.screenContainerClass}>
+            {isEditorMode ? (
+              <MusicEditor
+                instruments={musicEngine.instruments}
+                currentStep={musicEngine.currentStep}
+                onToggleStep={musicEngine.toggleStep}
+                isPlaying={musicEngine.isPlaying}
+              />
+            ) : isTagEditorMode ? (
+              <TagEditor
+                tracks={player.tracks}
+                onUpdateTrack={handleUpdateTrackTags}
+              />
+            ) : (
+              <RetroScreen
+                analyser={player.analyser}
+                isPlaying={player.isPlaying}
+                currentTrack={player.currentTrack}
+                tracks={player.tracks}
+                onTrackSelect={player.selectTrack}
+                bgMedia={config.bgMedia}
+                bgColor={config.bgColor}
+                bgPattern={config.bgPattern}
+                bgPatternConfig={config.bgPatternConfig}
+
+                videoStream={screenVideo}
+                isSystemAudioActive={screenCapture.isSysAudioActive} // Pass SysAudio flag for UI indicators
+                isMicActive={screenCapture.isMicActive} // NEW: Pass Mic flag for visuals
+                streamMode={streamMode}
+
+                visualizerConfig={config.visualizerConfig}
+                setVisualizerConfig={config.setVisualizerConfig}
+                reactorConfig={config.reactorConfig}
+                setReactorConfig={config.setReactorConfig}
+                sineWaveConfig={config.sineWaveConfig}
+
+                showVisualizer={config.showVisualizer}
+                showVisualizer3D={config.showVisualizer3D}
+                showSineWave={config.showSineWave}
+
+                dvdConfig={config.dvdConfig}
+                showDvd={config.showDvd}
+                effectsConfig={config.effectsConfig}
+                marqueeConfig={config.marqueeConfig}
+                watermarkConfig={config.watermarkConfig}
+
+                progress={playbackPercentage}
+                currentTime={player.currentTime}
+                duration={player.duration}
+
+                focusMode={view.focusMode}
+                setFocusMode={view.toggleFocusMode}
+                isDragging={fileHandler.isDragging}
+
+                onDragOver={fileHandler.onDragOver}
+                onDragEnter={fileHandler.onDragEnter}
+                onDragLeave={fileHandler.onDragLeave}
+                onDrop={fileHandler.onDrop}
+
+                onScheduleReload={system.handleScheduleReload}
+                rebootPhase={system.rebootPhase}
+
+                onPlaySfx={playSFX}
+                volume={player.volume}
+                onVolumeChange={player.setVolume} // Pass volume handler to screen
+                apiKey={config.apiKey}
+                useAlbumArtAsBackground={config.useAlbumArtAsBackground}
+                bgAnimation={config.bgAnimation}
+
+                isRecording={recorder.isRecording}
+                onStartRecording={() => recorder.startRecording(recorderConfig)}
+                onStopRecording={recorder.stopRecording}
+                
+                isResizing={view.isResizing}
+                isPlaylistLocked={isPlaylistLocked}
+              />
+            )}
+          </div>
         )}
 
         {/* RIGHT RESIZER */}
         {view.viewMode !== 'mini' && view.viewMode !== 'player-focus' && view.showRightPanel && view.showCenterPanel && (
-            <div className="w-4 z-30 flex items-center justify-center cursor-none custom-resizer group -ml-0 mr-[-8px] relative touch-none" onMouseDown={view.handleMouseDownRight}>
+            <div 
+                className="w-4 z-30 flex items-center justify-center cursor-none custom-resizer group -ml-0 mr-[-8px] relative touch-none"
+                onMouseDown={view.handleMouseDownRight}
+            >
                 <div className="w-[1px] h-[92%] bg-theme-primary/40 rounded-full group-hover:bg-theme-primary group-hover:w-[2px] group-hover:shadow-[0_0_10px_var(--color-primary)] transition-all duration-300"></div>
             </div>
         )}
 
-        {/* --- RIGHT PANEL --- */}
+        {/* RIGHT PANEL: CONTROLS (AND MINI PLAYER) */}
         <div className={view.rightPanelClass} style={view.rightPanelStyle}>
           <div 
             className={`${isRightPanelFullWidth ? 'w-full h-full' : (view.showCenterPanel ? '' : 'w-full')} h-full`} 
-            style={{ width: isRightPanelFullWidth ? '100%' : `${view.rightPanelWidth}px` }}
+            style={{ 
+                width: isRightPanelFullWidth ? '100%' : `${view.rightPanelWidth}px` 
+            }}
           >
             <Controls
               viewMode={view.viewMode}
@@ -277,14 +715,22 @@ function AppContent() {
               onNewPlaylistWithFiles={player.createPlaylistFromFiles}
               analyser={player.analyser}
               visualizerConfig={config.visualizerConfig}
-              isPlaylistLocked={appState.isPlaylistLocked}
-              onToggleLock={() => { appState.setPlaylistLocked(!appState.isPlaylistLocked); addNotification(appState.isPlaylistLocked ? "PLAYLIST UNLOCKED" : "PLAYLIST LOCKED", "info"); }}
+              // Lock Props
+              isPlaylistLocked={isPlaylistLocked}
+              onToggleLock={() => {
+                  setPlaylistLocked(!isPlaylistLocked);
+                  addNotification(isPlaylistLocked ? "PLAYLIST UNLOCKED" : "PLAYLIST LOCKED", "info");
+              }}
+              // Playback Modes
               isShuffle={player.isShuffle}
               setIsShuffle={player.setIsShuffle}
               isAutoNextPlaylist={player.isAutoNextPlaylist}
               setIsAutoNextPlaylist={player.setIsAutoNextPlaylist}
+              // Rating
               onRateTrack={player.rateTrack}
               onSortByRating={() => { player.sortByRating(); addNotification("Sorted by Rating", "info"); }}
+              
+              // NEW PROPS FOR FOCUS AND FULLSCREEN
               onTogglePlayerFocus={() => view.setViewMode(view.viewMode === 'player-focus' ? 'default' : 'player-focus')}
               isPlayerFocus={view.viewMode === 'player-focus'}
               onToggleFullscreen={handleToggleFullscreen}

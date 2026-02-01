@@ -43,22 +43,4 @@ declare global {
       [elemName: string]: any;
     }
   }
-
-  // Also augment React.JSX for React 18+ support which strictly separates global JSX
-  namespace React {
-    namespace JSX {
-      interface IntrinsicElements {
-        ambientLight: any;
-        pointLight: any;
-        directionalLight: any;
-        group: any;
-        mesh: any;
-        meshStandardMaterial: any;
-        meshBasicMaterial: any;
-        instancedMesh: any;
-        boxGeometry: any;
-        [elemName: string]: any;
-      }
-    }
-  }
 }

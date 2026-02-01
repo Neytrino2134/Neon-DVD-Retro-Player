@@ -506,11 +506,6 @@ const TronEffect: React.FC<TronEffectProps> = ({ config, analyser, isPlaying, vi
         }
 
         drawGrid(ctx, w, h, cellSize, safeZoneRows, cfg.opacity, cols, rows, getGateCoordinates);
-        
-        // Filter out old loot (5 seconds lifetime)
-        const now = Date.now();
-        lootRef.current = lootRef.current.filter(l => (now - l.birthTime) < 5000);
-        
         drawLoot(ctx, lootRef.current, cellSize, cfg.opacity);
 
         // --- SPAWN LOGIC ---
@@ -716,15 +711,23 @@ const TronEffect: React.FC<TronEffectProps> = ({ config, analyser, isPlaying, vi
                             agent.erasing = true; 
                             createExplosion(agent.x, agent.y, agent.color, cellSize, agent.name);
                             
-                            // Loot Drop: Kill Value + Half of Victim's Score
-                            const baseDeathValue = 200;
-                            const stolenScore = Math.floor(agent.score / 2);
-                            const totalDrop = baseDeathValue + stolenScore;
-                            
-                            // Reset score (since they died and dropped half)
-                            // This also prevents respawn with full score logic issues
-                            agent.score = 0;
+                            // Killer Bonus
+                            let killer: Agent | null = null;
+                            const nextX = agent.x + DIRECTIONS[agent.dirIndex].x;
+                            const nextY = agent.y + DIRECTIONS[agent.dirIndex].y;
+                            if (nextX >= 0 && nextX < cols && nextY >= safeZoneRows && nextY < rows) {
+                                const hitIdx = nextY * cols + nextX;
+                                if (grid[hitIdx] === 1) {
+                                    const ownerId = ownerGrid[hitIdx];
+                                    if (ownerId !== -1 && ownerId !== agent.id) {
+                                        killer = agentsRef.current.find(a => a.id === ownerId) || null;
+                                    }
+                                }
+                            }
+                            if (killer && killer.alive) killer.score += 100;
 
+                            const deathValue = 200; 
+                            const totalDrop = agent.score + deathValue;
                             if (totalDrop > 0) scatterLoot(agent.x, agent.y, totalDrop, cols, rows, safeZoneRows);
                         }
                     }

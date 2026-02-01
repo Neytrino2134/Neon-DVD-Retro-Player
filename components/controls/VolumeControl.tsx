@@ -36,9 +36,9 @@ export const VolumeControl: React.FC<VolumeControlProps> = ({ volume, onVolumeCh
   return (
     <div 
         ref={containerRef}
-        className="w-12 bg-black/40 rounded-lg flex flex-col items-center justify-between py-3 shadow-inner group/vol relative border border-white/5"
+        className="w-12 bg-black/40 rounded-lg flex flex-col items-center justify-between py-3 shadow-inner group relative border border-white/5"
     >
-        <Volume2 size={16} className="text-theme-muted group-hover/vol:text-white transition-colors opacity-70 mb-2 shrink-0" />
+        <Volume2 size={16} className="text-theme-muted group-hover:text-white transition-colors opacity-70 mb-2 shrink-0" />
         
         <div className="flex-1 w-full flex items-center justify-center relative">
             <input 

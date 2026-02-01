@@ -654,7 +654,7 @@ export const TrackList: React.FC<TrackListProps> = ({
                             {!isPlaylistLocked && (
                                 <button 
                                     onClick={(e) => handleDeleteTrack(e, track.id)}
-                                    className="text-theme-muted/50 hover:text-red-500 transition-colors p-1 cursor-pointer ml-2"
+                                    className="opacity-0 group-hover:opacity-100 text-theme-muted hover:text-red-500 transition-opacity p-1 cursor-pointer ml-2"
                                     title="Delete Track"
                                 >
                                     <Trash2 size={12} />

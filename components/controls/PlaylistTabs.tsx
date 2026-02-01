@@ -232,7 +232,7 @@ export const PlaylistTabs: React.FC<PlaylistTabsProps> = ({
                     {playlists.length > 1 && !isLocked && (
                         <button 
                             onClick={(e) => { e.stopPropagation(); requestDeleteTab(playlist.id, e); }}
-                            className="text-theme-muted/50 hover:text-red-500 transition-colors p-0.5 ml-1"
+                            className="opacity-0 group-hover:opacity-100 text-theme-muted hover:text-red-500 transition-opacity p-0.5 ml-1"
                         >
                             <X size={10} />
                         </button>
