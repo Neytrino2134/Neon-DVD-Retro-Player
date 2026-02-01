@@ -1,5 +1,5 @@
 
-import { app, BrowserWindow, ipcMain, globalShortcut, desktopCapturer, dialog } from 'electron';
+import { app, BrowserWindow, ipcMain, globalShortcut, desktopCapturer, dialog, powerSaveBlocker } from 'electron';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import fs from 'fs/promises';
@@ -8,13 +8,19 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 let mainWindow;
+// Initialize with undefined x/y to prevent crash on first restore if not set
+let lastBounds = { width: 1600, height: 800, x: undefined, y: undefined }; 
+
+// Prevent display from sleeping during playback/recording
+powerSaveBlocker.start('prevent-display-sleep');
 
 function createWindow() {
   mainWindow = new BrowserWindow({
-    width: 1700, // Default to Normal Mode size
-    height: 900,
-    minWidth: 770, // Updated to 770 to match new mini-mode constraint
-    minHeight: 900, 
+    width: 1600, 
+    height: 800,
+    // UPDATED: Fixed minimum size for both modes as requested
+    minWidth: 800, 
+    minHeight: 800,
     backgroundColor: '#030712', // Critical: Matches app background to hide resize flash
     title: "Neon Retro Player",
     frame: false, 
@@ -26,14 +32,20 @@ function createWindow() {
       nodeIntegration: true,
       contextIsolation: false,
       webSecurity: false,
-      devTools: true 
+      devTools: true,
+      backgroundThrottling: false 
     },
   });
 
-  // --- ENABLE SYSTEM AUDIO CAPTURE ---
+  // --- ENABLE SYSTEM AUDIO CAPTURE & WINDOW RECORDING ---
   mainWindow.webContents.session.setDisplayMediaRequestHandler((request, callback) => {
-    desktopCapturer.getSources({ types: ['screen'] }).then((sources) => {
-      callback({ video: sources[0], audio: 'loopback' });
+    desktopCapturer.getSources({ types: ['window', 'screen'] }).then((sources) => {
+      const appSource = sources.find(s => 
+        s.name === 'Neon DVD Player' || 
+        s.name === 'Neon Retro Player'
+      );
+      const source = appSource || sources[0];
+      callback({ video: source, audio: 'loopback' });
     }).catch((e) => {
       console.error(e);
       callback(null);
@@ -73,47 +85,19 @@ function createWindow() {
     mainWindow.close();
   });
 
-  // --- MINI MODE RESIZING HANDLERS ---
-  ipcMain.on('set-mini-mode', (event, { width, height }) => {
+  // --- MINI MODE HANDLERS ---
+  // UPDATED: No longer resizes the window, just acts as a state toggle notification if needed
+  ipcMain.on('set-mini-mode', () => {
     if (!mainWindow) return;
-    
-    // Set minimum constraints as requested: 770px width, 900px height
-    mainWindow.setMinimumSize(770, 900);
-    
-    // If the window is currently smaller than the new minimums, resize it up
-    const bounds = mainWindow.getBounds();
-    if (bounds.width < 770 || bounds.height < 900) {
-        mainWindow.setSize(Math.max(bounds.width, 770), Math.max(bounds.height, 900), true);
-    }
-    
-    // Note: We do NOT force it to shrink if it's larger, preserving user's resize preference 
-    // unless they manually resize it down.
+    // We allow resizing in mini mode now, so we don't lock resizable.
+    // Window size remains whatever the user set it to.
+    mainWindow.setResizable(true);
   });
 
   ipcMain.on('set-full-mode', () => {
     if (!mainWindow) return;
-    
-    // Temporarily relax constraints to allow resizing logic
-    mainWindow.setMinimumSize(770, 900);
-
-    const currentBounds = mainWindow.getBounds();
-    const targetW = 1700;
-    const targetH = 900;
-
-    // Logic: 
-    // If current size < 1700x900 -> Expand to 1700x900
-    // If current size >= 1700x900 -> Keep current size (do not shrink)
-    const newW = Math.max(currentBounds.width, targetW);
-    const newH = Math.max(currentBounds.height, targetH);
-    
-    // Only apply resize if dimensions actually need to change
-    if (newW !== currentBounds.width || newH !== currentBounds.height) {
-        mainWindow.setSize(newW, newH, true);
-        mainWindow.center(); // Center only if we had to resize/expand
-    }
-
-    // Enforce strict minimum constraints for Full Mode
-    mainWindow.setMinimumSize(targetW, targetH);
+    mainWindow.setResizable(true);
+    // Size persists from previous state, no need to restore bounds.
   });
 
   // --- RECORDING SAVE HANDLER ---

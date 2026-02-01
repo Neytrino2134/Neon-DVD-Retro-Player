@@ -1,3 +1,4 @@
+
 import { AppPreset } from '../types';
 import { 
   DEFAULT_VISUALIZER_CONFIG, 
@@ -117,6 +118,7 @@ export const OCEAN_BLUE_PRESET: AppPreset = {
         interval: 15,
         scale: 1,
         enableIcons: false,
+        showHotspots: true,
         categories: {
           system: true,
           interactive: true,
@@ -147,6 +149,11 @@ export const OCEAN_BLUE_PRESET: AppPreset = {
         speed: 0.5,
         number: 6
       },
+      lightFlicker: {
+        enabled: false,
+        intensity: 0.3,
+        speed: 0.5
+      },
       rain: {
         enabled: false,
         intensity: 0.5,
@@ -166,7 +173,14 @@ export const OCEAN_BLUE_PRESET: AppPreset = {
         trailLength: 0.8,
         size: 1,
         maxAgents: 12,
-        showNames: true
+        showNames: true,
+        showLeaderboard: true,
+        enableUser: false,
+        enableDummies: true,
+        glowEnabled: false,
+        glowIntensity: 0.5,
+        bgEnabled: false,
+        bgPattern: 'grid'
       },
       vignette: {
         enabled: true,

@@ -5,11 +5,11 @@ import ModuleWrapper from '../ModuleWrapper';
 import { BgConfigModule, BgResourceModule, BgColorModule } from '../BackgroundSettings';
 import { ScreenVideoModule } from '../modules/ScreenSettings';
 import { NumberedLabel } from '../SettingsSection';
-import { BackgroundMedia, PatternConfig, BgTransitionType, BgAnimationType } from '../../../types';
+import { BackgroundMedia, PatternConfig, BgTransitionType, BgAnimationType, BackgroundPlaylist, BgHotspot } from '../../../types';
 
 interface BackgroundSectionProps {
   expandedState: Record<string, boolean>;
-  toggleExpand: (id: string, isAdditive: boolean) => void;
+  toggleExpand: (id: string, isAdditive: boolean, forceOpen?: boolean) => void;
   // Props
   bgAnimation: BgAnimationType;
   setBgAnimation: (a: BgAnimationType) => void;
@@ -17,6 +17,14 @@ interface BackgroundSectionProps {
   setBgTransition: (t: BgTransitionType) => void;
   bgMedia: { type: 'image' | 'video', url: string } | null;
   bgList: BackgroundMedia[];
+  bgPlaylists: BackgroundPlaylist[]; // New
+  activeBgPlaylistId: string; // New
+  playingBgPlaylistId: string; // New
+  setActiveBgPlaylistId: (id: string) => void; // New
+  setPlayingBgPlaylistId: (id: string) => void; // New
+  addBgPlaylist: () => void; // New
+  removeBgPlaylist: (id: string) => void; // New
+  renameBgPlaylist: (id: string, name: string) => void; // New
   currentBgIndex: number;
   onRemoveBg: (id: string) => void;
   onMoveBg: (index: number, dir: 'up' | 'down') => void;
@@ -24,6 +32,8 @@ interface BackgroundSectionProps {
   onClearBgMedia: () => void;
   shuffleBgList?: () => void;
   onBgMediaUpload: (files: FileList) => void;
+  onUpdateBg: (id: string, newFile: File) => Promise<void>; // New Prop
+  onUpdateMetadata?: (id: string, hotspots: BgHotspot[]) => Promise<void>; // New Prop
   bgAutoplayInterval: number;
   setBgAutoplayInterval: (val: number) => void;
   useAlbumArtAsBackground: boolean;
@@ -44,7 +54,9 @@ interface BackgroundSectionProps {
 const BackgroundSection: React.FC<BackgroundSectionProps> = ({
   expandedState, toggleExpand,
   bgAnimation, setBgAnimation, bgTransition, setBgTransition,
-  bgMedia, bgList, currentBgIndex, onRemoveBg, onMoveBg, onSelectBg, onClearBgMedia, shuffleBgList, onBgMediaUpload,
+  bgMedia, bgList, bgPlaylists, activeBgPlaylistId, playingBgPlaylistId,
+  setActiveBgPlaylistId, setPlayingBgPlaylistId, addBgPlaylist, removeBgPlaylist, renameBgPlaylist,
+  currentBgIndex, onRemoveBg, onMoveBg, onSelectBg, onClearBgMedia, shuffleBgList, onBgMediaUpload, onUpdateBg, onUpdateMetadata,
   bgAutoplayInterval, setBgAutoplayInterval, useAlbumArtAsBackground, setUseAlbumArtAsBackground,
   bgColor, setBgColor, bgPattern, setBgPattern, bgPatternConfig, setBgPatternConfig, onDeselectBg,
   isVideoActive, toggleVideo, streamMode, setStreamMode
@@ -64,6 +76,14 @@ const BackgroundSection: React.FC<BackgroundSectionProps> = ({
             <BgResourceModule 
                 bgMedia={bgMedia}
                 bgList={bgList}
+                bgPlaylists={bgPlaylists}
+                activeBgPlaylistId={activeBgPlaylistId}
+                playingBgPlaylistId={playingBgPlaylistId}
+                setActiveBgPlaylistId={setActiveBgPlaylistId}
+                setPlayingBgPlaylistId={setPlayingBgPlaylistId}
+                addBgPlaylist={addBgPlaylist}
+                removeBgPlaylist={removeBgPlaylist}
+                renameBgPlaylist={renameBgPlaylist}
                 currentBgIndex={currentBgIndex}
                 onRemoveBg={onRemoveBg}
                 onMoveBg={onMoveBg}
@@ -71,6 +91,8 @@ const BackgroundSection: React.FC<BackgroundSectionProps> = ({
                 onClearBgMedia={onClearBgMedia}
                 onShuffleBg={shuffleBgList || (() => {})}
                 onBgMediaUpload={onBgMediaUpload}
+                onUpdateBg={onUpdateBg}
+                onUpdateMetadata={onUpdateMetadata}
                 bgAutoplayInterval={bgAutoplayInterval}
                 setBgAutoplayInterval={setBgAutoplayInterval}
                 useAlbumArtAsBackground={useAlbumArtAsBackground}

@@ -230,7 +230,7 @@ const ShutdownOverlay: React.FC<ShutdownOverlayProps> = ({ active, onCancel, onP
             <div className="bg-red-900/30 border-b border-red-600/50 p-2 flex items-center justify-between shrink-0 h-10">
                 <div className="flex items-center gap-2 text-red-500">
                     <Terminal size={16} className="animate-pulse" />
-                    <span className="font-mono text-xs font-bold tracking-widest uppercase">SYSTEM FAILURE</span>
+                    <span className="font-mono text-xs font-bold tracking-widest uppercase">{t('window_sys_failure')}</span>
                 </div>
                 <div className="flex gap-1">
                     <div className="w-1.5 h-1.5 bg-red-600 rounded-full"></div>
@@ -311,7 +311,7 @@ const ShutdownOverlay: React.FC<ShutdownOverlayProps> = ({ active, onCancel, onP
             {/* Footer */}
             <div className="bg-red-900/20 border-t border-red-600/30 p-1.5 flex justify-between px-3 text-[9px] font-mono text-red-500/60 uppercase">
                 <span>UID: 0xDEAD_BEEF</span>
-                <span>STATUS: {step === 'loading' ? 'CRITICAL' : 'UNSTABLE'}</span>
+                <span>{t('status_label')}: {step === 'loading' ? t('status_critical') : t('status_unstable')}</span>
             </div>
         </div>
     </div>

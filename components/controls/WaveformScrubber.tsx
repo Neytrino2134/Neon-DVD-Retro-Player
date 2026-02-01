@@ -1,5 +1,5 @@
 
-import React, { useRef, useState, useMemo } from 'react';
+import React, { useRef, useMemo, useState } from 'react';
 import { useTheme } from '../../contexts/ThemeContext';
 
 interface WaveformScrubberProps { 
@@ -7,6 +7,7 @@ interface WaveformScrubberProps {
     duration: number;
     onSeek: (time: number) => void;
     trackId?: string;
+    isLocked?: boolean; 
 }
 
 export const WaveformScrubber: React.FC<WaveformScrubberProps> = ({ currentTime, duration, onSeek, trackId }) => {
@@ -14,14 +15,22 @@ export const WaveformScrubber: React.FC<WaveformScrubberProps> = ({ currentTime,
     const { colors } = useTheme();
     const [isHovering, setIsHovering] = useState(false);
 
+    // Increased bar count for better resolution on wider panels
+    const BAR_COUNT = 100;
+
     const bars = useMemo(() => {
         const seed = trackId ? trackId.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0) : 0;
-        const count = 60; 
+        
         const generated = [];
-        for(let i=0; i<count; i++) {
-            const x = Math.sin(seed + i * 0.5) * 10000;
+        for(let i=0; i<BAR_COUNT; i++) {
+            // Pseudo-random waveform generation based on trackId
+            const x = Math.sin(seed + i * 0.2) * 10000;
             const rand = x - Math.floor(x); 
-            generated.push(0.2 + (rand * 0.8));
+            // Mix of sine wave pattern and random noise for a "music-like" look
+            const wave = Math.sin(i * 0.15) * 0.5 + 0.5; 
+            const height = 0.2 + (wave * 0.4) + (rand * 0.4);
+            
+            generated.push(Math.min(1, Math.max(0.15, height)));
         }
         return generated;
     }, [trackId]);
@@ -29,8 +38,15 @@ export const WaveformScrubber: React.FC<WaveformScrubberProps> = ({ currentTime,
     const handleClick = (e: React.MouseEvent) => {
         if (!containerRef.current || duration <= 0) return;
         const rect = containerRef.current.getBoundingClientRect();
-        const percent = (e.clientX - rect.left) / rect.width;
-        onSeek(Math.max(0, Math.min(duration, percent * duration)));
+        
+        // Calculate relative position accurately
+        const clickX = e.clientX - rect.left;
+        let percent = clickX / rect.width;
+        
+        // Clamp percentage between 0 and 1 to prevent out-of-bounds seeking
+        percent = Math.max(0, Math.min(1, percent));
+        
+        onSeek(percent * duration);
     };
 
     const handleMouseMove = (e: React.MouseEvent) => {
@@ -42,7 +58,8 @@ export const WaveformScrubber: React.FC<WaveformScrubberProps> = ({ currentTime,
     return (
         <div 
             ref={containerRef}
-            className="relative h-full w-full cursor-pointer group flex items-center gap-0.5"
+            className="relative h-full w-full group flex items-center cursor-pointer select-none"
+            style={{ gap: '1px' }} 
             onMouseDown={handleClick}
             onMouseMove={handleMouseMove}
             onMouseEnter={() => setIsHovering(true)}
@@ -55,7 +72,9 @@ export const WaveformScrubber: React.FC<WaveformScrubberProps> = ({ currentTime,
                 return (
                     <div 
                         key={i}
-                        className="flex-1 rounded-full transition-all duration-75"
+                        // Removed max-w-[4px] to allow bars to stretch fully
+                        // Changed min-w to 1px to prevent layout breaking on very small screens with high bar count
+                        className="rounded-full transition-all duration-75 flex-1 min-w-[1px]"
                         style={{
                             height: `${height * 100}%`,
                             // Restrained colors: Primary for active, very dim gray for inactive

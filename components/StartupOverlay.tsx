@@ -1,6 +1,6 @@
 
 import React, { useEffect, useState, useRef } from 'react';
-import { Terminal, Cpu, Power, Key, ShieldCheck, Globe, X, Circle } from 'lucide-react';
+import { Terminal, Cpu, Power, Key, ShieldCheck, Globe, X, Circle, Maximize } from 'lucide-react';
 import { useLanguage } from '../contexts/LanguageContext';
 import { APP_VERSION } from '../lib/version';
 import { Tooltip } from './ui/Tooltip';
@@ -350,6 +350,14 @@ const StartupOverlay: React.FC<StartupOverlayProps> = ({ onComplete, onFadeOut, 
       }, 800);
   };
 
+  const toggleFullscreen = () => {
+      if (!document.fullscreenElement) {
+          document.documentElement.requestFullscreen().catch(err => console.error(err));
+      } else {
+          document.exitFullscreen();
+      }
+  };
+
   // Keyboard listener for Enter
   useEffect(() => {
     if (hasStarted || collapsePhase !== 'idle' || forceSkip) return;
@@ -604,7 +612,7 @@ const StartupOverlay: React.FC<StartupOverlayProps> = ({ onComplete, onFadeOut, 
                         <div className="flex items-center gap-3">
                             {/* REC & LAUNCH BUTTON - Only visible in Electron */}
                             {onAutoLaunch && isElectron && (
-                                <Tooltip content="RECORD & LAUNCH" position="bottom">
+                                <Tooltip content="RECORD & LAUNCH" position="bottom" overrideColor="#00f3ff">
                                     <button
                                         onClick={(e) => { e.stopPropagation(); handleStart(true); }}
                                         className="flex items-center gap-1.5 px-2 py-0.5 rounded bg-neon-blue/20 border border-neon-blue/50 hover:bg-neon-blue/30 hover:border-neon-blue hover:shadow-[0_0_8px_var(--color-primary)] transition-all group"
@@ -615,12 +623,22 @@ const StartupOverlay: React.FC<StartupOverlayProps> = ({ onComplete, onFadeOut, 
                                 </Tooltip>
                             )}
 
+                            {/* FULLSCREEN BUTTON */}
+                            <Tooltip content="FULLSCREEN (SHIFT+F)" position="bottom" overrideColor="#00f3ff">
+                                <button
+                                    onClick={(e) => { e.stopPropagation(); toggleFullscreen(); }}
+                                    className="text-neon-blue/50 hover:text-white transition-colors p-0.5 hover:bg-neon-blue/20 rounded"
+                                >
+                                    <Maximize size={14} />
+                                </button>
+                            </Tooltip>
+
                             <div className="flex gap-1">
                                 <div className="w-1.5 h-1.5 bg-neon-blue rounded-full"></div>
                                 <div className="w-1.5 h-1.5 bg-neon-blue/50 rounded-full"></div>
                             </div>
                             
-                            <Tooltip content="SKIP SEQUENCE" position="bottom">
+                            <Tooltip content="SKIP SEQUENCE" position="bottom" overrideColor="#00f3ff">
                                 <button 
                                     onClick={(e) => { e.stopPropagation(); handleSkip(); }}
                                     className="text-neon-blue/50 hover:text-white transition-colors p-0.5 hover:bg-neon-blue/20 rounded"
@@ -670,7 +688,7 @@ const StartupOverlay: React.FC<StartupOverlayProps> = ({ onComplete, onFadeOut, 
 
                         {/* CENTER AREA: POWER BUTTON */}
                         <div className="flex-1 flex items-center justify-center w-full z-10">
-                            <Tooltip content="INITIALIZE SYSTEM" position="top">
+                            <Tooltip content="INITIALIZE SYSTEM" position="top" overrideColor="#00f3ff">
                                 <div 
                                     onClick={(e) => { e.stopPropagation(); handleStart(false); }}
                                     onMouseEnter={() => {

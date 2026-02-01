@@ -201,6 +201,14 @@ const ModuleWrapper: React.FC<ModuleWrapperProps> = ({
                       <circle cx="280" cy="70" r="25" fill="currentColor" opacity="0.5" filter="blur(8px)" />
                   </svg>
               );
+          case 'flicker': // Flicker: Simple Bulb
+              return (
+                  <svg {...commonProps} viewBox="0 0 300 80" preserveAspectRatio="xMidYMid slice">
+                      <circle cx="150" cy="40" r="20" fill="none" stroke="currentColor" strokeWidth="2" />
+                      <path d="M150 40 L160 30 M150 40 L140 30 M150 40 L150 25" stroke="currentColor" strokeWidth="1" />
+                      <circle cx="150" cy="40" r="30" fill="currentColor" opacity="0.2" filter="blur(10px)" />
+                  </svg>
+              );
           case 'hologram': // Hologram: Chat
               return (
                   <svg {...commonProps} viewBox="0 0 300 80" preserveAspectRatio="xMidYMid slice">
@@ -301,7 +309,14 @@ const ModuleWrapper: React.FC<ModuleWrapperProps> = ({
       <div 
         className="relative h-20 p-3 flex flex-col justify-between cursor-pointer select-none"
         onClick={(e) => {
-             if (isEnabled) onToggleExpand(e);
+             if (isEnabled) {
+                 // Shift + Click -> Turn Off
+                 if (e.shiftKey && !isAlwaysOn) {
+                     onToggleEnable();
+                 } else {
+                     onToggleExpand(e);
+                 }
+             }
              else if (!isAlwaysOn) onToggleEnable(); 
         }}
       >

@@ -1,36 +1,29 @@
 
-import React, { useState, useRef, useEffect } from 'react';
-import { Settings, HelpCircle, Power, Home } from 'lucide-react';
-import { VisualizerConfig, EffectsConfig, DvdConfig, MarqueeConfig, PatternConfig, BackgroundMedia, AppPreset, CursorStyle, WatermarkConfig, ThemeType, ControlStyle, BgTransitionType, AmbienceFile, AmbienceConfig, BgAnimationType } from '../../types';
-import { useLanguage } from '../../contexts/LanguageContext';
-import { useTheme } from '../../contexts/ThemeContext';
+import React, { useState } from 'react';
+import { VisualizerConfig, EffectsConfig, DvdConfig, MarqueeConfig, PatternConfig, BackgroundMedia, AppPreset, CursorStyle, WatermarkConfig, ThemeType, ControlStyle, BgTransitionType, AmbienceFile, AmbienceConfig, BgAnimationType, BackgroundPlaylist, BgHotspot } from '../../types';
 import { useNotification } from '../../contexts/NotificationContext';
-import { APP_VERSION } from '../../lib/version';
-import { Tooltip } from '../ui/Tooltip';
+import { useTheme } from '../../contexts/ThemeContext';
+import { useLanguage } from '../../contexts/LanguageContext';
 import { TranslatedText } from '../ui/TranslatedText';
 
-// Internal & Shared Components
+// Hooks
+import { useSettingsScroll } from '../../hooks/useSettingsScroll';
+import { useSettingsExpansion } from '../../hooks/useSettingsExpansion';
+import { useConfigUpdaters } from '../../hooks/useConfigUpdaters';
+
+// Components
+import SettingsHeader from './SettingsHeader';
 import SettingsSection from './SettingsSection';
 import HelpModal from './HelpModal';
 
-// Section Modules
+// Sections
 import SystemSection from './sections/SystemSection';
 import BackgroundSection from './sections/BackgroundSection';
 import SoundSection from './sections/SoundSection';
 import WaveformSection from './sections/WaveformSection';
 import ModulesSection from './sections/ModulesSection';
+import GameSection from './sections/GameSection';
 import PostProcessingSection from './sections/PostProcessingSection';
-
-// Map of Main Section ID -> Array of Child Module IDs
-// Used for auto-collapsing children when switching tabs or clicking modules
-const SECTION_MODULES: Record<string, string[]> = {
-  sys: ['files', 'presets', 'themes', 'debug'],
-  bg: ['bg-settings', 'bg-resources', 'bg-colors', 'screen-share'],
-  sfx: ['mixer', 'ambience', 'sysaudio'],
-  waves: ['wave', 'reactor', 'sine'],
-  mod: ['marquee', 'dvd', 'leaks', 'rain', 'hologram', 'gemini', 'scan', 'cyber', 'glitch'],
-  post: ['fps', 'signal', 'chromatic', 'vignette']
-};
 
 interface SettingsPanelProps {
   showVisualizer: boolean;
@@ -44,7 +37,6 @@ interface SettingsPanelProps {
   marqueeConfig: MarqueeConfig;
   setMarqueeConfig: (c: MarqueeConfig) => void;
   
-  // Independent Visualizers
   visualizerConfig: VisualizerConfig;
   setVisualizerConfig: (config: VisualizerConfig) => void;
   reactorConfig?: VisualizerConfig; 
@@ -69,6 +61,14 @@ interface SettingsPanelProps {
   onSfxUpload: (file: File) => void;
   bgMedia: { type: 'image' | 'video', url: string } | null;
   bgList: BackgroundMedia[];
+  bgPlaylists: BackgroundPlaylist[]; 
+  activeBgPlaylistId: string; 
+  playingBgPlaylistId: string; 
+  setActiveBgPlaylistId: (id: string) => void; 
+  setPlayingBgPlaylistId: (id: string) => void; 
+  addBgPlaylist: () => void; 
+  removeBgPlaylist: (id: string) => void; 
+  renameBgPlaylist: (id: string, name: string) => void; 
   currentBgIndex: number;
   onRemoveBg: (id: string) => void;
   onMoveBg: (index: number, dir: 'up' | 'down') => void;
@@ -85,7 +85,6 @@ interface SettingsPanelProps {
   smoothStart: boolean;
   setSmoothStart: (v: boolean) => void;
   
-  // Presets
   savedPresets: AppPreset[];
   activePresetId: string | null;
   savePreset: (name: string) => void;
@@ -95,33 +94,26 @@ interface SettingsPanelProps {
   renamePreset: (id: string, newName: string) => void;
   onResetDefault?: () => void; 
 
-  // SFX Data
   sfxMap: Record<string, string>;
   sfxVolume: number;
   setSfxVolume: (v: number) => void;
 
-  // Cursor
   cursorStyle: CursorStyle;
   setCursorStyle: (s: CursorStyle) => void;
   retroScreenCursorStyle: CursorStyle; 
   setRetroScreenCursorStyle: (s: CursorStyle) => void; 
 
-  // API
   apiKey: string;
   setApiKey: (k: string) => void;
 
-  // Transition 
   bgTransition: BgTransitionType;
   setBgTransition: (t: BgTransitionType) => void;
   
-  // Animation
   bgAnimation: BgAnimationType;
   setBgAnimation: (a: BgAnimationType) => void;
 
-  // Tutorial
   onRestartTutorial: () => void;
 
-  // Ambience
   ambienceFiles: AmbienceFile[];
   ambienceConfig: AmbienceConfig;
   onAmbienceUpload: (files: FileList) => void;
@@ -130,260 +122,41 @@ interface SettingsPanelProps {
   onAmbienceTogglePlay: () => void;
   onAmbienceVolume: (v: number) => void;
 
-  // Screen Capture Props
   isVideoActive: boolean;
   toggleVideo: () => void;
-  isAudioActive: boolean;
-  toggleAudio: () => void;
-  audioVolume: number;
-  setAudioVolume: (v: number) => void;
-  isMonitoring: boolean;
-  setMonitoring: (v: boolean) => void;
+  
+  isMicActive: boolean;
+  toggleMic: () => void;
+  isSysAudioActive: boolean;
+  toggleSysAudio: () => void;
 
-  // Advanced Mode
   isAdvancedMode?: boolean;
   setAdvancedMode?: (v: boolean) => void;
 
-  // Album Art BG
   useAlbumArtAsBackground?: boolean;
   setUseAlbumArtAsBackground?: (v: boolean) => void;
 
-  // Stream Mode
   streamMode?: 'bg' | 'window';
   setStreamMode?: (m: 'bg' | 'window') => void;
 
-  // Shuffle BG
   shuffleBgList?: () => void; 
+  updateBg?: (id: string, newFile: File) => Promise<void>; 
+  updateBgMetadata?: (id: string, hotspots: BgHotspot[]) => Promise<void>; 
 }
 
-const SettingsPanel: React.FC<SettingsPanelProps> = ({
-  showVisualizer, setShowVisualizer, showVisualizer3D, setShowVisualizer3D, showSineWave, setShowSineWave, showDvd, setShowDvd, marqueeConfig, setMarqueeConfig,
-  visualizerConfig, setVisualizerConfig, reactorConfig, setReactorConfig, sineWaveConfig, setSineWaveConfig, dvdConfig, setDvdConfig,
-  effectsConfig, setEffectsConfig, watermarkConfig, setWatermarkConfig, bgColor, setBgColor, bgPattern = 'none', setBgPattern, bgPatternConfig, setBgPatternConfig,
-  onBgMediaUpload, onAudioUpload, onSfxUpload, bgMedia, bgList, currentBgIndex, onRemoveBg, onMoveBg, onSelectBg, onDeselectBg, onClearBgMedia, onExportConfig,
-  bgAutoplayInterval, setBgAutoplayInterval, onScheduleReload, onGoHome,
-  crossfadeDuration, setCrossfadeDuration, smoothStart, setSmoothStart,
-  savedPresets, activePresetId, savePreset, overwritePreset, loadPreset, deletePreset, renamePreset, onResetDefault,
-  sfxMap, sfxVolume, setSfxVolume,
-  cursorStyle, setCursorStyle, retroScreenCursorStyle, setRetroScreenCursorStyle, apiKey, setApiKey,
-  bgTransition, setBgTransition, bgAnimation, setBgAnimation,
-  onRestartTutorial,
-  ambienceFiles, ambienceConfig, onAmbienceUpload, onAmbienceDelete, onAmbienceSetActive, onAmbienceTogglePlay, onAmbienceVolume,
-  isVideoActive, toggleVideo, isAudioActive, toggleAudio,
-  isAdvancedMode, setAdvancedMode,
-  useAlbumArtAsBackground = false, setUseAlbumArtAsBackground = () => {},
-  streamMode, setStreamMode,
-  shuffleBgList
-}) => {
-  // Module Expansion State
-  const [expandedState, setExpandedState] = useState<Record<string, boolean>>({});
-  
-  // Section Expansion State (Collapsible Headers)
-  const [openSections, setOpenSections] = useState<Record<string, boolean>>({
-      sys: true,
-      bg: true,
-      sfx: true,
-      waves: true, 
-      mod: true,
-      post: true
-  });
-
+const SettingsPanel: React.FC<SettingsPanelProps> = (props) => {
   const [showHelp, setShowHelp] = useState(false);
-  const { language, setLanguage, t } = useLanguage();
+  
   const { currentTheme, setTheme, controlStyle, setControlStyle } = useTheme();
   const { addNotification } = useNotification();
+  const { t } = useLanguage();
 
-  // Scroll Drag Logic Refs
-  const scrollContainerRef = useRef<HTMLDivElement>(null);
-  const isDragging = useRef(false);
-  const startY = useRef(0);
-  const scrollTop = useRef(0);
-  const startPageY = useRef(0); 
-  const wasDragged = useRef(false); 
+  // --- CUSTOM HOOKS FOR LOGIC SEPARATION ---
+  const { scrollContainerRef, handleMouseDown, safeAction } = useSettingsScroll();
+  const { expandedState, openSections, toggleExpand, handleSectionToggle } = useSettingsExpansion(safeAction, scrollContainerRef);
+  const updaters = useConfigUpdaters(props);
 
-  const toggleExpand = (id: string, isAdditive: boolean) => {
-    if (wasDragged.current) return;
-    
-    setExpandedState(prev => {
-        const isCurrentlyOpen = prev[id];
-        let newState = { ...prev };
-
-        if (isAdditive) {
-            // Shift click: Toggle target, leave others alone
-            newState[id] = !isCurrentlyOpen;
-        } else {
-            // Normal click: Accordion behavior within the section
-            
-            // 1. Identify which section this module belongs to
-            let groupIds: string[] = [];
-            for (const sectionKey in SECTION_MODULES) {
-                if (SECTION_MODULES[sectionKey].includes(id)) {
-                    groupIds = SECTION_MODULES[sectionKey];
-                    break;
-                }
-            }
-
-            // 2. Close all other modules in this group
-            groupIds.forEach(siblingId => {
-                if (siblingId !== id) {
-                    newState[siblingId] = false;
-                }
-            });
-
-            // 3. Toggle the target module
-            newState[id] = !isCurrentlyOpen;
-        }
-        
-        return newState;
-    });
-  };
-
-  const safeAction = (fn: () => void) => {
-      if (!wasDragged.current) fn();
-  };
-
-  // Helper Updaters
-  const updateVisualizer = (k: keyof VisualizerConfig, v: any) => setVisualizerConfig({ ...visualizerConfig, [k]: v });
-  const updateReactor = (k: keyof VisualizerConfig, v: any) => {
-      if (setReactorConfig && reactorConfig) {
-          setReactorConfig({ ...reactorConfig, [k]: v });
-      }
-  };
-  const updateSineWave = (k: keyof VisualizerConfig, v: any) => {
-      if (setSineWaveConfig && sineWaveConfig) {
-          setSineWaveConfig({ ...sineWaveConfig, [k]: v });
-      }
-  };
-  const updateDvd = (k: keyof DvdConfig, v: any) => setDvdConfig({ ...dvdConfig, [k]: v });
-  const updateEffect = (k: keyof EffectsConfig, v: any) => setEffectsConfig({ ...effectsConfig, [k]: v });
-  const updateMarquee = (k: keyof MarqueeConfig, v: any) => setMarqueeConfig({ ...marqueeConfig, [k]: v });
-  const updateDebugConfig = (v: EffectsConfig['debugConsole']) => updateEffect('debugConsole', v);
-
-  const handleOverwrite = (id: string) => {
-      overwritePreset(id, currentTheme, controlStyle);
-      addNotification("Preset Updated", "success");
-  };
-
-  // --- SECTION SCROLL LOGIC ---
-  const handleSectionToggle = (sectionId: string, index: number, isAdditive: boolean = false) => {
-      if (wasDragged.current) return;
-
-      setOpenSections(prev => {
-          const isCurrentlyOpen = prev[sectionId];
-          let newState: Record<string, boolean> = { ...prev };
-          const sectionsClosing: string[] = [];
-
-          if (isAdditive) {
-              newState[sectionId] = !isCurrentlyOpen;
-              if (isCurrentlyOpen) sectionsClosing.push(sectionId);
-          } else {
-              Object.keys(prev).forEach(key => {
-                  if (key !== sectionId && prev[key]) {
-                      newState[key] = false;
-                      sectionsClosing.push(key);
-                  }
-              });
-              newState[sectionId] = true;
-          }
-
-          if (sectionsClosing.length > 0) {
-              setExpandedState(prevExpanded => {
-                  const nextExpanded = { ...prevExpanded };
-                  sectionsClosing.forEach(closedSecId => {
-                      const modules = SECTION_MODULES[closedSecId];
-                      if (modules) {
-                          modules.forEach(modId => {
-                              nextExpanded[modId] = false;
-                          });
-                      }
-                  });
-                  return nextExpanded;
-              });
-          }
-          
-          if (newState[sectionId]) {
-              setTimeout(() => {
-                  if (!scrollContainerRef.current) return;
-                  const headerEl = document.getElementById(`section-header-${sectionId}`);
-                  if (headerEl) {
-                      const stickyOffset = index * 36;
-                      const targetScroll = headerEl.offsetTop - stickyOffset;
-                      scrollContainerRef.current.scrollTo({
-                          top: targetScroll,
-                          behavior: 'smooth'
-                      });
-                  }
-              }, 100);
-          }
-          
-          return newState;
-      });
-  };
-
-  // --- DRAG TO SCROLL HANDLERS ---
-  const handleMouseDown = (e: React.MouseEvent) => {
-      const target = e.target as HTMLElement;
-      if (target.tagName === 'INPUT' || target.tagName === 'BUTTON' || target.closest('button') || target.tagName === 'SELECT') {
-          return;
-      }
-
-      if (scrollContainerRef.current) {
-          isDragging.current = true;
-          wasDragged.current = false;
-          startY.current = e.pageY - scrollContainerRef.current.offsetTop;
-          scrollTop.current = scrollContainerRef.current.scrollTop;
-          startPageY.current = e.pageY;
-          
-          window.addEventListener('mousemove', handleGlobalMouseMove);
-          window.addEventListener('mouseup', handleGlobalMouseUp);
-      }
-  };
-
-  const handleGlobalMouseMove = (e: MouseEvent) => {
-      if (!isDragging.current || !scrollContainerRef.current) return;
-      e.preventDefault();
-      
-      const movedY = Math.abs(e.pageY - startPageY.current);
-      if (!wasDragged.current && movedY > 5) {
-          wasDragged.current = true;
-          document.body.classList.add('app-dragging');
-      }
-
-      const y = e.pageY - scrollContainerRef.current.offsetTop;
-      const walk = (y - startY.current); 
-      scrollContainerRef.current.scrollTop = scrollTop.current - walk;
-  };
-
-  const handleGlobalMouseUp = () => {
-      isDragging.current = false;
-      document.body.classList.remove('app-dragging');
-      window.removeEventListener('mousemove', handleGlobalMouseMove);
-      window.removeEventListener('mouseup', handleGlobalMouseUp);
-  };
-
-  // --- HOTKEYS ---
-  useEffect(() => {
-      const handleKeyDown = (e: KeyboardEvent) => {
-          const target = e.target as HTMLElement;
-          if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.tagName === 'SELECT') return;
-          if (e.ctrlKey || e.altKey || e.metaKey) return;
-
-          if (e.key === '1') handleSectionToggle('sys', 0, false);
-          if (e.key === '2') handleSectionToggle('bg', 1, false);
-          if (e.key === '3') handleSectionToggle('sfx', 2, false);
-          if (e.key === '4') handleSectionToggle('waves', 3, false);
-          if (e.key === '5') handleSectionToggle('mod', 4, false);
-          if (e.key === '6') handleSectionToggle('post', 5, false);
-      };
-
-      window.addEventListener('keydown', handleKeyDown);
-      return () => {
-          window.removeEventListener('keydown', handleKeyDown);
-          window.removeEventListener('mousemove', handleGlobalMouseMove);
-          window.removeEventListener('mouseup', handleGlobalMouseUp);
-      };
-  }, []);
-
+  // Constants / Options
   const themeOptions = [
     { value: 'neon-retro', label: 'Default - Neon Retro', color: '#00f3ff' },
     { value: 'neon-blue', label: 'Neon Blue', color: '#3b82f6' },
@@ -414,48 +187,13 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
   ];
 
   return (
-    <div className="w-full h-full flex flex-col bg-theme-bg border-r-4 border-theme-panel shadow-inner overflow-hidden">
-      {/* Header */}
-      <div className="p-4 pb-0 mb-4 bg-theme-bg z-40">
-        <div className="flex items-center justify-between pb-2">
-          <div className="flex items-center gap-2">
-            <Settings className="animate-spin-slow text-theme-primary" size={24} />
-            <div className="flex items-center gap-3">
-                <h2 className="text-xl font-mono text-theme-text leading-none">
-                    <TranslatedText k="system" />
-                </h2>
-                <div className="flex items-center gap-1.5 opacity-60 pt-1">
-                    <div className="w-1.5 h-1.5 bg-theme-accent rounded-full animate-pulse"></div>
-                    <span className="text-[9px] font-mono text-theme-primary tracking-widest">{APP_VERSION}</span>
-                </div>
-            </div>
-          </div>
-          
-          <div className="flex items-center gap-2">
-            <Tooltip content={t('help')} position="bottom">
-              <button onClick={() => setShowHelp(true)} className="text-theme-muted hover:text-theme-primary transition-colors p-1"><HelpCircle size={18} /></button>
-            </Tooltip>
-            <Tooltip content="HOME" position="bottom">
-              <button onClick={onGoHome} className="text-theme-muted hover:text-theme-primary transition-colors p-1"><Home size={18} /></button>
-            </Tooltip>
-            <Tooltip content={t('reboot')} position="bottom">
-              <button onClick={onScheduleReload} className="text-theme-muted hover:text-red-500 transition-colors p-1"><Power size={18} /></button>
-            </Tooltip>
-            <div className="w-px h-4 bg-theme-border mx-1"></div>
-            <div className="relative flex items-center bg-theme-panel border border-theme-border rounded h-7 w-20 cursor-pointer overflow-hidden shadow-inner">
-                <div className={`absolute top-0 bottom-0 w-1/2 bg-theme-primary rounded-sm transition-all duration-300 ease-out shadow-[0_0_10px_var(--color-primary)] opacity-90`} style={{ transform: language === 'en' ? 'translateX(2px)' : 'translateX(calc(100% + 2px))' }} />
-                
-                <Tooltip content="ENGLISH" position="bottom" className="flex-1 z-10 h-full">
-                    <button onClick={() => setLanguage('en')} className={`w-full h-full text-[10px] font-mono font-bold text-center transition-colors duration-300 ${language === 'en' ? 'text-black' : 'text-theme-muted hover:text-theme-text'}`}>EN</button>
-                </Tooltip>
-                
-                <Tooltip content="RUSSIAN" position="bottom" className="flex-1 z-10 h-full">
-                    <button onClick={() => setLanguage('ru')} className={`w-full h-full text-[10px] font-mono font-bold text-center transition-colors duration-300 ${language === 'ru' ? 'text-black' : 'text-theme-muted hover:text-theme-text'}`}>RU</button>
-                </Tooltip>
-            </div>
-          </div>
-        </div>
-      </div>
+    <div className="w-full h-full flex flex-col bg-theme-bg border-r-4 border-theme-bg shadow-inner overflow-hidden">
+      
+      <SettingsHeader 
+        onGoHome={props.onGoHome}
+        onScheduleReload={props.onScheduleReload}
+        onShowHelp={() => setShowHelp(true)}
+      />
 
       {/* Main Content Area */}
       <div 
@@ -467,18 +205,18 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
             id="sys" 
             title={<><span className="text-theme-muted opacity-50 font-normal mr-2">1 //</span> <TranslatedText k="system_params" /></>} 
             isOpen={openSections['sys']} 
-            onToggle={(isAdditive) => handleSectionToggle('sys', 0, isAdditive)}
+            onToggle={(isAdditive) => handleSectionToggle('sys', isAdditive)}
             stickyTop="0px"
         >
             <SystemSection 
                 expandedState={expandedState} toggleExpand={toggleExpand}
-                onBgMediaUpload={onBgMediaUpload} onAudioUpload={onAudioUpload} onSfxUpload={onSfxUpload} onExportConfig={onExportConfig} sfxMap={sfxMap}
-                savedPresets={savedPresets} activePresetId={activePresetId} savePreset={savePreset} overwritePreset={handleOverwrite} loadPreset={loadPreset} deletePreset={deletePreset} renamePreset={renamePreset} onResetDefault={onResetDefault}
-                currentTheme={currentTheme} setTheme={setTheme} cursorStyle={cursorStyle} setCursorStyle={setCursorStyle} retroScreenCursorStyle={retroScreenCursorStyle} setRetroScreenCursorStyle={setRetroScreenCursorStyle} controlStyle={controlStyle} setControlStyle={setControlStyle}
-                watermarkConfig={watermarkConfig} setWatermarkConfig={setWatermarkConfig}
-                debugConfig={effectsConfig.debugConsole} updateDebugConfig={updateDebugConfig}
+                onBgMediaUpload={props.onBgMediaUpload} onAudioUpload={props.onAudioUpload} onSfxUpload={props.onSfxUpload} onExportConfig={props.onExportConfig} sfxMap={props.sfxMap}
+                savedPresets={props.savedPresets} activePresetId={props.activePresetId} savePreset={props.savePreset} overwritePreset={props.overwritePreset} loadPreset={props.loadPreset} deletePreset={props.deletePreset} renamePreset={props.renamePreset} onResetDefault={props.onResetDefault}
+                currentTheme={currentTheme} setTheme={setTheme} cursorStyle={props.cursorStyle} setCursorStyle={props.setCursorStyle} retroScreenCursorStyle={props.retroScreenCursorStyle} setRetroScreenCursorStyle={props.setRetroScreenCursorStyle} controlStyle={controlStyle} setControlStyle={setControlStyle}
+                watermarkConfig={props.watermarkConfig} setWatermarkConfig={props.setWatermarkConfig}
+                debugConfig={props.effectsConfig.debugConsole} updateDebugConfig={updaters.updateDebugConfig}
                 themeOptions={themeOptions} cursorOptions={cursorOptions} controlStyleOptions={controlStyleOptions}
-                isAdvancedMode={isAdvancedMode}
+                isAdvancedMode={props.isAdvancedMode}
             />
         </SettingsSection>
 
@@ -486,16 +224,17 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
             id="bg" 
             title={<><span className="text-theme-muted opacity-50 font-normal mr-2">2 //</span> <TranslatedText k="cat_backgrounds" /></>} 
             isOpen={openSections['bg']} 
-            onToggle={(isAdditive) => handleSectionToggle('bg', 1, isAdditive)}
+            onToggle={(isAdditive) => handleSectionToggle('bg', isAdditive)}
             stickyTop="36px"
         >
             <BackgroundSection 
                 expandedState={expandedState} toggleExpand={toggleExpand}
-                bgAnimation={bgAnimation} setBgAnimation={setBgAnimation} bgTransition={bgTransition} setBgTransition={setBgTransition}
-                bgMedia={bgMedia} bgList={bgList} currentBgIndex={currentBgIndex} onRemoveBg={onRemoveBg} onMoveBg={onMoveBg} onSelectBg={onSelectBg} onClearBgMedia={onClearBgMedia} shuffleBgList={shuffleBgList} onBgMediaUpload={onBgMediaUpload}
-                bgAutoplayInterval={bgAutoplayInterval} setBgAutoplayInterval={setBgAutoplayInterval} useAlbumArtAsBackground={useAlbumArtAsBackground} setUseAlbumArtAsBackground={setUseAlbumArtAsBackground}
-                bgColor={bgColor} setBgColor={setBgColor} bgPattern={bgPattern} setBgPattern={setBgPattern} bgPatternConfig={bgPatternConfig} setBgPatternConfig={setBgPatternConfig} onDeselectBg={onDeselectBg}
-                isVideoActive={isVideoActive} toggleVideo={toggleVideo} streamMode={streamMode} setStreamMode={setStreamMode}
+                bgAnimation={props.bgAnimation} setBgAnimation={props.setBgAnimation} bgTransition={props.bgTransition} setBgTransition={props.setBgTransition}
+                bgMedia={props.bgMedia} bgList={props.bgList} currentBgIndex={props.currentBgIndex} onRemoveBg={props.onRemoveBg} onMoveBg={props.onMoveBg} onSelectBg={props.onSelectBg} onClearBgMedia={props.onClearBgMedia} shuffleBgList={props.shuffleBgList} onBgMediaUpload={props.onBgMediaUpload} onUpdateBg={props.updateBg || (async()=>{})} onUpdateMetadata={props.updateBgMetadata}
+                bgAutoplayInterval={props.bgAutoplayInterval} setBgAutoplayInterval={props.setBgAutoplayInterval} useAlbumArtAsBackground={props.useAlbumArtAsBackground || false} setUseAlbumArtAsBackground={props.setUseAlbumArtAsBackground}
+                bgColor={props.bgColor} setBgColor={props.setBgColor} bgPattern={props.bgPattern} setBgPattern={props.setBgPattern} bgPatternConfig={props.bgPatternConfig} setBgPatternConfig={props.setBgPatternConfig} onDeselectBg={props.onDeselectBg}
+                isVideoActive={props.isVideoActive} toggleVideo={props.toggleVideo} streamMode={props.streamMode} setStreamMode={props.setStreamMode}
+                bgPlaylists={props.bgPlaylists} activeBgPlaylistId={props.activeBgPlaylistId} playingBgPlaylistId={props.playingBgPlaylistId} setActiveBgPlaylistId={props.setActiveBgPlaylistId} setPlayingBgPlaylistId={props.setPlayingBgPlaylistId} addBgPlaylist={props.addBgPlaylist} removeBgPlaylist={props.removeBgPlaylist} renameBgPlaylist={props.renameBgPlaylist}
             />
         </SettingsSection>
 
@@ -503,14 +242,14 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
             id="sfx" 
             title={<><span className="text-theme-muted opacity-50 font-normal mr-2">3 //</span> <TranslatedText k="cat_sound_effects" /></>} 
             isOpen={openSections['sfx']} 
-            onToggle={(isAdditive) => handleSectionToggle('sfx', 2, isAdditive)}
+            onToggle={(isAdditive) => handleSectionToggle('sfx', isAdditive)}
             stickyTop="72px"
         >
             <SoundSection 
                 expandedState={expandedState} toggleExpand={toggleExpand}
-                crossfadeDuration={crossfadeDuration} setCrossfadeDuration={setCrossfadeDuration} sfxVolume={sfxVolume} setSfxVolume={setSfxVolume} smoothStart={smoothStart} setSmoothStart={setSmoothStart}
-                ambienceFiles={ambienceFiles} ambienceConfig={ambienceConfig} onAmbienceUpload={onAmbienceUpload} onAmbienceDelete={onAmbienceDelete} onAmbienceSetActive={onAmbienceSetActive} onAmbienceTogglePlay={onAmbienceTogglePlay} onAmbienceVolume={onAmbienceVolume}
-                isAudioActive={isAudioActive} toggleAudio={toggleAudio}
+                crossfadeDuration={props.crossfadeDuration} setCrossfadeDuration={props.setCrossfadeDuration} sfxVolume={props.sfxVolume} setSfxVolume={props.setSfxVolume} smoothStart={props.smoothStart} setSmoothStart={props.setSmoothStart}
+                ambienceFiles={props.ambienceFiles} ambienceConfig={props.ambienceConfig} onAmbienceUpload={props.onAmbienceUpload} onAmbienceDelete={props.onAmbienceDelete} onAmbienceSetActive={props.onAmbienceSetActive} onAmbienceTogglePlay={props.onAmbienceTogglePlay} onAmbienceVolume={props.onAmbienceVolume}
+                isMicActive={props.isMicActive} toggleMic={props.toggleMic} isSysAudioActive={props.isSysAudioActive} toggleSysAudio={props.toggleSysAudio}
             />
         </SettingsSection>
 
@@ -518,14 +257,14 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
             id="waves" 
             title={<><span className="text-theme-muted opacity-50 font-normal mr-2">4 //</span> WAVEFORMS</>} 
             isOpen={openSections['waves']} 
-            onToggle={(isAdditive) => handleSectionToggle('waves', 3, isAdditive)}
+            onToggle={(isAdditive) => handleSectionToggle('waves', isAdditive)}
             stickyTop="108px"
         >
             <WaveformSection 
                 expandedState={expandedState} toggleExpand={toggleExpand} safeAction={safeAction}
-                showVisualizer={showVisualizer} setShowVisualizer={setShowVisualizer} visualizerConfig={visualizerConfig} updateVisualizer={updateVisualizer}
-                showVisualizer3D={showVisualizer3D} setShowVisualizer3D={setShowVisualizer3D} reactorConfig={reactorConfig} updateReactor={updateReactor}
-                showSineWave={showSineWave} setShowSineWave={setShowSineWave} sineWaveConfig={sineWaveConfig} updateSineWave={updateSineWave}
+                showVisualizer={props.showVisualizer} setShowVisualizer={props.setShowVisualizer} visualizerConfig={props.visualizerConfig} updateVisualizer={updaters.updateVisualizer}
+                showVisualizer3D={props.showVisualizer3D} setShowVisualizer3D={props.setShowVisualizer3D} reactorConfig={props.reactorConfig} updateReactor={updaters.updateReactor}
+                showSineWave={props.showSineWave} setShowSineWave={props.setShowSineWave} sineWaveConfig={props.sineWaveConfig} updateSineWave={updaters.updateSineWave}
             />
         </SettingsSection>
 
@@ -533,39 +272,52 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
             id="mod" 
             title={<><span className="text-theme-muted opacity-50 font-normal mr-2">5 //</span> <TranslatedText k="modules" /></>} 
             isOpen={openSections['mod']} 
-            onToggle={(isAdditive) => handleSectionToggle('mod', 4, isAdditive)}
+            onToggle={(isAdditive) => handleSectionToggle('mod', isAdditive)}
             stickyTop="144px"
         >
             <ModulesSection 
                 expandedState={expandedState} toggleExpand={toggleExpand} safeAction={safeAction}
-                marqueeConfig={marqueeConfig} updateMarquee={updateMarquee}
-                showDvd={showDvd} setShowDvd={setShowDvd} dvdConfig={dvdConfig} updateDvd={updateDvd}
-                effectsConfig={effectsConfig} updateEffect={updateEffect} apiKey={apiKey} setApiKey={setApiKey}
+                marqueeConfig={props.marqueeConfig} updateMarquee={updaters.updateMarquee}
+                showDvd={props.showDvd} setShowDvd={props.setShowDvd} dvdConfig={props.dvdConfig} updateDvd={updaters.updateDvd}
+                effectsConfig={props.effectsConfig} updateEffect={updaters.updateEffect} apiKey={props.apiKey} setApiKey={props.setApiKey}
+            />
+        </SettingsSection>
+
+        <SettingsSection 
+            id="game" 
+            title={<><span className="text-theme-muted opacity-50 font-normal mr-2">6 //</span> GAME MODULES</>} 
+            isOpen={openSections['game']} 
+            onToggle={(isAdditive) => handleSectionToggle('game', isAdditive)}
+            stickyTop="180px"
+        >
+            <GameSection 
+                expandedState={expandedState} toggleExpand={toggleExpand} safeAction={safeAction}
+                effectsConfig={props.effectsConfig} updateEffect={updaters.updateEffect}
             />
         </SettingsSection>
 
         <SettingsSection 
             id="post" 
-            title={<><span className="text-theme-muted opacity-50 font-normal mr-2">6 //</span> <TranslatedText k="cat_screen_effects" /></>} 
+            title={<><span className="text-theme-muted opacity-50 font-normal mr-2">7 //</span> <TranslatedText k="cat_screen_effects" /></>} 
             isOpen={openSections['post']} 
-            onToggle={(isAdditive) => handleSectionToggle('post', 5, isAdditive)}
-            stickyTop="180px"
+            onToggle={(isAdditive) => handleSectionToggle('post', isAdditive)}
+            stickyTop="216px"
         >
             <PostProcessingSection 
                 expandedState={expandedState} toggleExpand={toggleExpand} safeAction={safeAction}
-                effectsConfig={effectsConfig} updateEffect={updateEffect}
+                effectsConfig={props.effectsConfig} updateEffect={updaters.updateEffect}
             />
         </SettingsSection>
       </div>
       
-      {showHelp && <HelpModal onClose={() => setShowHelp(false)} onRestartTutorial={onRestartTutorial} onUnlockAdvanced={(pass) => {
-          if (pass === 'Meow' && setAdvancedMode) {
-              setAdvancedMode(true);
+      {showHelp && <HelpModal onClose={() => setShowHelp(false)} onRestartTutorial={props.onRestartTutorial} onUnlockAdvanced={(pass) => {
+          if (pass === 'Meow' && props.setAdvancedMode) {
+              props.setAdvancedMode(true);
               addNotification("ADVANCED MODE UNLOCKED", "success");
               return true;
           }
           return false;
-      }} isAdvanced={isAdvancedMode} />}
+      }} isAdvanced={props.isAdvancedMode} />}
     </div>
   );
 };

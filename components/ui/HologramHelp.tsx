@@ -125,9 +125,23 @@ const HologramHelp: React.FC<HologramHelpProps> = ({ onClose }) => {
           icon: Command,
           items: [
               { key: "Space", desc: isRu ? "Старт / Пауза" : "Play / Pause" },
-              { key: "A / S / D", desc: isRu ? "Пред / Стоп / След" : "Prev / Stop / Next" },
-              { key: "Arrows ↕", desc: isRu ? "Громкость" : "Volume" },
-              { key: "Arrows ↔", desc: isRu ? "Смена фона" : "Change Background" }
+              { key: "- / =", desc: isRu ? "Пред / След трек" : "Prev / Next Track" },
+              { key: "PgUp / PgDn", desc: isRu ? "Смена темы" : "Change Theme" },
+              { key: "' / \\", desc: isRu ? "Смена фона" : "Change Background" }
+          ]
+      },
+      {
+          title: isRu ? "СИСТЕМА" : "SYSTEM",
+          icon: Monitor,
+          items: [
+              { key: "S", desc: isRu ? "Системная панель" : renderLabel("System Panel", "S") },
+              { key: "Shift + S", desc: isRu ? "Стоп" : renderLabel("Stop", "S") },
+              { key: "L", desc: isRu ? "Список треков (Вкл/Выкл)" : renderLabel("Playlist (Toggle)", "L") },
+              { key: "Shift + L", desc: isRu ? "Блок. плейлиста" : renderLabel("Lock Playlist", "L") },
+              { key: "P", desc: isRu ? "Плеер (Панель)" : renderLabel("Player Panel", "P") },
+              { key: "F", desc: isRu ? "Кино-режим" : "Cinema Mode" },
+              { key: "Shift + F", desc: isRu ? "Полный экран" : renderLabel("Fullscreen", "F") },
+              { key: "1-7", desc: isRu ? "Навигация настроек" : "Settings Nav" },
           ]
       },
       {
@@ -156,21 +170,6 @@ const HologramHelp: React.FC<HologramHelpProps> = ({ onClose }) => {
               { key: "E", desc: isRu ? "Частоты" : renderLabel("FrEquency", "E") },
               { key: "Y", desc: isRu ? "Прозрачность" : renderLabel("OpacitY", "Y") },
           ]
-      },
-      {
-          title: isRu ? "СИСТЕМА" : "SYSTEM",
-          icon: Monitor,
-          items: [
-              { key: "H", desc: isRu ? "Справка (Закрыть)" : renderLabel("Help (Close)", "H") },
-              { key: "L", desc: isRu ? "Список треков (Вкл/Выкл)" : renderLabel("Playlist (Toggle)", "L") },
-              { key: "P", desc: isRu ? "Плеер (Панель)" : renderLabel("Player Panel", "P") },
-              { key: "Shift + S", desc: isRu ? "Настройки" : renderLabel("Settings", "S") },
-              { key: "Shift + C", desc: isRu ? "Мини Плеер" : renderLabel("Compact Mode", "C") },
-              { key: "F", desc: isRu ? "Кино-режим" : "Cinema Mode" },
-              { key: "Shift + F", desc: isRu ? "Полный экран" : renderLabel("Fullscreen", "F") },
-              { key: "[", desc: isRu ? "Пред. пресет" : "Prev Preset" },
-              { key: "]", desc: isRu ? "След. пресет" : "Next Preset" },
-          ]
       }
   ];
 
@@ -183,22 +182,16 @@ const HologramHelp: React.FC<HologramHelpProps> = ({ onClose }) => {
             className="relative overflow-hidden pointer-events-auto flex flex-col transition-all ease-in-out duration-500 backdrop-blur-md"
             style={{
                 width: phase >= 1 ? '100%' : '4px',
-                maxWidth: '56rem', // max-w-4xl
-                // Height Transition Logic
+                maxWidth: '72rem', 
                 height: phase >= 2 ? 'auto' : '4px',
                 maxHeight: phase >= 2 ? '80vh' : '4px',
-                
-                // Colors & Borders
-                backgroundColor: `color-mix(in srgb, ${baseColor}, rgba(5, 5, 10, 0.9) 92%)`, // Denser background
+                backgroundColor: `color-mix(in srgb, ${baseColor}, rgba(5, 5, 10, 0.9) 92%)`, 
                 border: `2px solid color-mix(in srgb, ${baseColor}, transparent 40%)`,
                 boxShadow: `0 0 40px color-mix(in srgb, ${baseColor}, transparent 80%)`,
-                
-                // Shape Transition
                 borderRadius: phase >= 2 ? '16px' : '2px',
                 opacity: phase === 0 ? 0 : 1
             }}
         >
-            {/* Background Grid - Fades in with content */}
             <div 
                 className="absolute inset-0 bg-[length:40px_40px] pointer-events-none transition-opacity duration-500"
                 style={{
@@ -239,37 +232,39 @@ const HologramHelp: React.FC<HologramHelpProps> = ({ onClose }) => {
                 className="p-6 grid grid-cols-1 md:grid-cols-2 gap-6 overflow-y-auto custom-scrollbar relative z-10 transition-opacity duration-300"
                 style={{ opacity: contentActive ? 1 : 0 }}
             >
-                {sections.map((section, idx) => (
-                    <div key={idx} className="space-y-3">
-                        <div className="flex items-center gap-2 mb-2 pb-1 border-b" style={{ borderColor: `color-mix(in srgb, ${baseColor}, transparent 80%)` }}>
-                            <section.icon size={14} style={{ color: baseColor }} />
-                            <TypingBlock 
-                                active={contentActive} 
-                                text={section.title}
-                                className="font-mono text-xs font-bold tracking-widest text-white/70 uppercase"
-                                delay={200 + (idx * 100)}
-                            />
+                {sections.map((section, idx) => {
+                    return (
+                        <div key={idx} className={`space-y-3`}>
+                            <div className="flex items-center gap-2 mb-2 pb-1 border-b" style={{ borderColor: `color-mix(in srgb, ${baseColor}, transparent 80%)` }}>
+                                <section.icon size={14} style={{ color: baseColor }} />
+                                <TypingBlock 
+                                    active={contentActive} 
+                                    text={section.title}
+                                    className="font-mono text-xs font-bold tracking-widest text-white/70 uppercase"
+                                    delay={200 + (idx * 100)}
+                                />
+                            </div>
+                            <div className={`grid gap-x-4 gap-y-2 grid-cols-[auto_1fr]`}>
+                                {section.items.map((item, i) => (
+                                    <React.Fragment key={i}>
+                                        <div 
+                                            className="font-mono text-xs font-bold text-right py-1 px-2 rounded min-w-[30px]"
+                                            style={{ 
+                                                backgroundColor: `color-mix(in srgb, ${baseColor}, transparent 85%)`,
+                                                color: baseColor
+                                            }}
+                                        >
+                                            <TypingBlock active={contentActive} text={item.key} delay={300 + (idx * 50) + (i * 20)} />
+                                        </div>
+                                        <div className="font-mono text-xs text-white/80 flex items-center">
+                                            <TypingBlock active={contentActive} text={item.desc} delay={300 + (idx * 50) + (i * 20)} />
+                                        </div>
+                                    </React.Fragment>
+                                ))}
+                            </div>
                         </div>
-                        <div className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-2">
-                            {section.items.map((item, i) => (
-                                <React.Fragment key={i}>
-                                    <div 
-                                        className="font-mono text-xs font-bold text-right py-1 px-2 rounded min-w-[30px]"
-                                        style={{ 
-                                            backgroundColor: `color-mix(in srgb, ${baseColor}, transparent 85%)`,
-                                            color: baseColor
-                                        }}
-                                    >
-                                        <TypingBlock active={contentActive} text={item.key} delay={300 + (idx * 50) + (i * 20)} />
-                                    </div>
-                                    <div className="font-mono text-xs text-white/80 flex items-center">
-                                        <TypingBlock active={contentActive} text={item.desc} delay={300 + (idx * 50) + (i * 20)} />
-                                    </div>
-                                </React.Fragment>
-                            ))}
-                        </div>
-                    </div>
-                ))}
+                    );
+                })}
             </div>
 
             {/* Footer */}

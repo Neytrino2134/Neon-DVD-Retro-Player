@@ -8,6 +8,16 @@ export interface TronConfig {
   size: number; // NEW: Thickness of agent (1-4)
   maxAgents: number; // NEW: Maximum players on map (4-20)
   showNames: boolean; // NEW: Show player nicknames
+  showLeaderboard: boolean; // NEW: Show Holographic Leaderboard
+  enableUser: boolean; // NEW: User playable character
+  enableDummies: boolean; // NEW: Spawn stupid bots
+  glowEnabled: boolean; // NEW: Enable glow effect
+  glowIntensity: number; // NEW: Intensity of glow
+  bgEnabled: boolean; // NEW: Background pattern toggle
+  bgPattern: 'grid' | 'iso' | 'hex' | 'dots'; // NEW: Pattern type
+  erasureSpeed?: number; // NEW: Multiplier for line erasure speed
+  speedVariance?: number; // NEW: Random speed difference between agents (0-1)
+  roundMode?: boolean; // NEW: Enable competitive round mode linked to track time
 }
 
 export interface EffectsConfig {
@@ -50,6 +60,7 @@ export interface EffectsConfig {
     scale: number;
     color?: string; // NEW: Specific color for hologram
     enableIcons: boolean; // NEW: Enable graphical icons
+    showHotspots: boolean; // NEW: Show interactive background hotspots
     categories: Record<HologramCategory, boolean>;
   };
   geminiChat: GeminiChatConfig; // NEW
@@ -58,6 +69,11 @@ export interface EffectsConfig {
     intensity: number; // Opacity
     speed: number; // Movement speed
     number: number; // Amount of blobs
+  };
+  lightFlicker: { // NEW: Light Bulb Flicker Effect
+    enabled: boolean;
+    intensity: number; // How much brightness/darkness changes
+    speed: number; // How erratic the flicker is
   };
   rain: RainConfig; // NEW: Rain Effect
   tron: TronConfig; // NEW: Tron Game
@@ -78,6 +94,7 @@ export interface AudioTrack {
   artworkUrl?: string; // NEW: Album art blob URL
   tags?: TagMetadata; // NEW: ID3 Tags
   order?: number; // Added order property for sorting
+  rating?: number; // NEW: Track Rating
 }
 
 export interface TagMetadata {
@@ -96,11 +113,32 @@ export interface Playlist {
   tracks: AudioTrack[];
 }
 
+// NEW: Interactive Background Hotspots
+export type HotspotType = 'error' | 'decrypt' | 'target' | 'scan' | 'secure' | 'link';
+
+export interface BgHotspot {
+  id: string;
+  x: number; // Percentage 0-100
+  y: number; // Percentage 0-100
+  type: HotspotType;
+  label?: string; // Optional custom text
+}
+
 export interface BackgroundMedia {
   id: string;
+  playlistId: string; // NEW: Link to BG Playlist
   type: 'image' | 'video';
   url: string;
   file: File;
+  order?: number;
+  hotspots?: BgHotspot[]; // NEW: Interactive points
+}
+
+export interface BackgroundPlaylist {
+  id: string;
+  name: string;
+  order: number;
+  items: BackgroundMedia[];
 }
 
 // NEW: Ambience File Type
@@ -171,7 +209,7 @@ export const NEON_COLORS = [
 ];
 
 export type VisualizerStyle = 'retro' | 'blue' | 'pink' | 'matrix' | 'inferno' | 'warm' | 'gray' | 'ocean' | 'theme-blue' | 'theme-sync' | 'neon-gradient';
-export type VisualizerPosition = 'center' | 'top' | 'bottom';
+export type VisualizerPosition = 'center' | 'top' | 'bottom' | 'circle';
 export type TipColor = 'white' | 'blue' | 'pink' | 'green' | 'purple' | 'yellow' | 'red';
 export type CursorStyle = 'default' | 'music-flow' | 'classic-blue' | 'classic-warm' | 'classic-white' | 'classic-ocean' | 'theme-sync' | 'dos-terminal' | 'system' | 'crosshair' | 'rounded';
 
@@ -181,7 +219,7 @@ export type BgTransitionType = 'glitch' | 'leaks' | 'none';
 export type BgAnimationType = 'none' | 'zoom' | 'sway' | 'handheld' | 'cinematic' | 'chaos'; // NEW
 
 // NEW: View Mode for Application Layout
-export type ViewMode = 'default' | 'cinema' | 'mini';
+export type ViewMode = 'default' | 'cinema' | 'mini' | 'player-focus';
 
 export interface VisualizerConfig {
   style: VisualizerStyle;

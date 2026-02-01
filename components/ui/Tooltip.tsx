@@ -8,9 +8,10 @@ interface TooltipProps {
   position?: 'top' | 'bottom' | 'left' | 'right' | 'bottom-right';
   delay?: number;
   className?: string;
+  overrideColor?: string; // New prop to force color
 }
 
-export const Tooltip: React.FC<TooltipProps> = ({ content, children, position = 'top', delay = 200, className = "" }) => {
+export const Tooltip: React.FC<TooltipProps> = ({ content, children, position = 'top', delay = 200, className = "", overrideColor }) => {
   const [isVisible, setIsVisible] = useState(false);
   const [coords, setCoords] = useState({ top: 0, left: 0 });
   
@@ -167,20 +168,31 @@ export const Tooltip: React.FC<TooltipProps> = ({ content, children, position = 
             className={`
                 relative overflow-hidden transition-all duration-300 ease-out rounded
                 ${animStage === 1 
-                    ? 'h-[2px] min-w-[20px] max-w-[40px] bg-theme-primary border-none shadow-[0_0_10px_var(--color-primary)]' 
-                    : 'h-auto min-w-[60px] max-w-[250px] bg-black/90 border border-theme-primary shadow-[0_0_15px_var(--color-primary)]'
+                    ? `h-[2px] min-w-[20px] max-w-[40px] border-none ${!overrideColor ? 'bg-theme-primary shadow-[0_0_10px_var(--color-primary)]' : ''}` 
+                    : `h-auto min-w-[60px] max-w-[250px] bg-black/90 border ${!overrideColor ? 'border-theme-primary shadow-[0_0_15px_var(--color-primary)]' : ''}`
                 }
                 ${animStage >= 2 ? 'px-3 py-1.5' : 'px-0 py-0'}
             `}
+            style={overrideColor ? {
+                backgroundColor: animStage === 1 ? overrideColor : undefined,
+                borderColor: animStage >= 2 ? overrideColor : undefined,
+                boxShadow: `0 0 ${animStage === 1 ? '10px' : '15px'} ${overrideColor}`
+            } : undefined}
           >
              <div className={`
-                text-[10px] font-mono font-bold text-theme-primary tracking-wider uppercase whitespace-nowrap flex items-center
+                text-[10px] font-mono font-bold tracking-wider uppercase whitespace-nowrap flex items-center
+                ${!overrideColor ? 'text-theme-primary' : ''}
                 ${animStage >= 3 ? 'opacity-100' : 'opacity-0'}
-             `}>
+             `}
+             style={overrideColor ? { color: overrideColor } : undefined}
+             >
                 {isStringContent ? (
                     <>
                         {displayedText}
-                        <span className="inline-block w-1.5 h-3 bg-theme-primary ml-0.5 animate-pulse align-middle"></span>
+                        <span 
+                            className={`inline-block w-1.5 h-3 ml-0.5 animate-pulse align-middle ${!overrideColor ? 'bg-theme-primary' : ''}`}
+                            style={overrideColor ? { backgroundColor: overrideColor } : undefined}
+                        ></span>
                     </>
                 ) : (
                     // If content is complex (JSX), fade it in

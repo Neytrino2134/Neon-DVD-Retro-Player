@@ -80,7 +80,7 @@ const VisualizerSettings: React.FC<VisualizerSettingsProps> = ({ config, update,
       <div className="section-block">
          <label className="text-theme-text font-mono text-xs block mb-3 tracking-widest uppercase opacity-70">{t('position')}</label>
          <div className="grid grid-cols-3 gap-2">
-            {(['top', 'center', 'bottom'] as VisualizerPosition[]).map((pos) => (
+            {(['top', 'center', 'bottom', 'circle'] as VisualizerPosition[]).map((pos) => (
               <button 
                 id={`tutorial-vis-pos-${pos}`}
                 key={pos} 

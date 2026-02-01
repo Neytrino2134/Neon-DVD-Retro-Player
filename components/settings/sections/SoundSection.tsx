@@ -10,7 +10,7 @@ import { AmbienceFile, AmbienceConfig } from '../../../types';
 
 interface SoundSectionProps {
   expandedState: Record<string, boolean>;
-  toggleExpand: (id: string, isAdditive: boolean) => void;
+  toggleExpand: (id: string, isAdditive: boolean, forceOpen?: boolean) => void;
   // Props
   crossfadeDuration: number;
   setCrossfadeDuration: (val: number) => void;
@@ -25,15 +25,18 @@ interface SoundSectionProps {
   onAmbienceSetActive: (id: string) => void;
   onAmbienceTogglePlay: () => void;
   onAmbienceVolume: (v: number) => void;
-  isAudioActive: boolean;
-  toggleAudio: () => void;
+  // New split audio props
+  isMicActive: boolean;
+  toggleMic: () => void;
+  isSysAudioActive: boolean;
+  toggleSysAudio: () => void;
 }
 
 const SoundSection: React.FC<SoundSectionProps> = ({
   expandedState, toggleExpand,
   crossfadeDuration, setCrossfadeDuration, sfxVolume, setSfxVolume, smoothStart, setSmoothStart,
   ambienceFiles, ambienceConfig, onAmbienceUpload, onAmbienceDelete, onAmbienceSetActive, onAmbienceTogglePlay, onAmbienceVolume,
-  isAudioActive, toggleAudio
+  isMicActive, toggleMic, isSysAudioActive, toggleSysAudio
 }) => {
   return (
     <>
@@ -42,13 +45,15 @@ const SoundSection: React.FC<SoundSectionProps> = ({
         </ModuleWrapper>
 
         <ModuleWrapper id="ambience" label={<NumberedLabel num="02" k="ambience" />} icon={CloudRain} isEnabled={true} isExpanded={expandedState['ambience']} onToggleExpand={(e) => toggleExpand('ambience', e.shiftKey)} isAlwaysOn={true} onToggleEnable={() => {}}>
-            <AmbienceSettings files={ambienceFiles} config={ambienceConfig} onUpload={onAmbienceUpload} onDelete={onAmbienceDelete} onSetActive={onAmbienceSetActive} onTogglePlay={onAmbienceTogglePlay} onVolumeChange={onAmbienceVolume} />
+            <AmbienceSettings files={ambienceFiles} config={ambienceConfig} onUpload={onUpload => onAmbienceUpload(onUpload)} onDelete={onAmbienceDelete} onSetActive={onAmbienceSetActive} onTogglePlay={onAmbienceTogglePlay} onVolumeChange={onAmbienceVolume} />
         </ModuleWrapper>
 
         <ModuleWrapper id="sysaudio" label={<NumberedLabel num="03" k="sys_audio_input" />} icon={RadioReceiver} isEnabled={true} isExpanded={expandedState['sysaudio']} isAlwaysOn={true} onToggleExpand={(e) => toggleExpand('sysaudio', e.shiftKey)} onToggleEnable={() => {}}>
             <SystemAudioModule 
-                isAudioActive={isAudioActive} 
-                toggleAudio={toggleAudio} 
+                isMicActive={isMicActive} 
+                toggleMic={toggleMic} 
+                isSysAudioActive={isSysAudioActive} 
+                toggleSysAudio={toggleSysAudio}
             />
         </ModuleWrapper>
     </>

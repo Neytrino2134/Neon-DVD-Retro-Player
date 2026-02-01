@@ -1,7 +1,7 @@
 
 import { useEffect, useRef } from 'react';
 import { useNotification } from '../contexts/NotificationContext';
-import { useTheme } from '../contexts/ThemeContext';
+import { useTheme, THEME_KEYS } from '../contexts/ThemeContext';
 import { ViewMode, RecorderConfig } from '../types';
 
 interface UseAppHotkeysProps {
@@ -25,7 +25,23 @@ interface UseAppHotkeysProps {
   stopRecording: () => void;
   // System State
   introState: number;
+  // Playlist Lock
+  isPlaylistLocked: boolean;
+  setPlaylistLocked: (v: boolean) => void;
 }
+
+// Map of Section Key (1-7) -> Sub-key (1-9) -> Module ID (to be expanded)
+const COMBO_MAP: Record<string, Record<string, string>> = {
+    '1': { '1': 'files', '2': 'presets', '3': 'themes', '4': 'debug' }, // System
+    '2': { '1': 'bg-settings', '2': 'bg-resources', '3': 'bg-colors', '4': 'screen-share' }, // Background
+    '3': { '1': 'mixer', '2': 'ambience', '3': 'sysaudio' }, // Sound
+    '4': { '1': 'wave', '2': 'reactor', '3': 'sine' }, // Waves
+    '5': { '1': 'marquee', '2': 'dvd', '3': 'leaks', '4': 'rain', '5': 'hologram', '6': 'gemini', '7': 'scan', '8': 'cyber', '9': 'glitch' }, // Modules
+    '6': { '1': 'tron' }, // Game
+    '7': { '1': 'fps', '2': 'signal', '3': 'chromatic', '4': 'vignette', '5': 'flicker' } // Post
+};
+
+const COMBO_TIMEOUT = 1000; // ms to wait for second key
 
 export const useAppHotkeys = ({
   player,
@@ -45,13 +61,19 @@ export const useAppHotkeys = ({
   isRecording,
   startRecording,
   stopRecording,
-  introState
+  introState,
+  isPlaylistLocked,
+  setPlaylistLocked
 }: UseAppHotkeysProps) => {
   const { addNotification } = useNotification();
-  const { setTheme, setControlStyle } = useTheme();
+  const { currentTheme, setTheme, setControlStyle } = useTheme();
   
   // Throttling ref for preset switching to prevent spam freeze
   const lastPresetSwitchTimeRef = useRef<number>(0);
+
+  // Combo System Refs
+  const lastSectionKeyRef = useRef<string | null>(null);
+  const lastSectionTimeRef = useRef<number>(0);
 
   // Default recording config for hotkey
   const defaultRecConfig: RecorderConfig = {
@@ -74,8 +96,21 @@ export const useAppHotkeys = ({
           return;
       }
 
+      // Shift + F: Toggle Fullscreen (GLOBAL, Works during Boot)
+      if (e.code === 'KeyF' && e.shiftKey) {
+          e.preventDefault();
+          if (!document.fullscreenElement) {
+              document.documentElement.requestFullscreen().catch(err => {
+                  console.error(`Error attempting to enable full-screen mode: ${err.message}`);
+              });
+          } else {
+              document.exitFullscreen();
+          }
+          return;
+      }
+
       // SKIP INTRO (Allowed during startup)
-      if (e.code === 'Backslash' || e.code === 'Insert') {
+      if (e.code === 'Backslash' && e.shiftKey || e.code === 'Insert') {
           setDevSkip(true);
           setIntroState(2);
           setShowTutorial(false);
@@ -105,7 +140,9 @@ export const useAppHotkeys = ({
           return;
       }
 
-      if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.tagName === 'SELECT') return;
+      // --- INPUT FIELD PROTECTION ---
+      // Allow keys if modifier is held (e.g. Ctrl+C in input)
+      if ((target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.tagName === 'SELECT') && !e.ctrlKey && !e.altKey && !e.metaKey) return;
 
       if (e.repeat) return;
 
@@ -120,34 +157,105 @@ export const useAppHotkeys = ({
           return;
       }
 
-      // P: Toggle Media Player (Right Panel)
+      // Shift + L: Toggle Playlist Lock
+      if (e.code === 'KeyL' && e.shiftKey) {
+          e.preventDefault();
+          setPlaylistLocked(!isPlaylistLocked);
+          addNotification(isPlaylistLocked ? "PLAYLIST UNLOCKED" : "PLAYLIST LOCKED", "info");
+          return;
+      }
+
+      // KeyP logic
       if (e.code === 'KeyP') {
-          toggleRightPanel();
+          if (e.shiftKey) {
+              // Shift + P: Toggle Player Focus Mode
+              setViewMode(viewMode === 'player-focus' ? 'default' : 'player-focus');
+              addNotification(viewMode === 'player-focus' ? "UI RESTORED" : "PLAYER FOCUSED", "info");
+          } else {
+              // P: Toggle Media Player (Right Panel)
+              toggleRightPanel();
+          }
           return;
       }
 
       // Check for modifiers to avoid collisions with Ctrl+A, Ctrl+S, etc.
       const hasModifier = e.ctrlKey || e.metaKey || e.altKey;
 
-      if (e.code === 'KeyA' && !hasModifier) {
+      // --- COMBO SYSTEM FOR SECTIONS (1-7) ---
+      // Check if key is digit 1-9
+      if (!hasModifier && e.code.startsWith('Digit')) {
+          const keyNum = e.key; // "1", "2", etc.
+          const now = Date.now();
+          
+          // Check if we are in a combo window
+          if (lastSectionKeyRef.current && (now - lastSectionTimeRef.current < COMBO_TIMEOUT)) {
+              // Attempt to resolve sub-module
+              const sectionMap = COMBO_MAP[lastSectionKeyRef.current];
+              if (sectionMap && sectionMap[keyNum]) {
+                  // Valid Combo!
+                  const moduleId = sectionMap[keyNum];
+                  // Dispatch custom event for SettingsPanel to catch
+                  window.dispatchEvent(new CustomEvent('neon-toggle-module', { detail: moduleId }));
+                  
+                  // Keep the combo alive? User request says "short wait, then back".
+                  // We update time so they can chain within the same section if they want?
+                  // Or we can reset. Let's update time to allow 5-1... 5-2 quickly without repaying 5.
+                  lastSectionTimeRef.current = now;
+                  return; // Don't trigger main section toggle
+              }
+          }
+
+          // If no combo executed (or timed out, or first press):
+          // Check if this key corresponds to a main section (1-7)
+          // Mapping: 1=sys, 2=bg, 3=sfx, 4=waves, 5=mod, 6=game, 7=post
+          const sectionIds = ['sys', 'bg', 'sfx', 'waves', 'mod', 'game', 'post'];
+          const num = parseInt(keyNum);
+          
+          if (num >= 1 && num <= 7) {
+              const sectionId = sectionIds[num - 1];
+              // Trigger section toggle logic via event
+              window.dispatchEvent(new CustomEvent('neon-toggle-section', { detail: sectionId }));
+              
+              // Set state for potential combo
+              lastSectionKeyRef.current = keyNum;
+              lastSectionTimeRef.current = now;
+              return;
+          }
+      }
+
+      // Playback controls allowed even when playlist is locked
+      if (e.code === 'Minus' && !hasModifier) { // Previous Track (-)
+          if (isPlaylistLocked) return;
           player.prevTrack();
-      } else if (e.code === 'KeyS') {
+      } 
+      else if (e.code === 'Equal' && !hasModifier) { // Next Track (=)
+          if (isPlaylistLocked) return;
+          player.nextTrack();
+      }
+      else if (e.code === 'KeyS') {
           if (e.shiftKey) {
-              // Shift + S: Toggle System Panel (Left Panel)
-              toggleLeftPanel();
-          } else if (!hasModifier) {
-              // S: Stop Playback
+              // Shift + S: Stop Playback
+              if (isPlaylistLocked) return;
               player.stop();
               addNotification("STOPPED", "info");
+          } else if (!hasModifier) {
+              // S: Toggle System Panel (Left)
+              toggleLeftPanel();
           }
-      } else if (e.code === 'KeyD' && !hasModifier) {
-          player.nextTrack();
-      } else if (e.code === 'ArrowUp') {
+      } 
+      else if (e.code === 'PageUp') { // Theme Previous
           e.preventDefault();
-          player.setVolume(Math.min(1, player.volume + 0.05));
-      } else if (e.code === 'ArrowDown') {
+          const currentIdx = THEME_KEYS.indexOf(currentTheme);
+          const prevIdx = (currentIdx - 1 + THEME_KEYS.length) % THEME_KEYS.length;
+          setTheme(THEME_KEYS[prevIdx]);
+          addNotification(`THEME: ${THEME_KEYS[prevIdx].toUpperCase().replace('-', ' ')}`, "info");
+      }
+      else if (e.code === 'PageDown') { // Theme Next
           e.preventDefault();
-          player.setVolume(Math.max(0, player.volume - 0.05));
+          const currentIdx = THEME_KEYS.indexOf(currentTheme);
+          const nextIdx = (currentIdx + 1) % THEME_KEYS.length;
+          setTheme(THEME_KEYS[nextIdx]);
+          addNotification(`THEME: ${THEME_KEYS[nextIdx].toUpperCase().replace('-', ' ')}`, "info");
       }
       else if (e.code === 'BracketLeft') { 
           const now = Date.now();
@@ -180,22 +288,19 @@ export const useAppHotkeys = ({
       }
       else if (e.code === 'Space') {
         e.preventDefault();
+        // If Locked: Only allow starting playback. Do NOT allow pausing.
+        if (isPlaylistLocked && player.isPlaying) {
+            addNotification("CONTROLS LOCKED", "warning");
+            return;
+        }
         player.togglePlay();
-      } else if (e.code === 'ArrowRight') {
+      } else if (e.code === 'Backslash') { // BG Next (\)
         config.nextBg();
-      } else if (e.code === 'ArrowLeft') {
+      } else if (e.code === 'Quote') { // BG Prev (')
         config.prevBg();
       } else if (e.code === 'KeyF') {
-        if (e.shiftKey) {
-            e.preventDefault();
-            if (!document.fullscreenElement) {
-                document.documentElement.requestFullscreen().catch(err => {
-                    console.error(`Error attempting to enable full-screen mode: ${err.message}`);
-                });
-            } else {
-                document.exitFullscreen();
-            }
-        } else if (!e.ctrlKey && !e.metaKey && !e.altKey) {
+        // Just 'F' is Cinema Mode
+        if (!e.ctrlKey && !e.metaKey && !e.altKey && !e.shiftKey) {
             e.preventDefault();
             toggleFocusMode();
         }
@@ -210,5 +315,5 @@ export const useAppHotkeys = ({
 
     window.addEventListener('keydown', handleKeyDown, { capture: true });
     return () => window.removeEventListener('keydown', handleKeyDown, { capture: true });
-  }, [player, config, focusMode, handleScheduleReload, toggleFocusMode, addNotification, stopAllSFX, setTheme, setControlStyle, toggleLeftPanel, toggleRightPanel, viewMode, setViewMode, onGoHome, isRecording, startRecording, stopRecording, introState]);
+  }, [player, config, focusMode, handleScheduleReload, toggleFocusMode, addNotification, stopAllSFX, currentTheme, setTheme, setControlStyle, toggleLeftPanel, toggleRightPanel, viewMode, setViewMode, onGoHome, isRecording, startRecording, stopRecording, introState, isPlaylistLocked, setPlaylistLocked]);
 };

@@ -1,20 +1,19 @@
 
 import React from 'react';
-import { Video, Cast, Mic, MicOff, AlertTriangle } from 'lucide-react';
+import { Video, Cast, Mic, MicOff, Speaker, AlertTriangle } from 'lucide-react';
 import ToggleSwitch from '../ToggleSwitch';
 import { useLanguage } from '../../../contexts/LanguageContext';
-import CustomSelect from '../CustomSelect'; // Import CustomSelect
+import CustomSelect from '../CustomSelect'; 
 
 // Full interface for reference/parent usage
 interface ScreenSettingsProps {
   isVideoActive: boolean;
   toggleVideo: () => void;
-  isAudioActive: boolean;
-  toggleAudio: () => void;
-  audioVolume: number;
-  setAudioVolume: (v: number) => void;
-  isMonitoring: boolean;
-  setMonitoring: (v: boolean) => void;
+  // Audio Props
+  isMicActive: boolean;
+  toggleMic: () => void;
+  isSysAudioActive: boolean;
+  toggleSysAudio: () => void;
 }
 
 // Additional props for video module
@@ -24,43 +23,53 @@ interface ScreenVideoModuleProps extends Pick<ScreenSettingsProps, 'isVideoActiv
 }
 
 // Sub-component for System Audio settings
-export const SystemAudioModule: React.FC<Pick<ScreenSettingsProps, 'isAudioActive' | 'toggleAudio'>> = ({ 
-    isAudioActive, toggleAudio 
+export const SystemAudioModule: React.FC<Pick<ScreenSettingsProps, 'isMicActive' | 'toggleMic' | 'isSysAudioActive' | 'toggleSysAudio'>> = ({ 
+    isMicActive, toggleMic, isSysAudioActive, toggleSysAudio
 }) => {
-    const { t } = useLanguage();
+    // const { t } = useLanguage(); // Removed unused hook call
     
     // Check if running in Electron.
     const isElectron = typeof navigator !== 'undefined' && /Electron/.test(navigator.userAgent);
     
     return (
         <div className="pt-2 space-y-4">
+            
+            {/* MICROPHONE TOGGLE */}
             <ToggleSwitch 
-                label={t('capture_audio')} 
-                icon={isAudioActive ? Mic : MicOff} 
-                value={isAudioActive} 
-                onChange={toggleAudio} 
+                label="MICROPHONE" 
+                icon={isMicActive ? Mic : MicOff} 
+                value={isMicActive} 
+                onChange={toggleMic} 
                 color="green"
-                disabled={!isElectron}
+            />
+
+            {/* SYSTEM AUDIO TOGGLE */}
+            <ToggleSwitch 
+                label="SYSTEM AUDIO" 
+                icon={Speaker} 
+                value={isSysAudioActive} 
+                onChange={toggleSysAudio} 
+                color="blue"
             />
             
+            <div className="bg-black/20 p-3 rounded border border-theme-border flex flex-col gap-2 mt-2">
+                <p className="text-[10px] text-theme-muted font-mono leading-relaxed">
+                    INPUTS LINKED TO VISUALIZER.
+                </p>
+                <p className="text-[9px] text-theme-muted/50 font-mono italic">
+                    * Signals are used for visualization only.
+                    * No audio is routed back to speakers (0% volume).
+                </p>
+            </div>
+
             {!isElectron && (
                 <div className="bg-red-500/10 border border-red-500/30 p-2 rounded flex items-center gap-2">
                     <AlertTriangle size={14} className="text-red-500 shrink-0" />
                     <p className="text-[9px] text-red-400 font-mono leading-tight">
-                        SYSTEM AUDIO CAPTURE IS AVAILABLE ONLY IN DESKTOP APP VERSION.
+                        SYSTEM AUDIO CAPTURE WORKS BEST IN DESKTOP APP OR CHROME TAB SHARING.
                     </p>
                 </div>
             )}
-            
-            <div className="bg-black/20 p-3 rounded border border-theme-border flex flex-col gap-2">
-                <p className="text-[10px] text-theme-muted font-mono leading-relaxed">
-                    ANALYZER LINK ESTABLISHED.
-                </p>
-                <p className="text-[9px] text-theme-muted/50 font-mono italic">
-                    * Audio is routed directly to the visualizer core.
-                    * Playback is muted to prevent feedback loops.
-                </p>
-            </div>
         </div>
     );
 };

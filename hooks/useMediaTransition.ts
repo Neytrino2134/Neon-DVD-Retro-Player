@@ -3,7 +3,7 @@ import { useState, useEffect, useRef, useMemo } from 'react';
 import { BgTransitionType, AudioTrack } from '../types';
 
 interface UseMediaTransitionProps {
-  bgMedia: { type: 'image' | 'video', url: string } | null;
+  bgMedia: { type: 'image' | 'video', url: string, hotspots?: any[] } | null;
   videoStream?: MediaStream | null;
   streamMode?: 'bg' | 'window';
   useAlbumArtAsBackground?: boolean;
@@ -21,7 +21,7 @@ export const useMediaTransition = ({
   // Calculate Effective Media
   const effectiveMedia = useMemo(() => {
       if (useAlbumArtAsBackground && currentTrack?.artworkUrl) {
-          return { type: 'image' as const, url: currentTrack.artworkUrl };
+          return { type: 'image' as const, url: currentTrack.artworkUrl, hotspots: [] };
       }
       return bgMedia;
   }, [useAlbumArtAsBackground, currentTrack, bgMedia]);
@@ -61,7 +61,19 @@ export const useMediaTransition = ({
     }
 
     const currentTarget = overlayMedia || baseMedia;
-    if (effectiveMedia?.url === currentTarget?.url) return;
+    
+    // URL Check
+    if (effectiveMedia?.url === currentTarget?.url) {
+        // CRITICAL FIX: If URL is same but hotspots changed, update baseMedia immediately (no transition needed)
+        // This ensures interactive spots appear/move without glitching the background
+        const currentHotspots = JSON.stringify(currentTarget?.hotspots || []);
+        const newHotspots = JSON.stringify(effectiveMedia?.hotspots || []);
+        
+        if (currentHotspots !== newHotspots) {
+            setBaseMedia(effectiveMedia);
+        }
+        return;
+    }
 
     // Get fresh transition type
     const stored = localStorage.getItem('neon_bg_transition');
