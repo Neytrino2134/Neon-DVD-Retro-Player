@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useRef } from 'react';
-import { Smartphone, Radio, X, Minus, Maximize2, Disc, Minimize2, Maximize, Minimize, ArrowLeft } from 'lucide-react';
+import { Smartphone, Radio, X, Minus, Maximize2, Minimize2, Maximize, Minimize, ArrowLeft } from 'lucide-react';
 import { AudioTrack, Playlist, ViewMode, VisualizerConfig } from '../types';
 import { Tooltip } from './ui/Tooltip';
 import ConfirmModal from './ConfirmModal';
@@ -154,6 +154,10 @@ const Controls: React.FC<ControlsProps> = ({
   
   // Determine if we are in Mini Mode layout
   const isMini = viewMode === 'mini';
+  
+  // Ref for Mini Mode to access inside animation loop
+  const isMiniRef = useRef(isMini);
+  useEffect(() => { isMiniRef.current = isMini; }, [isMini]);
 
   // --- MATHEMATICAL WAVE GENERATOR ---
   useEffect(() => {
@@ -166,7 +170,9 @@ const Controls: React.FC<ControlsProps> = ({
 
     const animate = () => {
       // Smooth Acceleration Logic
-      const targetSpeed = isHeaderHoveredRef.current ? HOVER_SPEED : BASE_SPEED;
+      // Check both mouse hover OR mini mode to force active state
+      const isActive = isHeaderHoveredRef.current || isMiniRef.current;
+      const targetSpeed = isActive ? HOVER_SPEED : BASE_SPEED;
       currentSpeed += (targetSpeed - currentSpeed) * 0.05;
       
       time += currentSpeed;
@@ -275,6 +281,9 @@ const Controls: React.FC<ControlsProps> = ({
     ? "relative w-full h-full flex flex-col bg-theme-panel overflow-hidden player-chassis app-drag-region group" 
     : "relative w-full h-full flex flex-col bg-theme-panel rounded-xl overflow-hidden player-chassis"; 
 
+  // Determine if wave visuals should be active (Hovered OR Mini Mode)
+  const isWaveActive = isHeaderHovered || isMini;
+
   return (
     // OUTER PANEL CONTAINER
     <div 
@@ -287,58 +296,60 @@ const Controls: React.FC<ControlsProps> = ({
       {/* INNER PLAYER DEVICE CONTAINER */}
       <div className={innerContainerClass}>
 
-        {/* CUSTOM MINI WINDOW CONTROLS (Floating) */}
-        {isMini && (
-            <div className="absolute top-2 right-2 z-[60] flex items-center gap-1 app-no-drag opacity-0 group-hover:opacity-100 transition-opacity duration-200">
-                <Tooltip content="BACK TO MAIN" position="bottom">
-                    <button 
-                        onClick={onToggleMiniMode}
-                        className="p-1.5 text-theme-muted hover:text-theme-accent bg-black/40 hover:bg-white/10 rounded-full backdrop-blur-sm border border-transparent hover:border-white/10 transition-all"
-                    >
-                        <ArrowLeft size={10} />
-                    </button>
-                </Tooltip>
-                
-                {/* NEW: Maximize/Fullscreen in Mini Mode */}
-                <Tooltip content="MAXIMIZE" position="bottom">
-                    <button 
-                        onClick={onToggleFullscreen}
-                        className="p-1.5 text-theme-muted hover:text-theme-accent bg-black/40 hover:bg-white/10 rounded-full backdrop-blur-sm border border-transparent hover:border-white/10 transition-all"
-                    >
-                        {isFullscreen ? <Minimize size={10} /> : <Maximize size={10} />}
-                    </button>
-                </Tooltip>
-
-                <Tooltip content="MINIMIZE" position="bottom">
-                    <button 
-                        onClick={handleMinimize}
-                        className="p-1.5 text-theme-muted hover:text-theme-primary bg-black/40 hover:bg-white/10 rounded-full backdrop-blur-sm border border-transparent hover:border-white/10 transition-all"
-                    >
-                        <Minus size={10} />
-                    </button>
-                </Tooltip>
-                <Tooltip content="CLOSE APP" position="bottom-right">
-                    <button 
-                        onClick={handleClose}
-                        className="p-1.5 text-theme-muted hover:text-red-500 bg-black/40 hover:bg-white/10 rounded-full backdrop-blur-sm border border-transparent hover:border-red-500/30 transition-all"
-                    >
-                        <X size={10} />
-                    </button>
-                </Tooltip>
-            </div>
-        )}
-
         {/* 
             INTERACTIVE ZONE: Waves + TrackInfo
             In Mini mode, this area acts as the main drag handle (inherited from container)
             BUT we need to make the wrapper catch mouse events for the wave highlight.
             We force h-48 in mini mode to cover the visual area.
+            
+            ADDED: group/header to scope hover effects for window controls.
         */}
         <div 
-            className={`relative z-10 shrink-0 ${isMini ? 'h-48' : ''}`}
+            className={`relative z-10 shrink-0 ${isMini ? 'h-48 group/header' : ''}`}
             onMouseEnter={handleHeaderMouseEnter}
             onMouseLeave={handleHeaderMouseLeave}
         >
+            {/* CUSTOM MINI WINDOW CONTROLS (Floating - Scoped to Header Hover) */}
+            {isMini && (
+                <div className="absolute top-2 right-2 z-[60] flex items-center gap-1 app-no-drag opacity-0 group-hover/header:opacity-100 transition-opacity duration-200">
+                    <Tooltip content="BACK TO MAIN" position="bottom">
+                        <button 
+                            onClick={onToggleMiniMode}
+                            className="p-1.5 text-theme-muted hover:text-theme-accent bg-black/40 hover:bg-white/10 rounded-full backdrop-blur-sm border border-transparent hover:border-white/10 transition-all"
+                        >
+                            <ArrowLeft size={10} />
+                        </button>
+                    </Tooltip>
+                    
+                    {/* Maximize/Fullscreen in Mini Mode */}
+                    <Tooltip content={isFullscreen ? "EXIT FULLSCREEN (Shift+F)" : "FULLSCREEN (Shift+F)"} position="bottom">
+                        <button 
+                            onClick={onToggleFullscreen}
+                            className="p-1.5 text-theme-muted hover:text-theme-accent bg-black/40 hover:bg-white/10 rounded-full backdrop-blur-sm border border-transparent hover:border-white/10 transition-all"
+                        >
+                            {isFullscreen ? <Minimize size={10} /> : <Maximize size={10} />}
+                        </button>
+                    </Tooltip>
+
+                    <Tooltip content="MINIMIZE" position="bottom">
+                        <button 
+                            onClick={handleMinimize}
+                            className="p-1.5 text-theme-muted hover:text-theme-primary bg-black/40 hover:bg-white/10 rounded-full backdrop-blur-sm border border-transparent hover:border-white/10 transition-all"
+                        >
+                            <Minus size={10} />
+                        </button>
+                    </Tooltip>
+                    <Tooltip content="CLOSE APP" position="bottom-right">
+                        <button 
+                            onClick={handleClose}
+                            className="p-1.5 text-theme-muted hover:text-red-500 bg-black/40 hover:bg-white/10 rounded-full backdrop-blur-sm border border-transparent hover:border-red-500/30 transition-all"
+                        >
+                            <X size={10} />
+                        </button>
+                    </Tooltip>
+                </div>
+            )}
+
             {/* Background Graphic for Header - MATHEMATICAL WAVES */}
             <div className={`absolute top-0 left-0 w-full overflow-hidden z-0 pointer-events-none ${isMini ? 'h-48' : 'h-48'}`}>
                 <svg viewBox="0 0 300 80" preserveAspectRatio="none" className="w-full h-full">
@@ -348,9 +359,9 @@ const Controls: React.FC<ControlsProps> = ({
                         className="transition-all duration-500 ease-out"
                         style={{
                             stroke: '#ff00ff', 
-                            opacity: isHeaderHovered ? 1 : 0.1,
-                            strokeWidth: isHeaderHovered ? 2.5 : 1.5,
-                            filter: isHeaderHovered ? 'drop-shadow(0 0 8px #ff00ff)' : 'none'
+                            opacity: isWaveActive ? 1 : 0.1,
+                            strokeWidth: isWaveActive ? 2.5 : 1.5,
+                            filter: isWaveActive ? 'drop-shadow(0 0 8px #ff00ff)' : 'none'
                         }}
                         fill="none" 
                         vectorEffect="non-scaling-stroke"
@@ -361,9 +372,9 @@ const Controls: React.FC<ControlsProps> = ({
                         className="transition-all duration-500 ease-out"
                         style={{
                             stroke: '#bc13fe',
-                            opacity: isHeaderHovered ? 1 : 0.15,
-                            strokeWidth: isHeaderHovered ? 2 : 1.2,
-                            filter: isHeaderHovered ? 'drop-shadow(0 0 8px #bc13fe)' : 'none'
+                            opacity: isWaveActive ? 1 : 0.15,
+                            strokeWidth: isWaveActive ? 2 : 1.2,
+                            filter: isWaveActive ? 'drop-shadow(0 0 8px #bc13fe)' : 'none'
                         }}
                         fill="none" 
                         vectorEffect="non-scaling-stroke"
@@ -374,9 +385,9 @@ const Controls: React.FC<ControlsProps> = ({
                         className="transition-all duration-500 ease-out"
                         style={{
                             stroke: 'var(--color-primary)', 
-                            opacity: isHeaderHovered ? 1 : 0.2,
-                            strokeWidth: isHeaderHovered ? 1.5 : 1,
-                            filter: isHeaderHovered ? 'drop-shadow(0 0 5px var(--color-primary))' : 'none'
+                            opacity: isWaveActive ? 1 : 0.2,
+                            strokeWidth: isWaveActive ? 1.5 : 1,
+                            filter: isWaveActive ? 'drop-shadow(0 0 5px var(--color-primary))' : 'none'
                         }}
                         fill="none" 
                         vectorEffect="non-scaling-stroke"
@@ -390,13 +401,13 @@ const Controls: React.FC<ControlsProps> = ({
                 <div className="flex items-center gap-2">
                     <div className={`
                         p-1.5 rounded-full transition-all duration-500 border
-                        ${isHeaderHovered 
+                        ${isWaveActive 
                             ? 'bg-theme-primary/20 shadow-[0_0_10px_var(--color-primary)] border-theme-primary' 
                             : 'bg-theme-primary/10 border-transparent'}
                     `}>
-                        <Radio className={`text-theme-primary transition-opacity ${isHeaderHovered ? 'opacity-100' : 'opacity-90'}`} size={16} />
+                        <Radio className={`text-theme-primary transition-opacity ${isWaveActive ? 'opacity-100' : 'opacity-90'}`} size={16} />
                     </div>
-                    <h2 className={`text-xs font-mono tracking-[0.2em] font-bold transition-all duration-500 ${isHeaderHovered ? 'text-white drop-shadow-[0_0_5px_rgba(255,255,255,0.5)]' : 'text-theme-text opacity-80'}`}>
+                    <h2 className={`text-xs font-mono tracking-[0.2em] font-bold transition-all duration-500 ${isWaveActive ? 'text-white drop-shadow-[0_0_5px_rgba(255,255,255,0.5)]' : 'text-theme-text opacity-80'}`}>
                         NEON PLAYER
                     </h2>
                 </div>

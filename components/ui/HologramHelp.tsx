@@ -125,9 +125,23 @@ const HologramHelp: React.FC<HologramHelpProps> = ({ onClose }) => {
           icon: Command,
           items: [
               { key: "Space", desc: isRu ? "Старт / Пауза" : "Play / Pause" },
-              { key: "A / S / D", desc: isRu ? "Пред / Стоп / След" : "Prev / Stop / Next" },
-              { key: "Arrows ↕", desc: isRu ? "Громкость" : "Volume" },
-              { key: "Arrows ↔", desc: isRu ? "Смена фона" : "Change Background" }
+              { key: "- / =", desc: isRu ? "Пред / След трек" : "Prev / Next Track" },
+              { key: "PgUp / PgDn", desc: isRu ? "Смена темы" : "Change Theme" },
+              { key: "' / \\", desc: isRu ? "Смена фона" : "Change Background" }
+          ]
+      },
+      {
+          title: isRu ? "СИСТЕМА" : "SYSTEM",
+          icon: Monitor,
+          items: [
+              { key: "S", desc: isRu ? "Системная панель" : renderLabel("System Panel", "S") },
+              { key: "Shift + S", desc: isRu ? "Стоп" : renderLabel("Stop", "S") },
+              { key: "L", desc: isRu ? "Список треков (Вкл/Выкл)" : renderLabel("Playlist (Toggle)", "L") },
+              { key: "Shift + L", desc: isRu ? "Блок. плейлиста" : renderLabel("Lock Playlist", "L") },
+              { key: "P", desc: isRu ? "Плеер (Панель)" : renderLabel("Player Panel", "P") },
+              { key: "F", desc: isRu ? "Кино-режим" : "Cinema Mode" },
+              { key: "Shift + F", desc: isRu ? "Полный экран" : renderLabel("Fullscreen", "F") },
+              { key: "1-7", desc: isRu ? "Навигация настроек" : "Settings Nav" },
           ]
       },
       {
@@ -156,22 +170,6 @@ const HologramHelp: React.FC<HologramHelpProps> = ({ onClose }) => {
               { key: "E", desc: isRu ? "Частоты" : renderLabel("FrEquency", "E") },
               { key: "Y", desc: isRu ? "Прозрачность" : renderLabel("OpacitY", "Y") },
           ]
-      },
-      {
-          title: isRu ? "СИСТЕМА" : "SYSTEM",
-          icon: Monitor,
-          items: [
-              { key: "H", desc: isRu ? "Справка (Закрыть)" : renderLabel("Help (Close)", "H") },
-              { key: "L", desc: isRu ? "Список треков (Вкл/Выкл)" : renderLabel("Playlist (Toggle)", "L") },
-              { key: "Shift + L", desc: isRu ? "Блок. плейлиста" : renderLabel("Lock Playlist", "L") },
-              { key: "P", desc: isRu ? "Плеер (Панель)" : renderLabel("Player Panel", "P") },
-              { key: "Shift + S", desc: isRu ? "Настройки" : renderLabel("Settings", "S") },
-              { key: "Shift + C", desc: isRu ? "Мини Плеер" : renderLabel("Compact Mode", "C") },
-              { key: "F", desc: isRu ? "Кино-режим" : "Cinema Mode" },
-              { key: "Shift + F", desc: isRu ? "Полный экран" : renderLabel("Fullscreen", "F") },
-              { key: "[", desc: isRu ? "Пред. пресет" : "Prev Preset" },
-              { key: "]", desc: isRu ? "След. пресет" : "Next Preset" },
-          ]
       }
   ];
 
@@ -184,23 +182,16 @@ const HologramHelp: React.FC<HologramHelpProps> = ({ onClose }) => {
             className="relative overflow-hidden pointer-events-auto flex flex-col transition-all ease-in-out duration-500 backdrop-blur-md"
             style={{
                 width: phase >= 1 ? '100%' : '4px',
-                // Increased width for 2-column system layout
                 maxWidth: '72rem', 
-                // Height Transition Logic
                 height: phase >= 2 ? 'auto' : '4px',
                 maxHeight: phase >= 2 ? '80vh' : '4px',
-                
-                // Colors & Borders
-                backgroundColor: `color-mix(in srgb, ${baseColor}, rgba(5, 5, 10, 0.9) 92%)`, // Denser background
+                backgroundColor: `color-mix(in srgb, ${baseColor}, rgba(5, 5, 10, 0.9) 92%)`, 
                 border: `2px solid color-mix(in srgb, ${baseColor}, transparent 40%)`,
                 boxShadow: `0 0 40px color-mix(in srgb, ${baseColor}, transparent 80%)`,
-                
-                // Shape Transition
                 borderRadius: phase >= 2 ? '16px' : '2px',
                 opacity: phase === 0 ? 0 : 1
             }}
         >
-            {/* Background Grid - Fades in with content */}
             <div 
                 className="absolute inset-0 bg-[length:40px_40px] pointer-events-none transition-opacity duration-500"
                 style={{
@@ -242,9 +233,8 @@ const HologramHelp: React.FC<HologramHelpProps> = ({ onClose }) => {
                 style={{ opacity: contentActive ? 1 : 0 }}
             >
                 {sections.map((section, idx) => {
-                    const isSystem = section.title === (isRu ? "СИСТЕМА" : "SYSTEM");
                     return (
-                        <div key={idx} className={`space-y-3 ${isSystem ? 'col-span-1 md:col-span-2' : ''}`}>
+                        <div key={idx} className={`space-y-3`}>
                             <div className="flex items-center gap-2 mb-2 pb-1 border-b" style={{ borderColor: `color-mix(in srgb, ${baseColor}, transparent 80%)` }}>
                                 <section.icon size={14} style={{ color: baseColor }} />
                                 <TypingBlock 
@@ -254,7 +244,7 @@ const HologramHelp: React.FC<HologramHelpProps> = ({ onClose }) => {
                                     delay={200 + (idx * 100)}
                                 />
                             </div>
-                            <div className={`grid gap-x-4 gap-y-2 ${isSystem ? 'grid-cols-[auto_1fr] md:grid-cols-[auto_1fr_auto_1fr]' : 'grid-cols-[auto_1fr]'}`}>
+                            <div className={`grid gap-x-4 gap-y-2 grid-cols-[auto_1fr]`}>
                                 {section.items.map((item, i) => (
                                     <React.Fragment key={i}>
                                         <div 
