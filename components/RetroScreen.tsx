@@ -57,7 +57,6 @@ interface RetroScreenProps {
   
   videoStream?: MediaStream | null; 
   isSystemAudioActive?: boolean;
-  isMicActive?: boolean; // NEW: Added mic active prop
   streamMode?: 'bg' | 'window';
 
   visualizerConfig: VisualizerConfig;
@@ -114,7 +113,7 @@ interface RetroScreenProps {
 const RetroScreen = forwardRef<HTMLDivElement, RetroScreenProps>((props, externalRef) => {
   const {
     analyser, isPlaying, currentTrack, tracks, onTrackSelect, bgMedia, bgColor, bgPattern = 'none', bgPatternConfig,
-    videoStream, isSystemAudioActive, isMicActive, streamMode = 'bg',
+    videoStream, isSystemAudioActive, streamMode = 'bg',
     visualizerConfig, setVisualizerConfig, reactorConfig, sineWaveConfig, showVisualizer, showVisualizer3D, showSineWave, dvdConfig, showDvd, effectsConfig, marqueeConfig, watermarkConfig,
     progress = 0, currentTime, duration,
     focusMode, setFocusMode, isDragging,
@@ -180,10 +179,6 @@ const RetroScreen = forwardRef<HTMLDivElement, RetroScreenProps>((props, externa
   const effectivePixelation = isSignalEnabled ? effectsConfig.pixelation : 1;
   const effectiveVhsJitter = isSignalEnabled ? effectsConfig.vhsJitter : 0;
   const effectiveChromatic = isChromaticEnabled ? (effectsConfig.chromaticAberration || 0) : 0;
-
-  // Combine play state with external audio capture states to drive visualizers
-  // If system audio or mic is captured, we want visualizers to run even if music player is paused.
-  const isAudioProcessing = isPlaying || isSystemAudioActive || isMicActive || false;
 
   // Screen Shake Loop
   useEffect(() => {
@@ -374,7 +369,7 @@ const RetroScreen = forwardRef<HTMLDivElement, RetroScreenProps>((props, externa
                         <TronEffect 
                             config={effectsConfig.tron} 
                             analyser={analyser} 
-                            isPlaying={isAudioProcessing} // Use combined active flag
+                            isPlaying={isPlaying} 
                             visualizerConfig={visualizerConfig} 
                             volume={volume}
                             currentTime={currentTime}
@@ -385,19 +380,19 @@ const RetroScreen = forwardRef<HTMLDivElement, RetroScreenProps>((props, externa
                         <LightLeaksEffect config={transitionLeaksConfig} />
 
                         {showVisualizer && (
-                            <Visualizer analyser={analyser} isPlaying={isAudioProcessing} config={visualizerConfig} fps={120} volume={volume} />
+                            <Visualizer analyser={analyser} isPlaying={isPlaying} config={visualizerConfig} fps={120} volume={volume} />
                         )}
 
                         {showVisualizer3D && reactorConfig && (
                             reactorConfig.threeDMode === 'spectrum' ? (
-                                <VisualizerSpectrum3D analyser={analyser} isPlaying={isAudioProcessing} config={reactorConfig} volume={volume} />
+                                <VisualizerSpectrum3D analyser={analyser} isPlaying={isPlaying} config={reactorConfig} volume={volume} />
                             ) : (
-                                <Visualizer3D analyser={analyser} isPlaying={isAudioProcessing} config={reactorConfig} volume={volume} />
+                                <Visualizer3D analyser={analyser} isPlaying={isPlaying} config={reactorConfig} volume={volume} />
                             )
                         )}
 
                         {showSineWave && sineWaveConfig && (
-                            <SineWave analyser={analyser} isPlaying={isAudioProcessing} config={sineWaveConfig} volume={volume} />
+                            <SineWave analyser={analyser} isPlaying={isPlaying} config={sineWaveConfig} volume={volume} />
                         )}
                         
                         {showDvd && <DvdLogo containerRef={containerRef} fps={effectsConfig.fps} effectsConfig={effectsConfig} config={dvdConfig} onPlaySfx={onPlaySfx} />}

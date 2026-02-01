@@ -219,7 +219,7 @@ export type BgTransitionType = 'glitch' | 'leaks' | 'none';
 export type BgAnimationType = 'none' | 'zoom' | 'sway' | 'handheld' | 'cinematic' | 'chaos'; // NEW
 
 // NEW: View Mode for Application Layout
-export type ViewMode = 'default' | 'cinema' | 'mini' | 'player-focus';
+export type ViewMode = 'default' | 'cinema' | 'mini';
 
 export interface VisualizerConfig {
   style: VisualizerStyle;

@@ -143,12 +143,14 @@ interface SettingsPanelProps {
   // Screen Capture Props
   isVideoActive: boolean;
   toggleVideo: () => void;
-  
-  // Split Audio Capture Props
-  isMicActive: boolean;
-  toggleMic: () => void;
-  isSysAudioActive: boolean;
-  toggleSysAudio: () => void;
+  isAudioActive: boolean;
+  toggleAudio: () => void;
+  audioSourceType?: 'system' | 'mic'; 
+  setAudioSourceType?: (t: 'system' | 'mic') => void;
+  audioVolume: number;
+  setAudioVolume: (v: number) => void;
+  isMonitoring: boolean;
+  setMonitoring: (v: boolean) => void;
 
   // Advanced Mode
   isAdvancedMode?: boolean;
@@ -183,8 +185,7 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
   bgTransition, setBgTransition, bgAnimation, setBgAnimation,
   onRestartTutorial,
   ambienceFiles, ambienceConfig, onAmbienceUpload, onAmbienceDelete, onAmbienceSetActive, onAmbienceTogglePlay, onAmbienceVolume,
-  isVideoActive, toggleVideo, 
-  isMicActive, toggleMic, isSysAudioActive, toggleSysAudio,
+  isVideoActive, toggleVideo, isAudioActive, toggleAudio, audioSourceType, setAudioSourceType,
   isAdvancedMode, setAdvancedMode,
   useAlbumArtAsBackground = false, setUseAlbumArtAsBackground = () => {},
   streamMode, setStreamMode,
@@ -408,7 +409,7 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
   ];
 
   return (
-    <div className="w-full h-full flex flex-col bg-theme-bg border-r-4 border-theme-bg shadow-inner overflow-hidden">
+    <div className="w-full h-full flex flex-col bg-theme-bg border-r-4 border-theme-panel shadow-inner overflow-hidden">
       {/* Header */}
       <div className="p-4 pb-0 mb-4 bg-theme-bg z-40">
         <div className="flex items-center justify-between pb-2">
@@ -505,7 +506,7 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
                 expandedState={expandedState} toggleExpand={toggleExpand}
                 crossfadeDuration={crossfadeDuration} setCrossfadeDuration={setCrossfadeDuration} sfxVolume={sfxVolume} setSfxVolume={setSfxVolume} smoothStart={smoothStart} setSmoothStart={setSmoothStart}
                 ambienceFiles={ambienceFiles} ambienceConfig={ambienceConfig} onAmbienceUpload={onAmbienceUpload} onAmbienceDelete={onAmbienceDelete} onAmbienceSetActive={onAmbienceSetActive} onAmbienceTogglePlay={onAmbienceTogglePlay} onAmbienceVolume={onAmbienceVolume}
-                isMicActive={isMicActive} toggleMic={toggleMic} isSysAudioActive={isSysAudioActive} toggleSysAudio={toggleSysAudio}
+                isAudioActive={isAudioActive} toggleAudio={toggleAudio} audioSourceType={audioSourceType} setAudioSourceType={setAudioSourceType}
             />
         </SettingsSection>
 

@@ -96,14 +96,12 @@ export const useAudioPlayer = () => {
 
       if (audioRefA.current && !sourceNodeRefA.current) {
           const src = ctx.createMediaElementSource(audioRefA.current);
-          src.connect(audio.analyser); // Connect to Visualizer
-          src.connect(audio.gainNodeRef.current); // Connect to Speakers
+          src.connect(audio.analyser);
           sourceNodeRefA.current = src;
       }
       if (audioRefB.current && !sourceNodeRefB.current) {
           const src = ctx.createMediaElementSource(audioRefB.current);
-          src.connect(audio.analyser); // Connect to Visualizer
-          src.connect(audio.gainNodeRef.current); // Connect to Speakers
+          src.connect(audio.analyser);
           sourceNodeRefB.current = src;
       }
   }, [audio.analyser]);
@@ -440,11 +438,10 @@ export const useAudioPlayer = () => {
     isShuffle, setIsShuffle, isAutoNextPlaylist, setIsAutoNextPlaylist,
     // Events
     handleTimeUpdate, onAudioPlay, onAudioPause,
-    // Audio Context & Capture Routing
-    connectMic: audio.connectMic,
-    disconnectMic: audio.disconnectMic,
-    connectSys: audio.connectSys,
-    disconnectSys: audio.disconnectSys,
+    // Audio Context
+    connectAuxSource: audio.connectAuxSource, 
+    updateAuxVolume: audio.updateAuxVolume, 
+    updateAuxMonitor: audio.updateAuxMonitor, 
     getAudioStream: audio.getAudioStream
   };
 };

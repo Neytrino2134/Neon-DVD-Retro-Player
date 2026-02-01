@@ -27,12 +27,6 @@ const GRAB_PATH_D = "m2 12 3.5-3.5v7L2 12Zm20 0-3.5 3.5v-7L22 12Zm-3.5 0h-13M12 
 // New Rounded Cursor Path
 const ROUNDED_PATH_D = "M5.5 3.21V20.8c0 .45.54.67.85.35l4.86-4.86a.5.5 0 0 1 .35-.15h6.87a.5.5 0 0 0 .35-.85L6.35 2.85a.5.5 0 0 0-.85.35Z";
 
-// Thicker version for visibility (Resize Horizontal)
-const RESIZE_H_BOLD_D = "M 2 12 L 7 7 L 7 10 L 17 10 L 17 7 L 22 12 L 17 17 L 17 14 L 7 14 L 7 17 Z";
-
-// NEW: Resize Vertical (Up-Down Arrow)
-const RESIZE_V_BOLD_D = "M 12 2 L 17 7 L 14 7 L 14 17 L 17 17 L 12 22 L 7 17 L 10 17 L 10 7 L 7 7 Z";
-
 // --- GLOBAL MOUSE TRACKING STATE ---
 const mouseState = {
     x: -100,
@@ -43,8 +37,7 @@ const mouseState = {
     isScreenHover: false,
     hideCrosshair: false,
     isOut: false,
-    isPanelHover: false,
-    isResizerHover: false
+    isPanelHover: false
 };
 
 let listenersAttached = false;
@@ -83,8 +76,6 @@ const CustomCursor: React.FC<CustomCursorProps> = ({ style = 'default', retroScr
   const grabRef = useRef<SVGSVGElement>(null); 
   const crosshairRef = useRef<SVGSVGElement>(null);
   const roundedRef = useRef<SVGSVGElement>(null);
-  const resizeHRef = useRef<SVGSVGElement>(null); // NEW
-  const resizeVRef = useRef<SVGSVGElement>(null); // NEW
   
   const { colors } = useTheme();
   
@@ -150,10 +141,6 @@ const CustomCursor: React.FC<CustomCursorProps> = ({ style = 'default', retroScr
           // Detect panels for special cursor logic
           const isPanel = target.closest('.bg-theme-panel') || target.closest('.player-chassis') || target.closest('.bg-black\\/90');
           mouseState.isPanelHover = !!isPanel;
-
-          // Detect Resizers
-          const isResizer = target.closest('.custom-resizer');
-          mouseState.isResizerHover = !!isResizer;
       };
 
       window.addEventListener('pointermove', handleMove, { passive: true });
@@ -209,15 +196,9 @@ const CustomCursor: React.FC<CustomCursorProps> = ({ style = 'default', retroScr
       }
 
       const loop = () => {
-          const { x, y, forceSystemCursor, isOut, isHovering, isClicked, isScreenHover, isPanelHover, isResizerHover } = mouseState;
-          
-          // Check for custom resize classes on body OR hover on resizer
-          const isResizingH = document.body.classList.contains('custom-cursor-col-resize') || isResizerHover;
-          const isResizingV = document.body.classList.contains('custom-cursor-row-resize');
+          const { x, y, forceSystemCursor, isOut, isHovering, isClicked, isScreenHover, isPanelHover } = mouseState;
           const isAppDragging = document.body.classList.contains('app-dragging');
-          
-          // Don't hide if resizing
-          const shouldHide = (forceSystemCursor || isOut) && !isResizingH && !isResizingV;
+          const shouldHide = forceSystemCursor || isOut;
 
           // CALCULATE AUDIO LEVEL
           let audioLevel = 0;
@@ -259,8 +240,6 @@ const CustomCursor: React.FC<CustomCursorProps> = ({ style = 'default', retroScr
                   // Default to showing crosshair in Music Flow
                   let showCrosshair = !shouldHide; 
                   let showHand = isHovering && !shouldHide;
-                  let showResizeH = isResizingH;
-                  let showResizeV = isResizingV;
 
                   // Overrides for Music Flow: Hide arrow if over panel
                   if (isPanelHover || isHovering) {
@@ -273,7 +252,7 @@ const CustomCursor: React.FC<CustomCursorProps> = ({ style = 'default', retroScr
                       showHand = false;
                   } 
 
-                  if (isAppDragging || isResizingH || isResizingV) {
+                  if (isAppDragging) {
                       showArrow = false;
                       showHand = false;
                       showCrosshair = false;
@@ -290,8 +269,6 @@ const CustomCursor: React.FC<CustomCursorProps> = ({ style = 'default', retroScr
                   }
 
                   if (grabRef.current) grabRef.current.style.opacity = isAppDragging ? '1' : '0';
-                  if (resizeHRef.current) resizeHRef.current.style.opacity = showResizeH ? '1' : '0';
-                  if (resizeVRef.current) resizeVRef.current.style.opacity = showResizeV ? '1' : '0';
                   if (roundedRef.current) roundedRef.current.style.opacity = '0';
               }
 
@@ -299,7 +276,7 @@ const CustomCursor: React.FC<CustomCursorProps> = ({ style = 'default', retroScr
               frameRef.current++;
               ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-              if (!shouldHide && x > 0 && !isResizingH && !isResizingV) {
+              if (!shouldHide && x > 0) {
                   const dx = x - lastMousePos.current.x;
                   const dy = y - lastMousePos.current.y;
                   const dist = Math.sqrt(dx*dx + dy*dy);
@@ -375,8 +352,7 @@ const CustomCursor: React.FC<CustomCursorProps> = ({ style = 'default', retroScr
 
               ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-              // Standard particle logic... (Only if not resizing)
-              if (!shouldHide && x > 0 && !isResizingH && !isResizingV) {
+              if (!shouldHide && x > 0) {
                   const chance = isClicked ? 1.0 : 0.4;
                   const count = isClicked ? 3 : 1; // Slightly reduced
                   if (Math.random() < chance) {
@@ -438,8 +414,7 @@ const CustomCursor: React.FC<CustomCursorProps> = ({ style = 'default', retroScr
                   }
               }
 
-              // Draw Crosshair (Only if not resizing)
-              if (!shouldHide && x > 0 && !hideCrosshair && !isResizingH && !isResizingV) {
+              if (!shouldHide && x > 0 && !hideCrosshair) {
                   ctx.globalAlpha = 0.8;
                   ctx.strokeStyle = isClicked ? '#bc13fe' : '#00f3ff'; 
                   ctx.lineWidth = 2;
@@ -453,45 +428,13 @@ const CustomCursor: React.FC<CustomCursorProps> = ({ style = 'default', retroScr
                       ctx.fillStyle = '#fff'; ctx.fillRect(x - 1, y - 1, 2, 2);
                   }
               }
-
-              // If Resizing in Default mode, show the SVG cursor instead of canvas drawing
-              if (isResizingH || isResizingV) {
-                  // Ensure SVG container is visible even if main mode is default
-                  if (cursorRef.current) {
-                      cursorRef.current.style.display = 'block';
-                      cursorRef.current.style.opacity = '1';
-                      cursorRef.current.style.transform = `translate(${x}px, ${y}px)`;
-                      
-                      // Hide all but resize
-                      if (arrowRef.current) arrowRef.current.style.opacity = '0';
-                      if (handRef.current) handRef.current.style.opacity = '0';
-                      if (grabRef.current) grabRef.current.style.opacity = '0';
-                      if (crosshairRef.current) crosshairRef.current.style.opacity = '0';
-                      if (roundedRef.current) roundedRef.current.style.opacity = '0';
-                      
-                      if (resizeHRef.current) resizeHRef.current.style.opacity = isResizingH ? '1' : '0';
-                      if (resizeVRef.current) resizeVRef.current.style.opacity = isResizingV ? '1' : '0';
-                  }
-              }
           }
           
           else if (activeStyle === 'dos-terminal' && dosCursorRef.current) {
               if (canvas) ctx?.clearRect(0, 0, canvas.width, canvas.height);
               if (cursorRef.current) cursorRef.current.style.opacity = '0';
-              
-              // Handle resize override even for DOS mode
-              if (isResizingH || isResizingV) {
-                  dosCursorRef.current.style.opacity = '0';
-                  if (cursorRef.current) {
-                      cursorRef.current.style.opacity = '1';
-                      cursorRef.current.style.transform = `translate(${x}px, ${y}px)`;
-                      if (resizeHRef.current) resizeHRef.current.style.opacity = isResizingH ? '1' : '0';
-                      if (resizeVRef.current) resizeVRef.current.style.opacity = isResizingV ? '1' : '0';
-                  }
-              } else {
-                  dosCursorRef.current.style.transform = `translate(${x}px, ${y}px)`;
-                  dosCursorRef.current.style.opacity = shouldHide ? '0' : '1';
-              }
+              dosCursorRef.current.style.transform = `translate(${x}px, ${y}px)`;
+              dosCursorRef.current.style.opacity = shouldHide ? '0' : '1';
           }
 
           else if (cursorRef.current) {
@@ -511,12 +454,8 @@ const CustomCursor: React.FC<CustomCursorProps> = ({ style = 'default', retroScr
               let showGrab = false;
               let showCrosshair = false;
               let showRounded = false;
-              let showResizeH = isResizingH;
-              let showResizeV = isResizingV;
 
-              if (showResizeH || showResizeV) {
-                  // If resizing, ignore others
-              } else if (isAppDragging) {
+              if (isAppDragging) {
                   showGrab = true;
               } else if (isHovering) {
                   showHand = true;
@@ -537,9 +476,6 @@ const CustomCursor: React.FC<CustomCursorProps> = ({ style = 'default', retroScr
               if (grabRef.current) grabRef.current.style.opacity = showGrab ? '1' : '0';
               if (crosshairRef.current) crosshairRef.current.style.opacity = showCrosshair ? '1' : '0';
               if (roundedRef.current) roundedRef.current.style.opacity = showRounded ? '1' : '0';
-              
-              if (resizeHRef.current) resizeHRef.current.style.opacity = showResizeH ? '1' : '0';
-              if (resizeVRef.current) resizeVRef.current.style.opacity = showResizeV ? '1' : '0';
           }
 
           rAF = requestAnimationFrame(loop);
@@ -581,7 +517,7 @@ const CustomCursor: React.FC<CustomCursorProps> = ({ style = 'default', retroScr
                   if (crosshairRef.current) crosshairRef.current.style.color = '#ffffff';
               } else {
                   const pal = isScreenHover ? colorMapRef.current.retro : colorMapRef.current.global;
-                  const targets = [arrowRef.current, handRef.current, grabRef.current, crosshairRef.current, roundedRef.current, resizeHRef.current, resizeVRef.current];
+                  const targets = [arrowRef.current, handRef.current, grabRef.current, crosshairRef.current, roundedRef.current];
                   targets.forEach(svg => {
                       if (svg) {
                           svg.style.color = pal.primary;
@@ -639,16 +575,6 @@ const CustomCursor: React.FC<CustomCursorProps> = ({ style = 'default', retroScr
 
             <svg ref={roundedRef} width="24" height="24" viewBox="0 0 24 24" className="absolute top-0 left-0 transition-opacity duration-200 opacity-0" style={{ overflow: 'visible' }}>
                 <path d={ROUNDED_PATH_D} fill="#030712" stroke="currentColor" strokeWidth="2" strokeLinejoin="round" />
-            </svg>
-
-            {/* NEW RESIZE HORIZONTAL */}
-            <svg ref={resizeHRef} width="24" height="24" viewBox="0 0 24 24" className="absolute top-0 left-0 transition-opacity duration-200 opacity-0" style={{ transform: 'translate(-12px, -12px)', overflow: 'visible' }}>
-                <path d={RESIZE_H_BOLD_D} fill="#030712" stroke="currentColor" strokeWidth="2" strokeLinejoin="round" />
-            </svg>
-
-            {/* NEW RESIZE VERTICAL */}
-            <svg ref={resizeVRef} width="24" height="24" viewBox="0 0 24 24" className="absolute top-0 left-0 transition-opacity duration-200 opacity-0" style={{ transform: 'translate(-12px, -12px)', overflow: 'visible' }}>
-                <path d={RESIZE_V_BOLD_D} fill="#030712" stroke="currentColor" strokeWidth="2" strokeLinejoin="round" />
             </svg>
         </div>
     </>,

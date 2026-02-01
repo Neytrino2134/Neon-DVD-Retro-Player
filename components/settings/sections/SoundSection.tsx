@@ -25,18 +25,17 @@ interface SoundSectionProps {
   onAmbienceSetActive: (id: string) => void;
   onAmbienceTogglePlay: () => void;
   onAmbienceVolume: (v: number) => void;
-  // New split audio props
-  isMicActive: boolean;
-  toggleMic: () => void;
-  isSysAudioActive: boolean;
-  toggleSysAudio: () => void;
+  isAudioActive: boolean;
+  toggleAudio: () => void;
+  audioSourceType?: 'system' | 'mic';
+  setAudioSourceType?: (t: 'system' | 'mic') => void;
 }
 
 const SoundSection: React.FC<SoundSectionProps> = ({
   expandedState, toggleExpand,
   crossfadeDuration, setCrossfadeDuration, sfxVolume, setSfxVolume, smoothStart, setSmoothStart,
   ambienceFiles, ambienceConfig, onAmbienceUpload, onAmbienceDelete, onAmbienceSetActive, onAmbienceTogglePlay, onAmbienceVolume,
-  isMicActive, toggleMic, isSysAudioActive, toggleSysAudio
+  isAudioActive, toggleAudio, audioSourceType, setAudioSourceType
 }) => {
   return (
     <>
@@ -50,10 +49,10 @@ const SoundSection: React.FC<SoundSectionProps> = ({
 
         <ModuleWrapper id="sysaudio" label={<NumberedLabel num="03" k="sys_audio_input" />} icon={RadioReceiver} isEnabled={true} isExpanded={expandedState['sysaudio']} isAlwaysOn={true} onToggleExpand={(e) => toggleExpand('sysaudio', e.shiftKey)} onToggleEnable={() => {}}>
             <SystemAudioModule 
-                isMicActive={isMicActive} 
-                toggleMic={toggleMic} 
-                isSysAudioActive={isSysAudioActive} 
-                toggleSysAudio={toggleSysAudio}
+                isAudioActive={isAudioActive} 
+                toggleAudio={toggleAudio} 
+                audioSourceType={audioSourceType}
+                setAudioSourceType={setAudioSourceType}
             />
         </ModuleWrapper>
     </>

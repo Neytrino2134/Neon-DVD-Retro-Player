@@ -127,14 +127,9 @@ const DebugConsoleEffect: React.FC<DebugConsoleEffectProps> = ({ effects }) => {
     };
 
     const handleMouseUp = () => {
-        if (isResizing.current) {
-            isResizing.current = false;
-            // Clear both classes just in case
-            document.body.classList.remove('custom-cursor-col-resize');
-            document.body.classList.remove('custom-cursor-row-resize');
-            document.body.style.cursor = 'default';
-            document.body.style.userSelect = 'auto';
-        }
+        isResizing.current = false;
+        document.body.style.cursor = 'default';
+        document.body.style.userSelect = 'auto';
     };
 
     document.addEventListener('mousemove', handleMouseMove);
@@ -156,13 +151,7 @@ const DebugConsoleEffect: React.FC<DebugConsoleEffectProps> = ({ effects }) => {
           w: size.width, 
           h: size.height 
       };
-      
-      // Use Horizontal and Vertical resize cursors together if diagonally resizing, 
-      // or just Horizontal for width/diagonal for now.
-      // Since we don't have a diagonal custom cursor yet, let's use the Horizontal arrow 
-      // as the primary resize indicator for this panel as width is usually primary.
-      document.body.classList.add('custom-cursor-col-resize');
-      document.body.style.cursor = 'none';
+      document.body.style.cursor = 'nw-resize';
       document.body.style.userSelect = 'none';
   };
 

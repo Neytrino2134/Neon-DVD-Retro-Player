@@ -47,11 +47,6 @@ const StreamWindow: React.FC<StreamWindowProps> = ({ stream, onClose }) => {
     dragStart.current = { x: e.clientX, y: e.clientY };
     initialDims.current = { x: 0, y: 0, w: size.w, h: size.h };
 
-    // Set custom resize cursor class
-    document.body.classList.add('custom-cursor-col-resize');
-    document.body.style.cursor = 'none';
-    document.body.style.userSelect = 'none';
-
     document.addEventListener('mousemove', handleMouseMove);
     document.addEventListener('mouseup', handleMouseUp);
   };
@@ -76,14 +71,7 @@ const StreamWindow: React.FC<StreamWindowProps> = ({ stream, onClose }) => {
 
   const handleMouseUp = () => {
     isDragging.current = false;
-    
-    if (isResizing.current) {
-        isResizing.current = false;
-        document.body.classList.remove('custom-cursor-col-resize');
-        document.body.style.cursor = 'default';
-        document.body.style.userSelect = 'auto';
-    }
-    
+    isResizing.current = false;
     document.removeEventListener('mousemove', handleMouseMove);
     document.removeEventListener('mouseup', handleMouseUp);
   };

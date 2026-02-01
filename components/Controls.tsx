@@ -1,6 +1,5 @@
-
 import React, { useState, useEffect, useRef } from 'react';
-import { Smartphone, Radio, X, Minus, Maximize2, Disc, Minimize2, Maximize, Minimize, ArrowLeft } from 'lucide-react';
+import { Smartphone, Radio, X, Minus, Maximize2, Disc } from 'lucide-react';
 import { AudioTrack, Playlist, ViewMode, VisualizerConfig } from '../types';
 import { Tooltip } from './ui/Tooltip';
 import ConfirmModal from './ConfirmModal';
@@ -72,12 +71,6 @@ interface ControlsProps {
   setIsShuffle?: (v: boolean) => void;
   isAutoNextPlaylist?: boolean;
   setIsAutoNextPlaylist?: (v: boolean) => void;
-
-  // New View Controls
-  onTogglePlayerFocus?: () => void;
-  isPlayerFocus?: boolean;
-  onToggleFullscreen?: () => void;
-  isFullscreen?: boolean;
 }
 
 const Controls: React.FC<ControlsProps> = ({
@@ -126,11 +119,7 @@ const Controls: React.FC<ControlsProps> = ({
   isShuffle,
   setIsShuffle,
   isAutoNextPlaylist,
-  setIsAutoNextPlaylist,
-  onTogglePlayerFocus,
-  isPlayerFocus,
-  onToggleFullscreen,
-  isFullscreen
+  setIsAutoNextPlaylist
 }) => {
   // Drag State shared between TrackList and PlaylistTabs
   const [draggedTrackIds, setDraggedTrackIds] = useState<string[]>([]);
@@ -176,31 +165,28 @@ const Controls: React.FC<ControlsProps> = ({
       
       // WAVE 1 (Front - Primary)
       const amp1 = 15 + 5 * Math.sin(time * 0.8); 
-      // We subtract 'center' from 'x' to make frequency scaling happen from the center outwards
-      const center = width / 2;
-      const freq = 0.05;
-      const startY1 = 40 + amp1 * Math.sin((0 - center) * freq - time * 9);
+      const startY1 = 40 + amp1 * Math.sin(0 * 0.05 - time * 9);
       let points1 = `M0,${startY1}`;
       for (let x = step; x <= width; x += step) {
-        const y = 40 + amp1 * Math.sin((x - center) * freq - time * 9);
+        const y = 40 + amp1 * Math.sin(x * 0.05 - time * 9);
         points1 += ` L${x},${y}`;
       }
 
       // WAVE 2 (Middle - Secondary)
       const amp2 = 12 + 4 * Math.sin(time * 0.5 + 2);
-      const startY2 = 50 + amp2 * Math.sin((0 - center) * (freq * 0.6) - time * 4 + 1);
+      const startY2 = 50 + amp2 * Math.sin(0 * 0.03 - time * 4 + 1);
       let points2 = `M0,${startY2}`;
       for (let x = step; x <= width; x += step) {
-        const y = 50 + amp2 * Math.sin((x - center) * (freq * 0.6) - time * 4 + 1);
+        const y = 50 + amp2 * Math.sin(x * 0.03 - time * 4 + 1);
         points2 += ` L${x},${y}`;
       }
 
       // WAVE 3 (Back - Accent)
       const amp3 = 15 + 10 * Math.sin(time * 0.2 + 4);
-      const startY3 = 45 + amp3 * Math.sin((0 - center) * (freq * 0.3) - time * 1.5 + 3);
+      const startY3 = 45 + amp3 * Math.sin(0 * 0.015 - time * 1.5 + 3);
       let points3 = `M0,${startY3}`;
       for (let x = step; x <= width; x += step) {
-        const y = 45 + amp3 * Math.sin((x - center) * (freq * 0.3) - time * 1.5 + 3);
+        const y = 45 + amp3 * Math.sin(x * 0.015 - time * 1.5 + 3);
         points3 += ` L${x},${y}`;
       }
 
@@ -264,16 +250,63 @@ const Controls: React.FC<ControlsProps> = ({
   };
 
   // Outer container styling 
-  // Updated border-l-4 color to theme-bg to match background and hide visual seam
   const outerContainerClass = isMini 
     ? "relative w-full h-full flex flex-col bg-theme-bg overflow-hidden" 
-    : "relative w-full h-full flex flex-col bg-theme-bg border-l-4 border-theme-bg shadow-inner p-4"; 
+    : "relative w-full h-full flex flex-col bg-theme-bg border-l-4 border-theme-panel shadow-inner p-4"; 
 
   // Inner Chassis Styling
-  // In Mini mode, we make the chassis draggable (app-drag-region) and add the group class for hover effects
   const innerContainerClass = isMini
-    ? "relative w-full h-full flex flex-col bg-theme-panel overflow-hidden player-chassis app-drag-region group" 
+    ? "relative w-full h-full flex flex-col bg-theme-panel overflow-hidden player-chassis" 
     : "relative w-full h-full flex flex-col bg-theme-panel rounded-xl overflow-hidden player-chassis"; 
+
+  // --- CUSTOM MINI-HEADER ---
+  const MiniHeader = () => (
+    <div className="h-8 bg-gray-950 flex items-center justify-between select-none z-[99999] w-full shrink-0 transition-colors duration-500 border-b border-white/5">
+      {/* Draggable Area */}
+      <div className="flex-1 h-full flex items-center px-3 gap-2 app-drag-region overflow-hidden">
+        {/* Logo Icon */}
+        <Disc size={16} className="text-theme-accent animate-spin-slow shrink-0" />
+        
+        {/* Title Text */}
+        <span className="text-[10px] font-mono font-bold text-theme-primary tracking-widest pt-0.5 truncate drop-shadow-[0_0_5px_rgba(0,0,0,0.5)]">
+          NEON PLAYER
+        </span>
+      </div>
+
+      {/* Window Controls (No Drag) */}
+      <div className="flex h-full app-no-drag">
+        {onToggleMiniMode && (
+             <Tooltip content="RESTORE LAYOUT" position="bottom">
+                <button 
+                onClick={onToggleMiniMode}
+                className="system-cursor w-12 h-full flex items-center justify-center text-theme-accent transition-all duration-200 hover:bg-white/5 hover:text-white focus:outline-none"
+                >
+                <Maximize2 size={12} />
+                </button>
+            </Tooltip>
+        )}
+
+        <Tooltip content="MINIMIZE" position="bottom">
+            <button 
+            onClick={handleMinimize}
+            className="system-cursor w-12 h-full flex items-center justify-center text-theme-muted transition-all duration-200 hover:bg-white/5 hover:text-theme-primary hover:shadow-[inset_0_-2px_0_var(--color-primary)] focus:outline-none"
+            >
+            <Minus size={14} />
+            </button>
+        </Tooltip>
+        
+        {/* Close Button Only - Mini mode is fixed size */}
+        <Tooltip content="CLOSE" position="bottom-right">
+            <button 
+            onClick={handleClose}
+            className="system-cursor w-12 h-full flex items-center justify-center text-theme-muted transition-all duration-200 hover:bg-white/5 hover:text-red-500 hover:shadow-[inset_0_-2px_0_#ef4444] focus:outline-none"
+            >
+            <X size={14} />
+            </button>
+        </Tooltip>
+      </div>
+    </div>
+  );
 
   return (
     // OUTER PANEL CONTAINER
@@ -287,55 +320,14 @@ const Controls: React.FC<ControlsProps> = ({
       {/* INNER PLAYER DEVICE CONTAINER */}
       <div className={innerContainerClass}>
 
-        {/* CUSTOM MINI WINDOW CONTROLS (Floating) */}
-        {isMini && (
-            <div className="absolute top-2 right-2 z-[60] flex items-center gap-1 app-no-drag opacity-0 group-hover:opacity-100 transition-opacity duration-200">
-                <Tooltip content="BACK TO MAIN" position="bottom">
-                    <button 
-                        onClick={onToggleMiniMode}
-                        className="p-1.5 text-theme-muted hover:text-theme-accent bg-black/40 hover:bg-white/10 rounded-full backdrop-blur-sm border border-transparent hover:border-white/10 transition-all"
-                    >
-                        <ArrowLeft size={10} />
-                    </button>
-                </Tooltip>
-                
-                {/* NEW: Maximize/Fullscreen in Mini Mode */}
-                <Tooltip content="MAXIMIZE" position="bottom">
-                    <button 
-                        onClick={onToggleFullscreen}
-                        className="p-1.5 text-theme-muted hover:text-theme-accent bg-black/40 hover:bg-white/10 rounded-full backdrop-blur-sm border border-transparent hover:border-white/10 transition-all"
-                    >
-                        {isFullscreen ? <Minimize size={10} /> : <Maximize size={10} />}
-                    </button>
-                </Tooltip>
-
-                <Tooltip content="MINIMIZE" position="bottom">
-                    <button 
-                        onClick={handleMinimize}
-                        className="p-1.5 text-theme-muted hover:text-theme-primary bg-black/40 hover:bg-white/10 rounded-full backdrop-blur-sm border border-transparent hover:border-white/10 transition-all"
-                    >
-                        <Minus size={10} />
-                    </button>
-                </Tooltip>
-                <Tooltip content="CLOSE APP" position="bottom-right">
-                    <button 
-                        onClick={handleClose}
-                        className="p-1.5 text-theme-muted hover:text-red-500 bg-black/40 hover:bg-white/10 rounded-full backdrop-blur-sm border border-transparent hover:border-red-500/30 transition-all"
-                    >
-                        <X size={10} />
-                    </button>
-                </Tooltip>
-            </div>
-        )}
+        {/* CUSTOM MINI TITLE BAR */}
+        {isMini && <MiniHeader />}
 
         {/* 
             INTERACTIVE ZONE: Waves + TrackInfo
-            In Mini mode, this area acts as the main drag handle (inherited from container)
-            BUT we need to make the wrapper catch mouse events for the wave highlight.
-            We force h-48 in mini mode to cover the visual area.
         */}
         <div 
-            className={`relative z-10 shrink-0 ${isMini ? 'h-48' : ''}`}
+            className="relative z-10 shrink-0"
             onMouseEnter={handleHeaderMouseEnter}
             onMouseLeave={handleHeaderMouseLeave}
         >
@@ -384,7 +376,7 @@ const Controls: React.FC<ControlsProps> = ({
                 </svg>
             </div>
 
-            {/* HEADER AREA (Regular Mode only) */}
+            {/* HEADER AREA (Regular Mode - Mini has its own custom header) */}
             {!isMini && (
             <div className="flex items-center justify-between p-3 relative z-10 pb-2">
                 <div className="flex items-center gap-2">
@@ -402,27 +394,8 @@ const Controls: React.FC<ControlsProps> = ({
                 </div>
 
                 <div className="flex items-center gap-1 app-no-drag">
-                    {/* NEW BUTTONS */}
-                    <Tooltip content={isPlayerFocus ? "RESTORE VIEW (Shift+P)" : "FOCUS PLAYER (Shift+P)"} position="bottom">
-                        <button 
-                            onClick={onTogglePlayerFocus}
-                            className={`text-theme-muted hover:text-theme-primary transition-colors p-2 hover:bg-white/5 rounded-full ${isPlayerFocus ? 'text-theme-primary' : ''}`}
-                        >
-                            {isPlayerFocus ? <Minimize2 size={18} /> : <Maximize2 size={18} />}
-                        </button>
-                    </Tooltip>
-
-                    <Tooltip content={isFullscreen ? "EXIT FULLSCREEN (Shift+F)" : "FULLSCREEN (Shift+F)"} position="bottom">
-                        <button 
-                            onClick={onToggleFullscreen}
-                            className={`text-theme-muted hover:text-theme-accent transition-colors p-2 hover:bg-white/5 rounded-full ${isFullscreen ? 'text-theme-accent' : ''}`}
-                        >
-                            {isFullscreen ? <Minimize size={18} /> : <Maximize size={18} />}
-                        </button>
-                    </Tooltip>
-
                     {isElectron && onToggleMiniMode && (
-                        <Tooltip content="COMPACT VIEW (Shift+C)" position="bottom">
+                        <Tooltip content="COMPACT VIEW" position="bottom">
                             <button 
                                 onClick={onToggleMiniMode}
                                 className="text-theme-muted hover:text-theme-accent transition-colors p-2 hover:bg-white/5 rounded-full"
@@ -435,18 +408,14 @@ const Controls: React.FC<ControlsProps> = ({
             </div>
             )}
             
-            {/* 
-                Info & Art 
-                In Mini Mode, we ensure this area is draggable by NOT adding 'app-no-drag'.
-                The parent container has 'app-drag-region', so allowing this div to be part of it makes it draggable.
-            */}
+            {/* Info & Art */}
             <div className={`px-4 relative z-10 ${isMini ? 'pt-4' : ''}`}>
                 <TrackInfo currentTrack={currentTrack} />
             </div>
         </div>
 
-        {/* Control Grid - Needs app-no-drag in mini mode to be clickable */}
-        <div className={`flex gap-4 mb-4 shrink-0 relative z-10 px-4 h-44 ${isMini ? 'app-no-drag' : ''}`}>
+        {/* Control Grid - Height fixed for standard layout */}
+        <div className={`flex gap-4 mb-4 shrink-0 relative z-10 px-4 h-44`}>
             {/* Volume Control */}
             <VolumeControl volume={volume} onVolumeChange={onVolumeChange} />
             
@@ -470,8 +439,8 @@ const Controls: React.FC<ControlsProps> = ({
             />
         </div>
 
-        {/* Playlist Tabs & List - Needs app-no-drag in mini mode */}
-        <div className={`px-4 shrink-0 ${isMini ? 'app-no-drag' : ''}`}>
+        {/* Playlist Tabs & List - ALWAYS VISIBLE now even in Mini Mode, as 800x900 is plenty of space */}
+        <div className="px-4 shrink-0">
             <PlaylistTabs 
                 playlists={playlists}
                 activePlaylistId={activePlaylistId}
@@ -494,7 +463,7 @@ const Controls: React.FC<ControlsProps> = ({
         </div>
 
         {/* Track List */}
-        <div className={`flex-1 min-w-0 overflow-hidden bg-theme-bg/40 shadow-inner border-t border-theme-border mx-4 mb-4 rounded-b-lg rounded-tr-lg ${isMini ? 'app-no-drag' : ''}`}>
+        <div className="flex-1 min-w-0 overflow-hidden bg-theme-bg/40 shadow-inner border-t border-theme-border mx-4 mb-4 rounded-b-lg rounded-tr-lg">
             <TrackList 
                 tracks={tracks}
                 activePlaylistId={activePlaylistId}

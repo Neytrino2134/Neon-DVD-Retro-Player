@@ -7,9 +7,9 @@ export const useWebAudio = (volume: number) => {
   const analyserRef = useRef<AnalyserNode | null>(null);
   const [analyser, setAnalyser] = useState<AnalyserNode | null>(null);
   
-  // Independent Source Nodes
-  const micSourceRef = useRef<MediaStreamAudioSourceNode | null>(null);
-  const sysSourceRef = useRef<MediaStreamAudioSourceNode | null>(null);
+  // Aux Input (System Audio)
+  const auxSourceRef = useRef<MediaStreamAudioSourceNode | null>(null);
+  const auxGainRef = useRef<GainNode | null>(null);
 
   // Initialize Audio Context
   useEffect(() => {
@@ -29,10 +29,12 @@ export const useWebAudio = (volume: number) => {
             gain.connect(ctx.destination);
             gainNodeRef.current = gain;
             
-            // NOTE: We do NOT connect Analyser to Gain/Destination.
-            // Sources (Music) must connect to BOTH Analyser (for visuals) AND Gain (for audio).
-            // Input Sources (Mic/Sys) connect ONLY to Analyser (visuals only, no echo).
+            ana.connect(gain);
 
+            // Init Aux Gain (for system audio mixing)
+            const auxGain = ctx.createGain();
+            auxGain.connect(ana); // Mix into analyser
+            auxGainRef.current = auxGain;
         } catch (e) {
             console.error("AudioContext init failed", e);
         }
@@ -47,54 +49,42 @@ export const useWebAudio = (volume: number) => {
     };
   }, []); // Run once on mount
 
-  // Sync Volume (Only affects Music Playback, not inputs)
+  // Sync Volume
   useEffect(() => {
       if (gainNodeRef.current && audioContextRef.current) {
           try {
+              // Cancel any scheduled ramps to allow immediate manual adjustment
               gainNodeRef.current.gain.cancelScheduledValues(audioContextRef.current.currentTime);
               gainNodeRef.current.gain.value = volume;
           } catch (e) {}
       }
   }, [volume]);
 
-  // --- MICROPHONE INPUT (Visualizer Only) ---
-  const connectMic = (stream: MediaStream) => {
-      if (!audioContextRef.current || !analyserRef.current) return;
+  const connectAuxSource = (stream: MediaStream) => {
+      if (!audioContextRef.current || !auxGainRef.current) return;
+      if (auxSourceRef.current) auxSourceRef.current.disconnect();
       
-      // Cleanup old
-      if (micSourceRef.current) micSourceRef.current.disconnect();
-
       const src = audioContextRef.current.createMediaStreamSource(stream);
-      // Connect ONLY to Analyser. Do NOT connect to destination/speakers.
-      src.connect(analyserRef.current);
-      micSourceRef.current = src;
+      src.connect(auxGainRef.current);
+      auxSourceRef.current = src;
   };
 
-  const disconnectMic = () => {
-      if (micSourceRef.current) {
-          micSourceRef.current.disconnect();
-          micSourceRef.current = null;
+  const updateAuxMonitor = (enabled: boolean) => {
+      if (!auxGainRef.current || !audioContextRef.current) return;
+      if (enabled) {
+          auxGainRef.current.connect(audioContextRef.current.destination);
+      } else {
+          try {
+            auxGainRef.current.disconnect(audioContextRef.current.destination);
+          } catch(e) {}
       }
   };
 
-  // --- SYSTEM AUDIO INPUT (Visualizer Only) ---
-  const connectSys = (stream: MediaStream) => {
-      if (!audioContextRef.current || !analyserRef.current) return;
-
-      // Cleanup old
-      if (sysSourceRef.current) sysSourceRef.current.disconnect();
-
-      const src = audioContextRef.current.createMediaStreamSource(stream);
-      // Connect ONLY to Analyser. Do NOT connect to destination/speakers.
-      src.connect(analyserRef.current);
-      sysSourceRef.current = src;
-  };
-
-  const disconnectSys = () => {
-      if (sysSourceRef.current) {
-          sysSourceRef.current.disconnect();
-          sysSourceRef.current = null;
-      }
+  const updateAuxVolume = (vol: number) => {
+      if (!auxGainRef.current || !audioContextRef.current) return;
+      try {
+          auxGainRef.current.gain.setValueAtTime(vol, audioContextRef.current.currentTime);
+      } catch(e) {}
   };
 
   const getAudioStream = () => {
@@ -114,10 +104,9 @@ export const useWebAudio = (volume: number) => {
       audioContextRef,
       gainNodeRef,
       analyser,
-      connectMic,
-      disconnectMic,
-      connectSys,
-      disconnectSys,
+      connectAuxSource,
+      updateAuxMonitor,
+      updateAuxVolume,
       getAudioStream,
       resumeContext
   };
