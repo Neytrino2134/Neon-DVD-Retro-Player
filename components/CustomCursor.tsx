@@ -215,6 +215,7 @@ const CustomCursor: React.FC<CustomCursorProps> = ({ style = 'default', retroScr
           const isResizingH = document.body.classList.contains('custom-cursor-col-resize') || isResizerHover;
           const isResizingV = document.body.classList.contains('custom-cursor-row-resize');
           const isAppDragging = document.body.classList.contains('app-dragging');
+          const isDosForced = document.body.classList.contains('force-dos-cursor');
           
           // Don't hide if resizing
           const shouldHide = (forceSystemCursor || isOut) && !isResizingH && !isResizingV;
@@ -238,6 +239,7 @@ const CustomCursor: React.FC<CustomCursorProps> = ({ style = 'default', retroScr
 
           let activeStyle = (isScreenHover) ? retroScreenStyle : style;
           if (style === 'music-flow') activeStyle = 'music-flow';
+          if (isDosForced) activeStyle = 'dos-terminal';
 
           if (activeStyle === 'system') {
               if (canvas) ctx?.clearRect(0, 0, canvas.width, canvas.height);

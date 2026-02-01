@@ -21,7 +21,7 @@ if %errorlevel% neq 0 (
     echo      BUILD FAILED
     echo ==================================================
     echo.
-    echo AI Prompt: "Поправить ошибки сборки"
+    echo AI Prompt: "I tried to build the project using 'npm run build' but encountered errors. Please examine the output above and provide a solution to fix the build failure."
     echo.
     pause >nul
     exit

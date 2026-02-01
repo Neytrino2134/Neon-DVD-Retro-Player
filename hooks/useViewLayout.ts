@@ -53,7 +53,8 @@ export const useViewLayout = (introState: number) => {
   const [isWindowResizing, setIsWindowResizing] = useState(false);
   const windowResizeTimeoutRef = useRef<number>(0);
 
-  const focusMode = viewMode === 'cinema';
+  const isCinema = viewMode === 'cinema';
+  const focusMode = isCinema;
 
   // Combine all resizing states. If ANY is true, transitions become "none" (instant).
   const isResizing = animSequence.startsWith('exiting') || 
@@ -207,22 +208,22 @@ export const useViewLayout = (introState: number) => {
   const toggleLeftPanel = useCallback(() => {
       setShowLeftPanel(prev => {
           const willShow = !prev;
-          if (willShow && currentBreakpoint === 'tablet') {
+          if (willShow && currentBreakpoint === 'tablet' && viewMode === 'default') {
               setShowRightPanel(false);
           }
           return willShow;
       });
-  }, [currentBreakpoint]);
+  }, [currentBreakpoint, viewMode]);
 
   const toggleRightPanel = useCallback(() => {
       setShowRightPanel(prev => {
           const willShow = !prev;
-          if (willShow && currentBreakpoint === 'tablet') {
+          if (willShow && currentBreakpoint === 'tablet' && viewMode === 'default') {
               setShowLeftPanel(false);
           }
           return willShow;
       });
-  }, [currentBreakpoint]);
+  }, [currentBreakpoint, viewMode]);
 
 
   const handleSetViewMode = useCallback(async (targetMode: ViewMode) => {
@@ -258,15 +259,17 @@ export const useViewLayout = (introState: number) => {
           } 
           
           // 2. SWITCHING TO DEFAULT/FULL MODE
-          else if (targetMode === 'default' && viewMode === 'mini') {
-              playSFX('WHOOSH_OUT.mp3'); 
-              // Transition Step 1: Scale down into darkness
-              setAnimSequence('exiting_center');
-              await wait(600); 
+          else if (targetMode === 'default' && (viewMode === 'mini' || viewMode === 'cinema')) {
+              if (viewMode === 'mini') {
+                  playSFX('WHOOSH_OUT.mp3'); 
+                  // Transition Step 1: Scale down into darkness
+                  setAnimSequence('exiting_center');
+                  await wait(600); 
 
-              // Transition Step 2: Show Loader
-              setAnimSequence('loading');
-              await wait(800); // Simulate load time
+                  // Transition Step 2: Show Loader
+                  setAnimSequence('loading');
+                  await wait(800); // Simulate load time
+              }
 
               if (ipc) ipc.send('set-full-mode');
               
@@ -284,13 +287,17 @@ export const useViewLayout = (introState: number) => {
               setShowCenterPanel(shouldShowCenter);
               setShowRightPanel(true);
               
-              // Transition Step 3: Reveal from center
-              setAnimSequence('entering_center');
-              await wait(600);
+              if (viewMode === 'mini') {
+                  // Transition Step 3: Reveal from center
+                  setAnimSequence('entering_center');
+                  await wait(600);
+              }
           }
           // 3. CINEMA MODE
           else if (targetMode === 'cinema') {
               setViewMode('cinema');
+              // In Cinema, we keep center true. We hide sides initially for clean entry.
+              // But user can toggle them back on as overlays.
               setShowLeftPanel(false);
               setShowCenterPanel(true);
               setShowRightPanel(false);
@@ -361,22 +368,18 @@ export const useViewLayout = (introState: number) => {
 
   // Updated Transition Styles
   if (animSequence === 'exiting_center') {
-      // Shrink to center and fade out (More pronounced zoom out for visibility)
       masterStyle = { opacity: 0, transform: 'scale(0.5)', transition: 'opacity 0.5s ease-in, transform 0.5s ease-in' };
   } else if (animSequence === 'loading') {
-      // Completely hidden during load
       masterStyle = { opacity: 0, transform: 'scale(0.5)', transition: 'none' };
   } else if (animSequence === 'entering_center') {
-      // While entering, we animate TO opacity 1, scale 1. 
-      // The start state is implied by previous 'loading' state (opacity 0, scale 0.5)
       masterStyle = { opacity: 1, transform: 'scale(1)', transition: 'opacity 0.5s ease-out, transform 0.5s ease-out' };
   } else if (animSequence === 'exiting_mini' || animSequence === 'exiting_default') {
-      // Legacy handlers
       masterStyle = { opacity: 0, transform: 'scale(0.95)', transition: 'opacity 0.5s ease, transform 0.5s ease' };
   } else if (animSequence === 'void_layout') {
       masterStyle = { opacity: 0, transform: 'scale(1)', transition: 'none' };
   }
 
+  // --- LEFT PANEL LOGIC ---
   const isLeftPanelVisible = 
       (introState >= 1) && 
       showLeftPanel && 
@@ -384,20 +387,20 @@ export const useViewLayout = (introState: number) => {
       viewMode !== 'player-focus' &&
       (animSequence === 'reveal_left' || animSequence === 'reveal_right' || animSequence === 'reveal_center' || animSequence === 'idle' || animSequence === 'entering_center');
 
-  // Updated Class: Removed -translate-x-10, added scale-95 for center zoom feel
-  const leftPanelClass = `shrink-0 z-20 overflow-hidden
-      ${!isResizing ? 'transition-all duration-700 ease-[cubic-bezier(0.25,1,0.5,1)]' : ''}
-      ${!isLeftPanelVisible 
-          ? 'opacity-0 scale-95 origin-center' 
-          : 'opacity-100 scale-100 origin-center'
-      }
-  `;
+  let leftPanelClass = `shrink-0 z-20 overflow-hidden ${!isResizing ? 'transition-[width] duration-700 ease-[cubic-bezier(0.25,1,0.5,1)]' : ''}`;
+  let leftPanelStyle: React.CSSProperties = { width: isLeftPanelVisible ? `${leftPanelWidth}px` : '0px' };
 
-  const leftPanelStyle = {
-      width: isLeftPanelVisible ? `${leftPanelWidth}px` : '0px'
-  };
+  // CINEMA OVERRIDE (Left)
+  if (isCinema) {
+      leftPanelClass = `absolute z-50 h-[calc(100%-2rem)] top-4 left-4 rounded-xl border border-theme-border shadow-[0_0_40px_rgba(0,0,0,0.8)] backdrop-blur-xl bg-black/90 overflow-hidden transition-transform duration-500 cubic-bezier(0.2,0.8,0.2,1)`;
+      // In Cinema, width is fixed, visibility is controlled by transform slide
+      leftPanelStyle = { 
+          width: `${leftPanelWidth}px`, 
+          transform: isLeftPanelVisible ? 'translateX(0)' : 'translateX(-120%)'
+      };
+  }
 
-  // Right Panel is now the MAIN container for Mini Mode AND Mobile Mode AND Player Focus Mode
+  // --- RIGHT PANEL LOGIC ---
   const isRightPanelVisible = 
       (viewMode === 'mini' && (animSequence === 'reveal_right' || animSequence === 'reveal_center' || animSequence === 'idle' || animSequence === 'entering_center')) || 
       (viewMode === 'player-focus') ||
@@ -407,22 +410,25 @@ export const useViewLayout = (introState: number) => {
           (animSequence === 'reveal_right' || animSequence === 'reveal_center' || animSequence === 'idle' || animSequence === 'entering_center')
       );
 
-  // Updated Class: Removed translate-x-10, added scale-95 for center zoom feel
-  const rightPanelClass = `shrink-0 z-20 overflow-hidden
-      ${!isResizing ? 'transition-all duration-700 ease-[cubic-bezier(0.25,1,0.5,1)]' : ''}
-      ${!isRightPanelVisible 
-          ? 'opacity-0 scale-95 origin-center' 
-          : 'opacity-100 scale-100 origin-center'
-      }
-  `;
-
-  // If in 'mini' mode OR 'mobile' mode (where center panel is hidden by breakpoint) OR 'player-focus', right panel takes full width
+  let rightPanelClass = `shrink-0 z-20 overflow-hidden ${!isResizing ? 'transition-[width] duration-700 ease-[cubic-bezier(0.25,1,0.5,1)]' : ''}`;
+  
   const isMobileOrMini = viewMode === 'mini' || viewMode === 'player-focus' || (!showCenterPanel && !showLeftPanel && currentBreakpoint === 'mobile');
-
-  const rightPanelStyle = {
+  
+  let rightPanelStyle: React.CSSProperties = {
       width: !isRightPanelVisible ? '0px' : (isMobileOrMini ? '100%' : `${rightPanelWidth}px`)
   };
 
+  // CINEMA OVERRIDE (Right)
+  // UPDATED: Removed border/shadow/bg styles to allow a clean floating/sidebar look without "card" container.
+  if (isCinema) {
+      rightPanelClass = `absolute z-50 h-full top-0 right-0 overflow-hidden transition-transform duration-500 cubic-bezier(0.2,0.8,0.2,1)`;
+      rightPanelStyle = { 
+          width: `${rightPanelWidth}px`, 
+          transform: isRightPanelVisible ? 'translateX(0)' : 'translateX(100%)' // Move completely off-screen right
+      };
+  }
+
+  // --- CENTER PANEL LOGIC ---
   const isScreenVisible = 
       introState >= 2 && 
       viewMode !== 'mini' && 
@@ -430,6 +436,8 @@ export const useViewLayout = (introState: number) => {
       showCenterPanel &&
       (animSequence === 'reveal_center' || animSequence === 'idle' || animSequence === 'entering_center');
 
+  // In Cinema mode, Left/Right panels are absolute, so flex-grow takes 100% of space automatically.
+  // We ensure w-full is applied or w-0 if hidden.
   const screenContainerClass = `flex-grow flex flex-col relative overflow-hidden
       ${!isResizing ? 'transition-all duration-1000 ease-[cubic-bezier(0.34,1.56,0.64,1)]' : ''}
       ${!isScreenVisible ? 'w-0 opacity-0 scale-95' : 'w-auto opacity-100 scale-100'}

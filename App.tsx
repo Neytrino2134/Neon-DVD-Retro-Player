@@ -112,6 +112,7 @@ function AppContent() {
   // Render Check
   const shouldRenderCenter = view.viewMode !== 'mini' && view.showCenterPanel;
   const isRightPanelFullWidth = view.viewMode === 'mini' || view.viewMode === 'player-focus' || !view.showCenterPanel;
+  const isCinema = view.viewMode === 'cinema';
 
   const handleToggleFullscreen = () => {
       if (!document.fullscreenElement) {
@@ -209,8 +210,8 @@ function AppContent() {
           />
         )}
 
-        {/* LEFT RESIZER */}
-        {view.viewMode !== 'mini' && view.viewMode !== 'player-focus' && view.showLeftPanel && view.showCenterPanel && (
+        {/* LEFT RESIZER - Hide in Cinema Mode to avoid visual clutter */}
+        {view.viewMode !== 'mini' && view.viewMode !== 'player-focus' && !isCinema && view.showLeftPanel && view.showCenterPanel && (
             <div className="w-4 z-30 flex items-center justify-center cursor-none custom-resizer group -ml-2 mr-0 relative touch-none" onMouseDown={view.handleMouseDownLeft}>
                 <div className="w-[1px] h-[92%] bg-theme-primary/40 rounded-full group-hover:bg-theme-primary group-hover:w-[2px] group-hover:shadow-[0_0_10px_var(--color-primary)] transition-all duration-300"></div>
             </div>
@@ -225,8 +226,8 @@ function AppContent() {
           />
         )}
 
-        {/* RIGHT RESIZER */}
-        {view.viewMode !== 'mini' && view.viewMode !== 'player-focus' && view.showRightPanel && view.showCenterPanel && (
+        {/* RIGHT RESIZER - Hide in Cinema Mode */}
+        {view.viewMode !== 'mini' && view.viewMode !== 'player-focus' && !isCinema && view.showRightPanel && view.showCenterPanel && (
             <div className="w-4 z-30 flex items-center justify-center cursor-none custom-resizer group -ml-0 mr-[-8px] relative touch-none" onMouseDown={view.handleMouseDownRight}>
                 <div className="w-[1px] h-[92%] bg-theme-primary/40 rounded-full group-hover:bg-theme-primary group-hover:w-[2px] group-hover:shadow-[0_0_10px_var(--color-primary)] transition-all duration-300"></div>
             </div>

@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState, useRef } from 'react';
 import { Terminal, Cpu, Power, Key, ShieldCheck, Globe, X, Circle, Maximize } from 'lucide-react';
 import { useLanguage } from '../contexts/LanguageContext';
@@ -231,6 +230,7 @@ const StartupOverlay: React.FC<StartupOverlayProps> = ({ onComplete, onFadeOut, 
           timeoutsRef.current.forEach(window.clearTimeout);
           timeoutsRef.current = [];
           setIsVisible(false);
+          document.body.classList.remove('force-dos-cursor');
       }
   }, [forceSkip]);
 
@@ -301,6 +301,7 @@ const StartupOverlay: React.FC<StartupOverlayProps> = ({ onComplete, onFadeOut, 
     // Fade out immediately
     setContainerOpacity(0);
     setStandbyOpacity(0);
+    document.body.classList.remove('force-dos-cursor');
 
     // Short delay to allow fade out to render, then finish
     setTimeout(() => {
@@ -313,6 +314,9 @@ const StartupOverlay: React.FC<StartupOverlayProps> = ({ onComplete, onFadeOut, 
       // Guard: Only allow start if animation has finished presenting the window
       if (collapsePhase !== 'idle' || introPhase !== 'content') return;
       
+      // Force DOS cursor during Login Sequence
+      document.body.classList.add('force-dos-cursor');
+
       if (tempApiKey !== apiKey) {
           setApiKey(tempApiKey);
       }
@@ -471,6 +475,9 @@ const StartupOverlay: React.FC<StartupOverlayProps> = ({ onComplete, onFadeOut, 
       setContainerOpacity(0);
       await wait(1500); 
       
+      // Remove forced cursor
+      document.body.classList.remove('force-dos-cursor');
+
       // FINISH: Unmount overlay and trigger tutorial if needed
       if (mounted && !skippedRef.current) {
         onCompleteRef.current?.();
@@ -482,6 +489,7 @@ const StartupOverlay: React.FC<StartupOverlayProps> = ({ onComplete, onFadeOut, 
 
     return () => {
         mounted = false;
+        document.body.classList.remove('force-dos-cursor');
         timeoutsRef.current.forEach(window.clearTimeout);
         
         // CRITICAL FIX: Stop any playing SFX when this specific effect cleans up.
@@ -534,7 +542,7 @@ const StartupOverlay: React.FC<StartupOverlayProps> = ({ onComplete, onFadeOut, 
 
     return (
         <div 
-            className="fixed inset-0 z-[10000] bg-[#030712] flex flex-col items-center justify-center cursor-none select-none overflow-hidden"
+            className="fixed inset-0 z-[200000] bg-[#030712] flex flex-col items-center justify-center cursor-none select-none overflow-hidden"
             style={{ 
                 opacity: standbyOpacity, 
                 transition: 'opacity 1s ease-in-out' 
@@ -786,7 +794,7 @@ const StartupOverlay: React.FC<StartupOverlayProps> = ({ onComplete, onFadeOut, 
 
   return (
     <div 
-      className={`fixed inset-0 z-[10000] bg-[#030712] flex items-center justify-center cursor-none transition-opacity duration-1000 ease-out select-none ${containerOpacity < 1 ? 'pointer-events-none' : ''}`}
+      className={`fixed inset-0 z-[200000] bg-[#030712] flex items-center justify-center cursor-none transition-opacity duration-1000 ease-out select-none ${containerOpacity < 1 ? 'pointer-events-none' : ''}`}
       style={{ opacity: containerOpacity }}
       onDoubleClick={handleSkip}
     >

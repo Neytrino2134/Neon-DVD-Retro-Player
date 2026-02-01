@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState, useRef } from 'react';
 import { Terminal } from 'lucide-react';
 import { useLanguage } from '../contexts/LanguageContext';
@@ -44,6 +43,13 @@ const ShutdownOverlay: React.FC<ShutdownOverlayProps> = ({ active, onCancel, onP
       onPlayRebootSfxRef.current = onPlayRebootSfx;
   }, [onPlayRebootSfx]);
 
+  // Handle Forced DOS Cursor logic
+  useEffect(() => {
+      if (active) document.body.classList.add('force-dos-cursor');
+      else document.body.classList.remove('force-dos-cursor');
+      return () => document.body.classList.remove('force-dos-cursor');
+  }, [active]);
+
   // Helper to manage timeouts cleanly
   const wait = (ms: number) => new Promise(resolve => {
     const id = window.setTimeout(resolve, ms);
@@ -74,7 +80,7 @@ const ShutdownOverlay: React.FC<ShutdownOverlayProps> = ({ active, onCancel, onP
       setStep('window_slide');
       setWindowSize({ w: 600, h: 2 }); // Expand Width
       await wait(800);
-      setWindowSize({ w: 600, h: 420 }); // Expand Height (Increased slightly)
+      setWindowSize({ w: 600, h: 500 }); // Expand Height (Increased to prevent footer clipping)
       await wait(800);
 
       // 3. Type "CRITICAL ERROR DETECTED"
@@ -186,11 +192,13 @@ const ShutdownOverlay: React.FC<ShutdownOverlayProps> = ({ active, onCancel, onP
   const showInstructions = step !== 'window_slide' && step !== 'typing_header';
   const showCountdown = step === 'countdown' || step === 'loading';
   const showLoading = step === 'loading';
+  // Animation continues during countdown AND loading
+  const isBreathing = step === 'countdown' || step === 'loading';
 
   // 1. TV OFF / SILENCE PHASE
   if (step === 'tv_off' || step === 'silence') {
     return (
-        <div className="fixed inset-0 z-[10000] bg-black overflow-hidden pointer-events-none cursor-none">
+        <div className="fixed inset-0 z-[200005] bg-black overflow-hidden cursor-none">
             {step === 'tv_off' && (
                 <div className="absolute inset-0 z-[100] bg-black animate-[tv-off-scale_0.5s_ease-in_forwards] origin-center">
                     <div className="absolute inset-0 animate-[tv-off-flash_0.6s_ease-out_forwards] pointer-events-none"></div>
@@ -203,7 +211,7 @@ const ShutdownOverlay: React.FC<ShutdownOverlayProps> = ({ active, onCancel, onP
   // 2. MAIN INTERFACE PHASE
   return (
     <div 
-        className="fixed inset-0 z-[9999] flex items-center justify-center select-none overflow-hidden"
+        className="fixed inset-0 z-[200000] flex items-center justify-center select-none overflow-hidden cursor-none"
         onDoubleClick={handleDoubleClick}
         style={{
             backgroundColor: `rgba(0, 0, 0, ${bgOpacity})`,
@@ -260,9 +268,9 @@ const ShutdownOverlay: React.FC<ShutdownOverlayProps> = ({ active, onCancel, onP
                     {/* Instructions Block - Wrapper to smooth out height changes if needed, but typing handles it well */}
                     <div className="w-full max-w-[480px] min-h-[100px] mb-2">
                         {showInstructions && (
-                            <div className="text-xs text-red-400 space-y-1 text-left border-l-2 border-red-900/50 pl-4 py-2 bg-red-950/10 transition-opacity duration-500">
+                            <div className="text-xs space-y-1 text-left border-l-2 border-red-900/50 pl-4 py-2 bg-red-950/10 transition-opacity duration-500">
                                 {typedLines.map((line, i) => (
-                                    <div key={i} className={`${i === 0 ? 'text-red-300 font-bold mb-2 tracking-widest' : 'opacity-80'}`}>
+                                    <div key={i} className={`${i === 0 ? 'text-red-500 font-bold mb-2 tracking-widest' : `text-red-300 font-bold opacity-100 ${isBreathing ? 'animate-pulse' : ''}`}`}>
                                         {line}
                                     </div>
                                 ))}

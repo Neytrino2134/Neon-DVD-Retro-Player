@@ -154,6 +154,7 @@ const Controls: React.FC<ControlsProps> = ({
   
   // Determine if we are in Mini Mode layout
   const isMini = viewMode === 'mini';
+  const isCinema = viewMode === 'cinema';
   
   // Ref for Mini Mode to access inside animation loop
   const isMiniRef = useRef(isMini);
@@ -270,10 +271,14 @@ const Controls: React.FC<ControlsProps> = ({
   };
 
   // Outer container styling 
-  // Updated border-l-4 color to theme-bg to match background and hide visual seam
-  const outerContainerClass = isMini 
-    ? "relative w-full h-full flex flex-col bg-theme-bg overflow-hidden" 
-    : "relative w-full h-full flex flex-col bg-theme-bg border-l-4 border-theme-bg shadow-inner p-4"; 
+  let outerContainerClass = "relative w-full h-full flex flex-col bg-theme-bg border-l-4 border-theme-bg shadow-inner p-4";
+  
+  if (isMini) {
+      outerContainerClass = "relative w-full h-full flex flex-col bg-theme-bg overflow-hidden";
+  } else if (isCinema) {
+      // CINEMA OVERRIDE: Transparent container, no border, standard padding
+      outerContainerClass = "relative w-full h-full flex flex-col bg-transparent p-4";
+  }
 
   // Inner Chassis Styling
   // In Mini mode, we make the chassis draggable (app-drag-region) and add the group class for hover effects

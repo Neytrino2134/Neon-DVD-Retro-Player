@@ -1,5 +1,5 @@
 
-import { useRef, useCallback } from 'react';
+import React, { useRef, useCallback } from 'react';
 
 export const useSettingsScroll = () => {
   const scrollContainerRef = useRef<HTMLDivElement>(null);

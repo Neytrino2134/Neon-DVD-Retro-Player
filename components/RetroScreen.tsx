@@ -306,7 +306,7 @@ const RetroScreen = forwardRef<HTMLDivElement, RetroScreenProps>((props, externa
         onMouseMove={handleMouseMove}
         onWheel={handleWheel} // Added wheel handler
         {...gestureHandlers} 
-        className={`cursor-hide-center cursor-target-screen relative w-full h-full bg-gray-900 transition-all duration-700 ${focusMode ? 'rounded-none border-0' : 'rounded-xl border-2'} ${isDragging ? 'border-neon-blue shadow-[0_0_30px_#00f3ff]' : 'border-theme-border shadow-md'} overflow-hidden group touch-action-manipulation`}
+        className={`cursor-hide-center cursor-target-screen relative w-full h-full bg-gray-900 ${isResizing ? 'transition-none' : 'transition-all duration-700'} ${focusMode ? 'rounded-none border-0' : 'rounded-xl border-2'} ${isDragging ? 'border-neon-blue shadow-[0_0_30px_#00f3ff]' : 'border-theme-border shadow-md'} overflow-hidden group touch-action-manipulation`}
         onDragOver={onDragOver}
         onDragEnter={onDragEnter}
         onDragLeave={onDragLeave}
@@ -363,46 +363,42 @@ const RetroScreen = forwardRef<HTMLDivElement, RetroScreenProps>((props, externa
                 </div>
                 
                 {/* 
-                    HEAVY EFFECTS - DISABLED DURING RESIZE
-                    This prevents WebGL context loss and freezing during rapid window geometry changes
+                    EFFECTS LAYER
+                    Rendering unconditionally to ensure visibility in all modes.
                 */}
-                {!isResizing && (
-                    <>
-                        <PatternOverlay pattern={bgPattern} config={bgPatternConfig} />
-                        <TransitionEffect phase={transitionPhase} mode={bgTransition} />
-                        <RainEffect config={effectsConfig.rain} />
-                        <TronEffect 
-                            config={effectsConfig.tron} 
-                            analyser={analyser} 
-                            isPlaying={isAudioProcessing} // Use combined active flag
-                            visualizerConfig={visualizerConfig} 
-                            volume={volume}
-                            currentTime={currentTime}
-                            duration={duration}
-                        />
-                        
-                        <LightLeaksEffect config={effectsConfig.lightLeaks} />
-                        <LightLeaksEffect config={transitionLeaksConfig} />
+                <PatternOverlay pattern={bgPattern} config={bgPatternConfig} />
+                <TransitionEffect phase={transitionPhase} mode={bgTransition} />
+                <RainEffect config={effectsConfig.rain} />
+                <TronEffect 
+                    config={effectsConfig.tron} 
+                    analyser={analyser} 
+                    isPlaying={isAudioProcessing} // Use combined active flag
+                    visualizerConfig={visualizerConfig} 
+                    volume={volume}
+                    currentTime={currentTime}
+                    duration={duration}
+                />
+                
+                <LightLeaksEffect config={effectsConfig.lightLeaks} />
+                <LightLeaksEffect config={transitionLeaksConfig} />
 
-                        {showVisualizer && (
-                            <Visualizer analyser={analyser} isPlaying={isAudioProcessing} config={visualizerConfig} fps={120} volume={volume} />
-                        )}
-
-                        {showVisualizer3D && reactorConfig && (
-                            reactorConfig.threeDMode === 'spectrum' ? (
-                                <VisualizerSpectrum3D analyser={analyser} isPlaying={isAudioProcessing} config={reactorConfig} volume={volume} />
-                            ) : (
-                                <Visualizer3D analyser={analyser} isPlaying={isAudioProcessing} config={reactorConfig} volume={volume} />
-                            )
-                        )}
-
-                        {showSineWave && sineWaveConfig && (
-                            <SineWave analyser={analyser} isPlaying={isAudioProcessing} config={sineWaveConfig} volume={volume} />
-                        )}
-                        
-                        {showDvd && <DvdLogo containerRef={containerRef} fps={effectsConfig.fps} effectsConfig={effectsConfig} config={dvdConfig} onPlaySfx={onPlaySfx} />}
-                    </>
+                {showVisualizer && (
+                    <Visualizer analyser={analyser} isPlaying={isAudioProcessing} config={visualizerConfig} fps={120} volume={volume} />
                 )}
+
+                {showVisualizer3D && reactorConfig && (
+                    reactorConfig.threeDMode === 'spectrum' ? (
+                        <VisualizerSpectrum3D analyser={analyser} isPlaying={isAudioProcessing} config={reactorConfig} volume={volume} />
+                    ) : (
+                        <Visualizer3D analyser={analyser} isPlaying={isAudioProcessing} config={reactorConfig} volume={volume} />
+                    )
+                )}
+
+                {showSineWave && sineWaveConfig && (
+                    <SineWave analyser={analyser} isPlaying={isAudioProcessing} config={sineWaveConfig} volume={volume} />
+                )}
+                
+                {showDvd && <DvdLogo containerRef={containerRef} fps={effectsConfig.fps} effectsConfig={effectsConfig} config={dvdConfig} onPlaySfx={onPlaySfx} />}
                 
                 <ProgressBar 
                     progress={progress} 
@@ -437,20 +433,16 @@ const RetroScreen = forwardRef<HTMLDivElement, RetroScreenProps>((props, externa
                     setVisualizerConfig={setVisualizerConfig}
                 />
 
-                {!isResizing && (
-                    <>
-                        <GlitchEffect effects={effectsConfig} />
-                        <CyberHackEffect effects={effectsConfig} />
-                        <HologramEffect effects={effectsConfig} bgMedia={baseMedia} />
-                        <GeminiChatEffect effects={effectsConfig} apiKey={apiKey} />
-                        <LightFlickerEffect config={effectsConfig.lightFlicker} />
-                    </>
-                )}
+                <GlitchEffect effects={effectsConfig} />
+                <CyberHackEffect effects={effectsConfig} />
+                <HologramEffect effects={effectsConfig} bgMedia={baseMedia} />
+                <GeminiChatEffect effects={effectsConfig} apiKey={apiKey} />
+                <LightFlickerEffect config={effectsConfig.lightFlicker} />
                 
                 <VignetteEffect config={effectsConfig.vignette} />
             </div>
             
-            {!isResizing && <DebugConsoleEffect effects={effectsConfig} />}
+            <DebugConsoleEffect effects={effectsConfig} />
             <NoiseOverlay opacity={effectiveNoise} pixelation={effectivePixelation} />
             <ScanlineEffect config={effectsConfig} />
             

@@ -1,5 +1,5 @@
 
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 
 // Map of Main Section ID -> Array of Child Module IDs
 const SECTION_MODULES: Record<string, string[]> = {
