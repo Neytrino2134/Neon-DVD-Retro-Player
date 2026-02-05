@@ -1,6 +1,6 @@
 
 import React, { useState } from 'react';
-import { VisualizerConfig, EffectsConfig, DvdConfig, MarqueeConfig, PatternConfig, BackgroundMedia, AppPreset, CursorStyle, WatermarkConfig, ThemeType, ControlStyle, BgTransitionType, AmbienceFile, AmbienceConfig, BgAnimationType, BackgroundPlaylist, BgHotspot } from '../../types';
+import { VisualizerConfig, EffectsConfig, DvdConfig, MarqueeConfig, PatternConfig, BackgroundMedia, AppPreset, CursorStyle, WatermarkConfig, ThemeType, ControlStyle, BgTransitionType, AmbienceFile, AmbienceConfig, BgAnimationType, BackgroundPlaylist, BgHotspot, EqualizerConfig } from '../../types';
 import { useNotification } from '../../contexts/NotificationContext';
 import { useTheme } from '../../contexts/ThemeContext';
 import { useLanguage } from '../../contexts/LanguageContext';
@@ -142,6 +142,12 @@ interface SettingsPanelProps {
   shuffleBgList?: () => void; 
   updateBg?: (id: string, newFile: File) => Promise<void>; 
   updateBgMetadata?: (id: string, hotspots: BgHotspot[]) => Promise<void>; 
+
+  // EQ
+  eqConfig: EqualizerConfig;
+  setEqBand: (i: number, v: number) => void;
+  setEqPreset: (id: string, bands: number[]) => void;
+  toggleEq: () => void;
 }
 
 const SettingsPanel: React.FC<SettingsPanelProps> = (props) => {
@@ -250,6 +256,7 @@ const SettingsPanel: React.FC<SettingsPanelProps> = (props) => {
                 crossfadeDuration={props.crossfadeDuration} setCrossfadeDuration={props.setCrossfadeDuration} sfxVolume={props.sfxVolume} setSfxVolume={props.setSfxVolume} smoothStart={props.smoothStart} setSmoothStart={props.setSmoothStart}
                 ambienceFiles={props.ambienceFiles} ambienceConfig={props.ambienceConfig} onAmbienceUpload={props.onAmbienceUpload} onAmbienceDelete={props.onAmbienceDelete} onAmbienceSetActive={props.onAmbienceSetActive} onAmbienceTogglePlay={props.onAmbienceTogglePlay} onAmbienceVolume={props.onAmbienceVolume}
                 isMicActive={props.isMicActive} toggleMic={props.toggleMic} isSysAudioActive={props.isSysAudioActive} toggleSysAudio={props.toggleSysAudio}
+                eqConfig={props.eqConfig} setEqBand={props.setEqBand} setEqPreset={props.setEqPreset} toggleEq={props.toggleEq}
             />
         </SettingsSection>
 

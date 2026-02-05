@@ -82,10 +82,14 @@ const scanEntry = async (entry: FileSystemEntry): Promise<File[]> => {
             }
         };
 
-        await readBatch();
-        
-        const results = await Promise.all(entries.map(e => scanEntry(e)));
-        return results.flat();
+        try {
+            await readBatch();
+            const results = await Promise.all(entries.map(e => scanEntry(e)));
+            return results.flat();
+        } catch (e) {
+            console.warn("Directory scan failed (permission issues?)", e);
+            return [];
+        }
     }
     return [];
 };
@@ -94,23 +98,32 @@ const extractFilesFromDrop = async (dataTransfer: DataTransfer): Promise<File[]>
     const items = dataTransfer.items;
     let allFiles: File[] = [];
 
-    if (items && items.length > 0) {
-        const promises: Promise<File[]>[] = [];
-        for (let i = 0; i < items.length; i++) {
-            const item = items[i];
-            const entry = item.webkitGetAsEntry ? item.webkitGetAsEntry() : null;
-            if (entry) {
-                promises.push(scanEntry(entry as unknown as FileSystemEntry));
-            } else if (item.kind === 'file') {
-                const f = item.getAsFile();
-                if (f) promises.push(Promise.resolve([f]));
-            }
+    // Fallback: If items API is missing or empty, use 'files' directly
+    if (!items || items.length === 0) {
+        return Array.from(dataTransfer.files);
+    }
+
+    const promises: Promise<File[]>[] = [];
+    for (let i = 0; i < items.length; i++) {
+        const item = items[i];
+        const entry = item.webkitGetAsEntry ? item.webkitGetAsEntry() : null;
+        if (entry) {
+            promises.push(scanEntry(entry as unknown as FileSystemEntry));
+        } else if (item.kind === 'file') {
+            const f = item.getAsFile();
+            if (f) promises.push(Promise.resolve([f]));
         }
+    }
+    
+    try {
         const results = await Promise.all(promises);
         allFiles = results.flat();
-    } else {
+    } catch (e) {
+        // Fallback if entry scanning fails
+        console.warn("Advanced entry scanning failed, falling back to basic file list", e);
         allFiles = Array.from(dataTransfer.files);
     }
+    
     return allFiles;
 };
 
@@ -296,7 +309,8 @@ export const TrackList: React.FC<TrackListProps> = ({
 
       if (isPlaylistLocked) return;
 
-      if (e.dataTransfer.types.includes('Files')) {
+      // Handle Files
+      if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
           const files = await extractFilesFromDrop(e.dataTransfer);
           if (files.length > 0) {
               if (onFilesInserted) {
@@ -361,7 +375,8 @@ export const TrackList: React.FC<TrackListProps> = ({
       setDropIndicator(null);
       if (isPlaylistLocked) return;
 
-      if (e.dataTransfer.types.includes('Files')) {
+      // Handle Files
+      if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
           const files = await extractFilesFromDrop(e.dataTransfer);
           if (files.length > 0) {
               if (onFilesInserted) {

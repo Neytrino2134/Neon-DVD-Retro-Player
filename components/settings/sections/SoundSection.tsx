@@ -1,12 +1,13 @@
 
 import React from 'react';
-import { AudioWaveform, CloudRain, RadioReceiver } from 'lucide-react';
+import { AudioWaveform, CloudRain, RadioReceiver, Sliders } from 'lucide-react';
 import ModuleWrapper from '../ModuleWrapper';
 import { MixerSettings } from '../modules/EffectModules';
 import AmbienceSettings from '../modules/AmbienceSettings';
+import EqualizerSettings from '../modules/EqualizerSettings';
 import { SystemAudioModule } from '../modules/ScreenSettings';
 import { NumberedLabel } from '../SettingsSection';
-import { AmbienceFile, AmbienceConfig } from '../../../types';
+import { AmbienceFile, AmbienceConfig, EqualizerConfig } from '../../../types';
 
 interface SoundSectionProps {
   expandedState: Record<string, boolean>;
@@ -30,13 +31,19 @@ interface SoundSectionProps {
   toggleMic: () => void;
   isSysAudioActive: boolean;
   toggleSysAudio: () => void;
+  // EQ Props
+  eqConfig: EqualizerConfig;
+  setEqBand: (i: number, v: number) => void;
+  setEqPreset: (id: string, bands: number[]) => void;
+  toggleEq: () => void;
 }
 
 const SoundSection: React.FC<SoundSectionProps> = ({
   expandedState, toggleExpand,
   crossfadeDuration, setCrossfadeDuration, sfxVolume, setSfxVolume, smoothStart, setSmoothStart,
   ambienceFiles, ambienceConfig, onAmbienceUpload, onAmbienceDelete, onAmbienceSetActive, onAmbienceTogglePlay, onAmbienceVolume,
-  isMicActive, toggleMic, isSysAudioActive, toggleSysAudio
+  isMicActive, toggleMic, isSysAudioActive, toggleSysAudio,
+  eqConfig, setEqBand, setEqPreset, toggleEq
 }) => {
   return (
     <>
@@ -44,11 +51,15 @@ const SoundSection: React.FC<SoundSectionProps> = ({
             <MixerSettings crossfadeDuration={crossfadeDuration} setCrossfadeDuration={setCrossfadeDuration} sfxVolume={sfxVolume} setSfxVolume={setSfxVolume} smoothStart={smoothStart} setSmoothStart={setSmoothStart} />
         </ModuleWrapper>
 
-        <ModuleWrapper id="ambience" label={<NumberedLabel num="02" k="ambience" />} icon={CloudRain} isEnabled={true} isExpanded={expandedState['ambience']} onToggleExpand={(e) => toggleExpand('ambience', e.shiftKey)} isAlwaysOn={true} onToggleEnable={() => {}}>
+        <ModuleWrapper id="eq" label={<NumberedLabel num="02" k="equalizer" />} icon={Sliders} isEnabled={eqConfig.enabled} isExpanded={expandedState['eq']} onToggleExpand={(e) => toggleExpand('eq', e.shiftKey)} onToggleEnable={() => toggleEq()}>
+            <EqualizerSettings config={eqConfig} onBandChange={setEqBand} onPresetChange={setEqPreset} onToggle={toggleEq} />
+        </ModuleWrapper>
+
+        <ModuleWrapper id="ambience" label={<NumberedLabel num="03" k="ambience" />} icon={CloudRain} isEnabled={true} isExpanded={expandedState['ambience']} onToggleExpand={(e) => toggleExpand('ambience', e.shiftKey)} isAlwaysOn={true} onToggleEnable={() => {}}>
             <AmbienceSettings files={ambienceFiles} config={ambienceConfig} onUpload={onUpload => onAmbienceUpload(onUpload)} onDelete={onAmbienceDelete} onSetActive={onAmbienceSetActive} onTogglePlay={onAmbienceTogglePlay} onVolumeChange={onAmbienceVolume} />
         </ModuleWrapper>
 
-        <ModuleWrapper id="sysaudio" label={<NumberedLabel num="03" k="sys_audio_input" />} icon={RadioReceiver} isEnabled={true} isExpanded={expandedState['sysaudio']} isAlwaysOn={true} onToggleExpand={(e) => toggleExpand('sysaudio', e.shiftKey)} onToggleEnable={() => {}}>
+        <ModuleWrapper id="sysaudio" label={<NumberedLabel num="04" k="sys_audio_input" />} icon={RadioReceiver} isEnabled={true} isExpanded={expandedState['sysaudio']} isAlwaysOn={true} onToggleExpand={(e) => toggleExpand('sysaudio', e.shiftKey)} onToggleEnable={() => {}}>
             <SystemAudioModule 
                 isMicActive={isMicActive} 
                 toggleMic={toggleMic} 

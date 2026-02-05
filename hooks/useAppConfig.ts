@@ -1,6 +1,6 @@
 
 import { useState, useEffect, useCallback } from 'react';
-import { VisualizerConfig, DvdConfig, EffectsConfig, MarqueeConfig, PatternConfig, BackgroundMedia, BackgroundPlaylist, AppPreset, CursorStyle, WatermarkConfig, ThemeType, ControlStyle, BgTransitionType, BgAnimationType, BgHotspot } from '../types';
+import { VisualizerConfig, DvdConfig, EffectsConfig, MarqueeConfig, PatternConfig, BackgroundMedia, BackgroundPlaylist, AppPreset, CursorStyle, WatermarkConfig, ThemeType, ControlStyle, BgTransitionType, BgAnimationType, BgHotspot, EqualizerConfig } from '../types';
 import { getAllBackgrounds, saveBackground, deleteBackground, getAllBgPlaylists, saveBgPlaylist, deleteBgPlaylistAndFiles } from '../lib/db';
 import { 
   DEFAULT_VISUALIZER_CONFIG, 
@@ -9,7 +9,8 @@ import {
   DEFAULT_DVD_CONFIG, 
   DEFAULT_EFFECTS_CONFIG, 
   DEFAULT_MARQUEE_CONFIG, 
-  DEFAULT_WATERMARK_CONFIG 
+  DEFAULT_WATERMARK_CONFIG,
+  DEFAULT_EQUALIZER_CONFIG
 } from '../config/defaults';
 import { DEFAULT_PRESETS, DEFAULT_SYSTEM_PRESET } from '../config/presets';
 
@@ -39,7 +40,8 @@ const STORAGE_KEYS = {
   ADVANCED_MODE: 'neon_advanced_mode',
   USE_ALBUM_ART: 'neon_use_album_art',
   ACTIVE_BG_PLAYLIST: 'neon_active_bg_playlist',
-  PLAYING_BG_PLAYLIST: 'neon_playing_bg_playlist'
+  PLAYING_BG_PLAYLIST: 'neon_playing_bg_playlist',
+  EQUALIZER: 'neon_equalizer_config' // NEW
 };
 
 // --- HELPER: SAFE MERGE ---
@@ -88,6 +90,7 @@ export const useAppConfig = () => {
   
   const [marqueeConfig, setMarqueeConfig] = useState<MarqueeConfig>(() => getInitial(STORAGE_KEYS.MARQUEE, DEFAULT_MARQUEE_CONFIG));
   const [watermarkConfig, setWatermarkConfig] = useState<WatermarkConfig>(() => getInitial(STORAGE_KEYS.WATERMARK, DEFAULT_WATERMARK_CONFIG));
+  const [equalizerConfig, setEqualizerConfig] = useState<EqualizerConfig>(() => getInitial(STORAGE_KEYS.EQUALIZER, DEFAULT_EQUALIZER_CONFIG));
   
   // Independent Configs
   const [visualizerConfig, setVisualizerConfig] = useState<VisualizerConfig>(() => getInitial(STORAGE_KEYS.VISUALIZER, DEFAULT_VISUALIZER_CONFIG));
@@ -150,6 +153,7 @@ export const useAppConfig = () => {
     localStorage.setItem(STORAGE_KEYS.SHOW_DVD, JSON.stringify(showDvd));
     localStorage.setItem(STORAGE_KEYS.MARQUEE, JSON.stringify(marqueeConfig));
     localStorage.setItem(STORAGE_KEYS.WATERMARK, JSON.stringify(watermarkConfig));
+    localStorage.setItem(STORAGE_KEYS.EQUALIZER, JSON.stringify(equalizerConfig));
     localStorage.setItem(STORAGE_KEYS.BG_AUTOPLAY, JSON.stringify(bgAutoplayInterval));
     localStorage.setItem(STORAGE_KEYS.CURSOR, JSON.stringify(cursorStyle));
     localStorage.setItem(STORAGE_KEYS.RETRO_CURSOR, JSON.stringify(retroScreenCursorStyle));
@@ -157,7 +161,7 @@ export const useAppConfig = () => {
     localStorage.setItem(STORAGE_KEYS.BG_ANIMATION, JSON.stringify(bgAnimation)); 
     localStorage.setItem(STORAGE_KEYS.ADVANCED_MODE, JSON.stringify(isAdvancedMode));
     localStorage.setItem(STORAGE_KEYS.USE_ALBUM_ART, JSON.stringify(useAlbumArtAsBackground));
-  }, [visualizerConfig, reactorConfig, sineWaveConfig, dvdConfig, effectsConfig, bgColor, bgPattern, bgPatternConfig, showVisualizer, showVisualizer3D, showSineWave, showDvd, marqueeConfig, watermarkConfig, bgAutoplayInterval, cursorStyle, retroScreenCursorStyle, bgTransition, bgAnimation, isAdvancedMode, useAlbumArtAsBackground]);
+  }, [visualizerConfig, reactorConfig, sineWaveConfig, dvdConfig, effectsConfig, bgColor, bgPattern, bgPatternConfig, showVisualizer, showVisualizer3D, showSineWave, showDvd, marqueeConfig, watermarkConfig, bgAutoplayInterval, cursorStyle, retroScreenCursorStyle, bgTransition, bgAnimation, isAdvancedMode, useAlbumArtAsBackground, equalizerConfig]);
 
   useEffect(() => {
     localStorage.setItem(STORAGE_KEYS.PRESETS, JSON.stringify(savedPresets));
@@ -530,7 +534,8 @@ export const useAppConfig = () => {
         controlStyle,
         bgTransition,
         bgAnimation,
-        ambienceConfig: undefined 
+        ambienceConfig: undefined,
+        equalizerConfig // Save EQ
       }
     };
     
@@ -564,7 +569,8 @@ export const useAppConfig = () => {
                     theme: theme || p.config.theme,
                     controlStyle: controlStyle || p.config.controlStyle,
                     bgTransition,
-                    bgAnimation
+                    bgAnimation,
+                    equalizerConfig // Save EQ
                   }
               };
           }
@@ -587,6 +593,7 @@ export const useAppConfig = () => {
     const safeMarquee = safeMerge(DEFAULT_MARQUEE_CONFIG, c.marqueeConfig);
     const safeWatermark = safeMerge(DEFAULT_WATERMARK_CONFIG, c.watermarkConfig || {});
     const safePatternConfig = safeMerge({ intensity: 0.25, scale: 1.0 }, c.bgPatternConfig);
+    const safeEqualizer = safeMerge(DEFAULT_EQUALIZER_CONFIG, c.equalizerConfig || {});
 
     setVisualizerConfig(safeVisualizer);
     setReactorConfig(safeReactor);
@@ -595,6 +602,7 @@ export const useAppConfig = () => {
     setEffectsConfig(safeEffects);
     setMarqueeConfig(safeMarquee);
     setWatermarkConfig(safeWatermark);
+    setEqualizerConfig(safeEqualizer);
     
     setBgColor(c.bgColor);
     setBgPattern(c.bgPattern);
@@ -652,7 +660,8 @@ export const useAppConfig = () => {
         theme: currentTheme,
         controlStyle: currentControlStyle,
         bgTransition,
-        bgAnimation
+        bgAnimation,
+        equalizerConfig
       };
       
       const blob = new Blob([JSON.stringify(configToExport, null, 2)], { type: 'application/json' });
@@ -720,6 +729,7 @@ export const useAppConfig = () => {
     dvdConfig, setDvdConfig,
     effectsConfig, setEffectsConfig,
     watermarkConfig, setWatermarkConfig,
+    equalizerConfig, setEqualizerConfig, // Export EQ
     bgColor, setBgColor,
     bgPattern, setBgPattern,
     bgPatternConfig, setBgPatternConfig,

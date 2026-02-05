@@ -195,8 +195,14 @@ function AppContent() {
           </>
         )}
 
-        <audio ref={player.audioRefA} onEnded={player.activeDeck === 'A' ? () => { if (system.rebootPhase === 'waiting') { player.setIsPlaying(false); system.setRebootPhase('active'); } else { player.nextTrack(true); } } : undefined} onTimeUpdate={player.activeDeck === 'A' ? (e) => player.handleTimeUpdate(e, system.rebootPhase === 'waiting') : undefined} onLoadedMetadata={player.activeDeck === 'A' ? (e) => player.handleTimeUpdate(e, system.rebootPhase === 'waiting') : undefined} onPlay={player.onAudioPlay} onPause={player.onAudioPause} crossOrigin="anonymous" />
-        <audio ref={player.audioRefB} onEnded={player.activeDeck === 'B' ? () => { if (system.rebootPhase === 'waiting') { player.setIsPlaying(false); system.setRebootPhase('active'); } else { player.nextTrack(true); } } : undefined} onTimeUpdate={player.activeDeck === 'B' ? (e) => player.handleTimeUpdate(e, system.rebootPhase === 'waiting') : undefined} onLoadedMetadata={player.activeDeck === 'B' ? (e) => player.handleTimeUpdate(e, system.rebootPhase === 'waiting') : undefined} onPlay={player.onAudioPlay} onPause={player.onAudioPause} crossOrigin="anonymous" />
+        {/* 
+            CRITICAL FIX: 
+            Added unique 'key' based on contextId. 
+            This forces React to completely destroy and recreate the <audio> elements when the Audio Engine resets (new context).
+            Without this, the browser throws an error when trying to create a MediaElementSource on a recycled element.
+        */}
+        <audio key={`deck-a-${player.contextId}`} ref={player.audioRefA} onEnded={player.activeDeck === 'A' ? () => { if (system.rebootPhase === 'waiting') { player.setIsPlaying(false); system.setRebootPhase('active'); } else { player.nextTrack(true); } } : undefined} onTimeUpdate={player.activeDeck === 'A' ? (e) => player.handleTimeUpdate(e, system.rebootPhase === 'waiting') : undefined} onLoadedMetadata={player.activeDeck === 'A' ? (e) => player.handleTimeUpdate(e, system.rebootPhase === 'waiting') : undefined} onPlay={player.onAudioPlay} onPause={player.onAudioPause} />
+        <audio key={`deck-b-${player.contextId}`} ref={player.audioRefB} onEnded={player.activeDeck === 'B' ? () => { if (system.rebootPhase === 'waiting') { player.setIsPlaying(false); system.setRebootPhase('active'); } else { player.nextTrack(true); } } : undefined} onTimeUpdate={player.activeDeck === 'B' ? (e) => player.handleTimeUpdate(e, system.rebootPhase === 'waiting') : undefined} onLoadedMetadata={player.activeDeck === 'B' ? (e) => player.handleTimeUpdate(e, system.rebootPhase === 'waiting') : undefined} onPlay={player.onAudioPlay} onPause={player.onAudioPause} />
 
         {/* --- LEFT PANEL --- */}
         {view.viewMode !== 'mini' && view.viewMode !== 'player-focus' && (
@@ -236,8 +242,8 @@ function AppContent() {
         {/* --- RIGHT PANEL --- */}
         <div className={view.rightPanelClass} style={view.rightPanelStyle}>
           <div 
-            className={`${isRightPanelFullWidth ? 'w-full h-full' : (view.showCenterPanel ? '' : 'w-full')} h-full`} 
-            style={{ width: isRightPanelFullWidth ? '100%' : `${view.rightPanelWidth}px` }}
+            className={`${isRightPanelFullWidth ? 'w-full h-full' : (view.showCenterPanel ? '' : 'w-full')} h-full relative`} 
+            style={view.rightPanelInnerStyle}
           >
             <Controls
               viewMode={view.viewMode}

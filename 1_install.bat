@@ -1,3 +1,4 @@
+
 @echo off
 title Neon Player - Installation
 color 0b
@@ -38,6 +39,6 @@ echo.
 echo ==================================================
 echo      INSTALLATION COMPLETE!
 echo ==================================================
-echo You can now run 'start.bat' to launch the player.
+echo You can now run '2_start.bat' to launch the player.
 echo.
 pause

@@ -1,8 +1,9 @@
 
 import React, { useState, useRef, useCallback, useEffect } from 'react';
-import { AudioTrack } from '../types';
+import { AudioTrack, EqualizerConfig } from '../types';
 import { useLibrary } from './useLibrary';
 import { useWebAudio } from './useWebAudio';
+import { DEFAULT_EQUALIZER_CONFIG } from '../config/defaults';
 
 export const useAudioPlayer = () => {
   const lib = useLibrary(); // Logic for DB and Playlists
@@ -37,6 +38,12 @@ export const useAudioPlayer = () => {
       return localStorage.getItem('neon_auto_next_playlist') === 'true';
   });
 
+  // EQ State
+  const [eqConfig, setEqConfig] = useState<EqualizerConfig>(() => {
+      const saved = localStorage.getItem('neon_equalizer_config');
+      return saved ? JSON.parse(saved) : DEFAULT_EQUALIZER_CONFIG;
+  });
+
   // Refs for logic
   const hasTriggeredAutoMixRef = useRef(false);
 
@@ -58,6 +65,10 @@ export const useAudioPlayer = () => {
   useEffect(() => {
       localStorage.setItem('neon_auto_next_playlist', String(isAutoNextPlaylist));
   }, [isAutoNextPlaylist]);
+
+  useEffect(() => {
+      localStorage.setItem('neon_equalizer_config', JSON.stringify(eqConfig));
+  }, [eqConfig]);
 
   // --- RESTORE STATE ON LOAD ---
   useEffect(() => {
@@ -90,23 +101,56 @@ export const useAudioPlayer = () => {
 
   // --- CONNECT AUDIO NODES ---
   useEffect(() => {
-      if (!audio.audioContextRef.current || !audio.gainNodeRef.current || !audio.analyser) return;
+      if (!audio.audioContextRef.current || !audio.eqInputNodeRef.current) return;
       
       const ctx = audio.audioContextRef.current;
+      const targetNode = audio.eqInputNodeRef.current; 
 
-      if (audioRefA.current && !sourceNodeRefA.current) {
-          const src = ctx.createMediaElementSource(audioRefA.current);
-          src.connect(audio.analyser); // Connect to Visualizer
-          src.connect(audio.gainNodeRef.current); // Connect to Speakers
-          sourceNodeRefA.current = src;
+      // Safely connect Source A
+      if (audioRefA.current) {
+          try {
+              // We catch errors here because in strict mode fast remounts might cause race conditions,
+              // but the 'key' prop in App.tsx should ensure we always have a fresh element.
+              const src = ctx.createMediaElementSource(audioRefA.current);
+              src.connect(targetNode);
+              sourceNodeRefA.current = src;
+          } catch(e) {
+              console.warn("Audio Node A connection warning:", e);
+          }
       }
-      if (audioRefB.current && !sourceNodeRefB.current) {
-          const src = ctx.createMediaElementSource(audioRefB.current);
-          src.connect(audio.analyser); // Connect to Visualizer
-          src.connect(audio.gainNodeRef.current); // Connect to Speakers
-          sourceNodeRefB.current = src;
+      
+      // Safely connect Source B
+      if (audioRefB.current) {
+          try {
+              const src = ctx.createMediaElementSource(audioRefB.current);
+              src.connect(targetNode);
+              sourceNodeRefB.current = src;
+          } catch(e) {
+              console.warn("Audio Node B connection warning:", e);
+          }
       }
-  }, [audio.analyser]);
+  }, [audio.analyser, audio.contextId]); // CRITICAL: Re-run when context ID changes
+
+  // --- EQUALIZER UPDATE ---
+  useEffect(() => {
+      if (!audio.eqFiltersRef.current || audio.eqFiltersRef.current.length === 0) return;
+      
+      const filters = audio.eqFiltersRef.current;
+      
+      filters.forEach((filter, i) => {
+          // If EQ disabled, set flat (0 gain). If enabled, set band value.
+          const gainValue = eqConfig.enabled ? eqConfig.bands[i] : 0;
+          
+          // Smooth transition to prevent clicks
+          if (audio.audioContextRef.current) {
+              const now = audio.audioContextRef.current.currentTime;
+              filter.gain.cancelScheduledValues(now);
+              filter.gain.linearRampToValueAtTime(gainValue, now + 0.1);
+          } else {
+              filter.gain.value = gainValue;
+          }
+      });
+  }, [eqConfig, audio.eqFiltersRef]);
 
   // --- HELPERS ---
   const getPlayingTracks = useCallback(() => {
@@ -116,6 +160,22 @@ export const useAudioPlayer = () => {
   const setVolume = (vol: number) => {
       setVolumeState(vol);
       // Actual gain update handled by useEffect in useWebAudio
+  };
+
+  const setEqBand = (index: number, value: number) => {
+      setEqConfig(prev => {
+          const newBands = [...prev.bands];
+          newBands[index] = value;
+          return { ...prev, bands: newBands, preset: 'custom' };
+      });
+  };
+
+  const setEqPreset = (presetId: string, bands: number[]) => {
+      setEqConfig(prev => ({ ...prev, preset: presetId, bands }));
+  };
+
+  const toggleEq = () => {
+      setEqConfig(prev => ({ ...prev, enabled: !prev.enabled }));
   };
 
   const seek = (time: number) => {
@@ -395,13 +455,10 @@ export const useAudioPlayer = () => {
       if (target === activeAudio) setIsPlaying(false);
   };
 
-  // --- WRAPPER FOR INSERTION (Bridge for App.tsx) ---
   const insertAudioFiles = async (files: File[], _index: number) => {
-      // Just append for now, complexity reduced
       await lib.actions.processAudioFiles(files);
   };
 
-  // Return the monolithic object expected by the UI
   return {
     // Refs
     audioRefA, audioRefB, activeDeck,
@@ -414,8 +471,11 @@ export const useAudioPlayer = () => {
     currentTrack,
     isPlaying, volume, currentTime, duration, 
     analyser: audio.analyser,
+    eqConfig, 
+    contextId: audio.contextId, // Pass contextId to force key updates in UI
     // Controls
     setVolume, seek, togglePlay, stop, nextTrack, prevTrack, selectTrack, setIsPlaying,
+    setEqBand, setEqPreset, toggleEq, 
     // Library Actions
     insertAudioFiles, 
     clearPlaylist: lib.actions.clearPlaylist, 
@@ -430,7 +490,7 @@ export const useAudioPlayer = () => {
     switchPlaylist: lib.setActivePlaylistId, 
     reorderPlaylists: lib.actions.reorderPlaylists,
     removeTracks: lib.actions.removeTracks, 
-    reorderTracks: () => {}, // Not implemented in library yet, placeholder
+    reorderTracks: () => {}, 
     moveTracksToPlaylist: lib.actions.moveTracksToPlaylist, 
     createPlaylistFromMove: lib.actions.createPlaylistFromMove, 
     createPlaylistFromFiles: lib.actions.createPlaylistFromFiles,

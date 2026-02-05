@@ -15,7 +15,8 @@ export type AnimSequence =
   | 'void_layout'       // Layout mounted but hidden (preparation phase)
   | 'reveal_left'       // System panel slides in
   | 'reveal_right'      // Player panel slides in
-  | 'reveal_center';    // Screen pops in
+  | 'reveal_center'     // Screen pops in
+  | 'switching_layout'; // NEW: Transition lock for layout mode swapping
 
 type Breakpoint = 'mobile' | 'tablet' | 'desktop';
 
@@ -49,20 +50,16 @@ export const useViewLayout = (introState: number) => {
   const startX = useRef(0);
   const startWidth = useRef(0);
 
-  // NEW: Detect Native Window Resize
-  const [isWindowResizing, setIsWindowResizing] = useState(false);
-  const windowResizeTimeoutRef = useRef<number>(0);
-
   const isCinema = viewMode === 'cinema';
   const focusMode = isCinema;
 
-  // Combine all resizing states. If ANY is true, transitions become "none" (instant).
+  // Combine resizing states. 
   const isResizing = animSequence.startsWith('exiting') || 
                      animSequence === 'void_layout' || 
                      animSequence === 'loading' || 
+                     animSequence === 'switching_layout' || // Disable transitions during layout switch
                      isResizingLeft.current || 
-                     isResizingRight.current ||
-                     isWindowResizing;
+                     isResizingRight.current;
 
   // Fullscreen listener
   useEffect(() => {
@@ -72,27 +69,6 @@ export const useViewLayout = (introState: number) => {
       document.addEventListener('fullscreenchange', handleFullscreenChange);
       return () => document.removeEventListener('fullscreenchange', handleFullscreenChange);
   }, []);
-
-  // Window Resize Listener (For Transition Disabling)
-  useEffect(() => {
-    const handleNativeResize = () => {
-        // As soon as resize event fires, disable transitions
-        if (!isWindowResizing) setIsWindowResizing(true);
-        
-        // Debounce the clearing of the flag
-        if (windowResizeTimeoutRef.current) clearTimeout(windowResizeTimeoutRef.current);
-        
-        windowResizeTimeoutRef.current = window.setTimeout(() => {
-            setIsWindowResizing(false);
-        }, 150); // Small buffer to ensure resize is definitely done
-    };
-
-    window.addEventListener('resize', handleNativeResize);
-    return () => {
-        window.removeEventListener('resize', handleNativeResize);
-        if (windowResizeTimeoutRef.current) clearTimeout(windowResizeTimeoutRef.current);
-    };
-  }, [isWindowResizing]);
 
   // --- PANEL RESIZING LOGIC ---
   const handleMouseDownLeft = useCallback((e: React.MouseEvent) => {
@@ -153,7 +129,6 @@ export const useViewLayout = (introState: number) => {
   }, []);
 
   // --- SMART BREAKPOINT LOGIC ---
-  // Calculates the current breakpoint based on width
   const getBreakpoint = (width: number): Breakpoint => {
       if (width < 940) return 'mobile';
       if (width < 1300) return 'tablet';
@@ -204,7 +179,6 @@ export const useViewLayout = (introState: number) => {
 
 
   // --- MUTUAL EXCLUSION TOGGLING ---
-  
   const toggleLeftPanel = useCallback(() => {
       setShowLeftPanel(prev => {
           const willShow = !prev;
@@ -234,7 +208,7 @@ export const useViewLayout = (introState: number) => {
       isTransitioningRef.current = true; // LOCK responsive logic
 
       try {
-          // 1. SWITCHING TO MINI MODE (Compact Mode: No Left Panel, Fixed Size)
+          // 1. SWITCHING TO MINI MODE
           if (targetMode === 'mini' && viewMode !== 'mini') {
               playSFX('WHOOSH_IN.mp3');
               // Transition Step 1: Scale down into darkness
@@ -248,9 +222,8 @@ export const useViewLayout = (introState: number) => {
               if (ipc) ipc.send('set-mini-mode');
               
               setViewMode('mini');
-              // Mini Mode Logic: Show Screen + Player, Hide Settings
               setShowLeftPanel(false);
-              setShowCenterPanel(false); // Hide center screen in true mini mode
+              setShowCenterPanel(false); 
               setShowRightPanel(true);
               
               // Transition Step 3: Reveal from center
@@ -258,8 +231,10 @@ export const useViewLayout = (introState: number) => {
               await wait(600); 
           } 
           
-          // 2. SWITCHING TO DEFAULT/FULL MODE
+          // 2. SWITCHING TO DEFAULT/FULL MODE (FROM MINI OR CINEMA)
           else if (targetMode === 'default' && (viewMode === 'mini' || viewMode === 'cinema')) {
+              const wasCinema = viewMode === 'cinema';
+
               if (viewMode === 'mini') {
                   playSFX('WHOOSH_OUT.mp3'); 
                   // Transition Step 1: Scale down into darkness
@@ -268,7 +243,18 @@ export const useViewLayout = (introState: number) => {
 
                   // Transition Step 2: Show Loader
                   setAnimSequence('loading');
-                  await wait(800); // Simulate load time
+                  await wait(800); 
+              } else if (wasCinema) {
+                  // EXITING CINEMA MODE - SMOOTH FIX
+                  // 1. Disable transitions temporarily to prevent "squeezing" artifact
+                  setAnimSequence('switching_layout');
+                  
+                  // 2. Ensure panels are closed logically so they snap to 0px width when we switch to Default
+                  setShowLeftPanel(false);
+                  setShowCenterPanel(true);
+                  setShowRightPanel(false);
+                  
+                  await wait(50);
               }
 
               if (ipc) ipc.send('set-full-mode');
@@ -280,27 +266,56 @@ export const useViewLayout = (introState: number) => {
               const bp = getBreakpoint(w);
               setCurrentBreakpoint(bp);
 
-              const shouldShowLeft = bp === 'desktop';
-              const shouldShowCenter = bp !== 'mobile';
-
-              setShowLeftPanel(shouldShowLeft);
-              setShowCenterPanel(shouldShowCenter);
-              setShowRightPanel(true);
-              
-              if (viewMode === 'mini') {
-                  // Transition Step 3: Reveal from center
+              // 3. Reveal Animation
+              if (wasCinema) {
+                  // Wait for DOM to stabilize in Default mode with 0px side panels
+                  await wait(50);
+                  
+                  // Re-enable transitions
+                  setAnimSequence('idle');
+                  
+                  // Trigger slide-in animation
+                  const shouldShowLeft = bp === 'desktop';
+                  const shouldShowCenter = bp !== 'mobile';
+                  setShowLeftPanel(shouldShowLeft);
+                  setShowCenterPanel(shouldShowCenter);
+                  setShowRightPanel(true);
+              } else {
+                  // From Mini: Standard reveal
                   setAnimSequence('entering_center');
                   await wait(600);
+                  
+                  // Restore panels
+                  const shouldShowLeft = bp === 'desktop';
+                  const shouldShowCenter = bp !== 'mobile';
+                  setShowLeftPanel(shouldShowLeft);
+                  setShowCenterPanel(shouldShowCenter);
+                  setShowRightPanel(true);
               }
           }
-          // 3. CINEMA MODE
+          // 3. ENTERING CINEMA MODE
           else if (targetMode === 'cinema') {
-              setViewMode('cinema');
-              // In Cinema, we keep center true. We hide sides initially for clean entry.
-              // But user can toggle them back on as overlays.
+              // 1. Collapse panels smoothly while still in Default mode
               setShowLeftPanel(false);
-              setShowCenterPanel(true);
               setShowRightPanel(false);
+              
+              // 2. Wait for collapse animation (match CSS duration ~700ms)
+              await wait(700);
+
+              // 3. LOCK TRANSITIONS
+              // This is the critical fix. We switch to 'switching_layout' which sets 
+              // 'transition: none' in the style calculators below.
+              // This prevents the browser from animating the width jump (0 -> 460) when we flip the switch.
+              setAnimSequence('switching_layout');
+
+              // 4. Switch state to Cinema
+              setViewMode('cinema');
+              setShowCenterPanel(true);
+              
+              // 5. Allow DOM to settle in the new Cinema state (where panels are absolute and off-screen)
+              // without transition artifacts
+              await wait(50);
+
               if (ipc) ipc.send('set-full-mode');
           } 
           // 4. PLAYER FOCUS MODE
@@ -328,7 +343,10 @@ export const useViewLayout = (introState: number) => {
           setShowCenterPanel(true);
           setShowRightPanel(true);
       } finally {
-          setAnimSequence('idle');
+          // Always restore idle state if not explicitly loading
+          if (animSequence !== 'loading') {
+              setAnimSequence('idle');
+          }
           isTransitioningRef.current = false; // UNLOCK
           
           // Trigger a manual resize event to ensure Canvases update dimensions after animation
@@ -337,7 +355,7 @@ export const useViewLayout = (introState: number) => {
           }, 100);
       }
 
-  }, [viewMode, playSFX]);
+  }, [viewMode, playSFX, animSequence]);
 
   // NEW EFFECT: Auto-enter Cinema Mode if both panels are manually collapsed in Default View
   useEffect(() => {
@@ -389,10 +407,21 @@ export const useViewLayout = (introState: number) => {
 
   let leftPanelClass = `shrink-0 z-20 overflow-hidden ${!isResizing ? 'transition-[width] duration-700 ease-[cubic-bezier(0.25,1,0.5,1)]' : ''}`;
   let leftPanelStyle: React.CSSProperties = { width: isLeftPanelVisible ? `${leftPanelWidth}px` : '0px' };
+  
+  // INNER SLIDE LOGIC (DEFAULT MODE)
+  let leftPanelInnerStyle: React.CSSProperties = {
+      width: `${leftPanelWidth}px`,
+      height: '100%',
+      // In default mode, translate inner content to create sliding effect. 
+      transform: (!isCinema && !isLeftPanelVisible) ? 'translateX(-100%)' : 'translateX(0)',
+      transition: isResizing ? 'none' : 'transform 0.7s cubic-bezier(0.25,1,0.5,1)'
+  };
 
   // CINEMA OVERRIDE (Left)
   if (isCinema) {
-      leftPanelClass = `absolute z-50 h-[calc(100%-2rem)] top-4 left-4 rounded-xl border border-theme-border shadow-[0_0_40px_rgba(0,0,0,0.8)] backdrop-blur-xl bg-black/90 overflow-hidden transition-transform duration-500 cubic-bezier(0.2,0.8,0.2,1)`;
+      // Dynamic Z-Index: Put behind TV (z-0) when hidden/transitioning, bring to front (z-50) when active
+      const zIndex = isLeftPanelVisible ? 'z-50' : 'z-0';
+      leftPanelClass = `absolute ${zIndex} h-[calc(100%-2rem)] top-4 left-4 rounded-xl border border-theme-border shadow-[0_0_40px_rgba(0,0,0,0.8)] backdrop-blur-xl bg-black/90 overflow-hidden transition-transform duration-500 cubic-bezier(0.2,0.8,0.2,1)`;
       // In Cinema, width is fixed, visibility is controlled by transform slide
       leftPanelStyle = { 
           width: `${leftPanelWidth}px`, 
@@ -418,10 +447,20 @@ export const useViewLayout = (introState: number) => {
       width: !isRightPanelVisible ? '0px' : (isMobileOrMini ? '100%' : `${rightPanelWidth}px`)
   };
 
+  // INNER SLIDE LOGIC (DEFAULT MODE) - Right
+  let rightPanelInnerStyle: React.CSSProperties = {
+      width: isMobileOrMini ? '100%' : `${rightPanelWidth}px`,
+      height: '100%',
+      // Move right (100%) when hidden
+      transform: (!isCinema && !isRightPanelVisible) ? 'translateX(100%)' : 'translateX(0)',
+      transition: isResizing ? 'none' : 'transform 0.7s cubic-bezier(0.25,1,0.5,1)'
+  };
+
   // CINEMA OVERRIDE (Right)
-  // UPDATED: Removed border/shadow/bg styles to allow a clean floating/sidebar look without "card" container.
   if (isCinema) {
-      rightPanelClass = `absolute z-50 h-full top-0 right-0 overflow-hidden transition-transform duration-500 cubic-bezier(0.2,0.8,0.2,1)`;
+      // Dynamic Z-Index: Put behind TV (z-0) when hidden/transitioning, bring to front (z-50) when active
+      const zIndex = isRightPanelVisible ? 'z-50' : 'z-0';
+      rightPanelClass = `absolute ${zIndex} h-full top-0 right-0 overflow-hidden transition-transform duration-500 cubic-bezier(0.2,0.8,0.2,1)`;
       rightPanelStyle = { 
           width: `${rightPanelWidth}px`, 
           transform: isRightPanelVisible ? 'translateX(0)' : 'translateX(100%)' // Move completely off-screen right
@@ -434,11 +473,10 @@ export const useViewLayout = (introState: number) => {
       viewMode !== 'mini' && 
       viewMode !== 'player-focus' &&
       showCenterPanel &&
-      (animSequence === 'reveal_center' || animSequence === 'idle' || animSequence === 'entering_center');
+      (animSequence === 'reveal_center' || animSequence === 'idle' || animSequence === 'entering_center' || animSequence === 'switching_layout');
 
-  // In Cinema mode, Left/Right panels are absolute, so flex-grow takes 100% of space automatically.
-  // We ensure w-full is applied or w-0 if hidden.
-  const screenContainerClass = `flex-grow flex flex-col relative overflow-hidden
+  // Center Panel gets z-10 to stay above the hidden side panels (z-0) in Cinema Mode
+  const screenContainerClass = `flex-grow flex flex-col relative overflow-hidden z-10
       ${!isResizing ? 'transition-all duration-1000 ease-[cubic-bezier(0.34,1.56,0.64,1)]' : ''}
       ${!isScreenVisible ? 'w-0 opacity-0 scale-95' : 'w-auto opacity-100 scale-100'}
   `;
@@ -460,8 +498,10 @@ export const useViewLayout = (introState: number) => {
     masterStyle,
     leftPanelClass,
     leftPanelStyle,
+    leftPanelInnerStyle,
     rightPanelClass,
     rightPanelStyle,
+    rightPanelInnerStyle,
     screenContainerClass,
     isResizing,
     leftPanelWidth,

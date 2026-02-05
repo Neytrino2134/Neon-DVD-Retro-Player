@@ -45,6 +45,7 @@ const LeftPanel: React.FC<LeftPanelProps> = (props) => {
     config.setEffectsConfig(defaults.effectsConfig);
     config.setMarqueeConfig(defaults.marqueeConfig);
     if (defaults.watermarkConfig) config.setWatermarkConfig(defaults.watermarkConfig);
+    config.setEqualizerConfig(defaults.equalizerConfig); // Reset EQ
     config.setBgColor(defaults.bgColor);
     config.setBgPattern(defaults.bgPattern);
     config.setBgPatternConfig(defaults.bgPatternConfig);
@@ -64,7 +65,7 @@ const LeftPanel: React.FC<LeftPanelProps> = (props) => {
 
   return (
     <div className={view.leftPanelClass} style={view.leftPanelStyle}>
-      <div className="h-full relative" style={{ width: `${view.leftPanelWidth}px` }}>
+      <div className="relative" style={view.leftPanelInnerStyle}>
         
         {/* MODE SWITCHER: EDITOR vs TAGS vs SETTINGS */}
         {appState.isEditorMode ? (
@@ -137,6 +138,7 @@ const LeftPanel: React.FC<LeftPanelProps> = (props) => {
                 if (loaded.theme) setTheme(loaded.theme);
                 if (loaded.controlStyle) setControlStyle(loaded.controlStyle);
                 if (loaded.ambienceConfig) ambience.importConfig(loaded.ambienceConfig);
+                if (loaded.equalizerConfig) player.setEqConfig(loaded.equalizerConfig); // Apply EQ on load (optional, handled by config hook but useful for forced updates)
                 addNotification("Preset loaded", "success");
               }
             }}
@@ -179,6 +181,11 @@ const LeftPanel: React.FC<LeftPanelProps> = (props) => {
             setStreamMode={appState.setStreamMode}
             shuffleBgList={config.shuffleBgList}
             updateBg={config.updateBg} 
+            // EQ Props
+            eqConfig={player.eqConfig}
+            setEqBand={player.setEqBand}
+            setEqPreset={player.setEqPreset}
+            toggleEq={player.toggleEq}
           />
         )}
 

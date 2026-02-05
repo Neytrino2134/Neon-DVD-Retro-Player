@@ -1,5 +1,5 @@
 
-import { VisualizerConfig, DvdConfig, EffectsConfig, MarqueeConfig, WatermarkConfig } from '../types';
+import { VisualizerConfig, DvdConfig, EffectsConfig, MarqueeConfig, WatermarkConfig, EqualizerConfig } from '../types';
 
 export const DEFAULT_VISUALIZER_CONFIG: VisualizerConfig = {
   style: 'blue', position: 'bottom', barCount: 128, sensitivity: 1.5, fillOpacity: 0.3,
@@ -84,4 +84,10 @@ export const DEFAULT_MARQUEE_CONFIG: MarqueeConfig = {
 
 export const DEFAULT_WATERMARK_CONFIG: WatermarkConfig = { 
   scale: 1.0, opacity: 1.0, flashIntensity: 0.5 
+};
+
+export const DEFAULT_EQUALIZER_CONFIG: EqualizerConfig = {
+  enabled: false,
+  bands: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0], // 10 bands
+  preset: 'flat'
 };

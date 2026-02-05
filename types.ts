@@ -156,6 +156,13 @@ export interface AmbienceConfig {
   volume: number;
 }
 
+// NEW: Equalizer Configuration
+export interface EqualizerConfig {
+  enabled: boolean;
+  bands: number[]; // Array of 10 gain values (-12 to 12)
+  preset: string; // ID of current preset
+}
+
 // NEW: Recorder Configuration
 export interface RecorderConfig {
   resolution: '1080p' | '720p' | '4k';
@@ -334,6 +341,7 @@ export interface AppPreset {
     controlStyle?: ControlStyle;
     bgTransition?: BgTransitionType; // New
     ambienceConfig?: AmbienceConfig; // NEW
+    equalizerConfig?: EqualizerConfig; // NEW: EQ
     bgAnimation?: BgAnimationType; // NEW
   }
 }

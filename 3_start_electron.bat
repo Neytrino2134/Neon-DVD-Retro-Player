@@ -1,3 +1,4 @@
+
 @echo off
 title Neon Player - Electron Dev Mode
 color 0b

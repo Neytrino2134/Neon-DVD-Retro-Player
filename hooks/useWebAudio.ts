@@ -1,5 +1,6 @@
 
 import { useRef, useState, useEffect } from 'react';
+import { EQ_FREQUENCIES } from '../config/eqPresets';
 
 export const useWebAudio = (volume: number) => {
   const audioContextRef = useRef<AudioContext | null>(null);
@@ -7,6 +8,13 @@ export const useWebAudio = (volume: number) => {
   const analyserRef = useRef<AnalyserNode | null>(null);
   const [analyser, setAnalyser] = useState<AnalyserNode | null>(null);
   
+  // Unique ID to force re-mounting of Audio Elements when context resets
+  const [contextId, setContextId] = useState<string>('');
+  
+  // Equalizer Nodes
+  const eqInputNodeRef = useRef<GainNode | null>(null);
+  const eqFiltersRef = useRef<BiquadFilterNode[]>([]);
+
   // Independent Source Nodes
   const micSourceRef = useRef<MediaStreamAudioSourceNode | null>(null);
   const sysSourceRef = useRef<MediaStreamAudioSourceNode | null>(null);
@@ -19,6 +27,11 @@ export const useWebAudio = (volume: number) => {
             const ctx = new AudioContext();
             audioContextRef.current = ctx;
             
+            // Generate a unique ID for this audio context session
+            // We use a simple random string to avoid crypto dependencies if not available
+            const id = Math.random().toString(36).substring(2, 15);
+            setContextId(id);
+            
             const ana = ctx.createAnalyser();
             ana.fftSize = 2048; // Higher res for visualizer
             analyserRef.current = ana;
@@ -29,9 +42,43 @@ export const useWebAudio = (volume: number) => {
             gain.connect(ctx.destination);
             gainNodeRef.current = gain;
             
-            // NOTE: We do NOT connect Analyser to Gain/Destination.
-            // Sources (Music) must connect to BOTH Analyser (for visuals) AND Gain (for audio).
-            // Input Sources (Mic/Sys) connect ONLY to Analyser (visuals only, no echo).
+            // --- EQUALIZER CHAIN SETUP ---
+            const eqInput = ctx.createGain();
+            eqInputNodeRef.current = eqInput;
+
+            // Create 10 Bands
+            const filters: BiquadFilterNode[] = [];
+            
+            EQ_FREQUENCIES.forEach((freq, i) => {
+                const filter = ctx.createBiquadFilter();
+                filter.frequency.value = freq;
+                
+                if (i === 0) {
+                    filter.type = 'lowshelf';
+                } else if (i === EQ_FREQUENCIES.length - 1) {
+                    filter.type = 'highshelf';
+                } else {
+                    filter.type = 'peaking';
+                    filter.Q.value = 1; // Bandwidth
+                }
+                filter.gain.value = 0; // Flat start
+                filters.push(filter);
+            });
+            eqFiltersRef.current = filters;
+
+            // Connect Chain: Input -> F1 -> F2... -> F10 -> Output
+            let previousNode: AudioNode = eqInput;
+            filters.forEach(f => {
+                previousNode.connect(f);
+                previousNode = f;
+            });
+            
+            // Connect Last Filter to Master Gain (Volume) -> Speaker
+            previousNode.connect(gain);
+
+            // Connect EQ Chain Output to Analyser
+            // Connect eqInput directly to Analyser for Raw Visualization (Pre-EQ)
+            eqInput.connect(ana);
 
         } catch (e) {
             console.error("AudioContext init failed", e);
@@ -61,11 +108,9 @@ export const useWebAudio = (volume: number) => {
   const connectMic = (stream: MediaStream) => {
       if (!audioContextRef.current || !analyserRef.current) return;
       
-      // Cleanup old
       if (micSourceRef.current) micSourceRef.current.disconnect();
 
       const src = audioContextRef.current.createMediaStreamSource(stream);
-      // Connect ONLY to Analyser. Do NOT connect to destination/speakers.
       src.connect(analyserRef.current);
       micSourceRef.current = src;
   };
@@ -81,11 +126,9 @@ export const useWebAudio = (volume: number) => {
   const connectSys = (stream: MediaStream) => {
       if (!audioContextRef.current || !analyserRef.current) return;
 
-      // Cleanup old
       if (sysSourceRef.current) sysSourceRef.current.disconnect();
 
       const src = audioContextRef.current.createMediaStreamSource(stream);
-      // Connect ONLY to Analyser. Do NOT connect to destination/speakers.
       src.connect(analyserRef.current);
       sysSourceRef.current = src;
   };
@@ -113,7 +156,10 @@ export const useWebAudio = (volume: number) => {
   return {
       audioContextRef,
       gainNodeRef,
+      eqInputNodeRef, 
+      eqFiltersRef,   
       analyser,
+      contextId, // EXPOSED ID
       connectMic,
       disconnectMic,
       connectSys,

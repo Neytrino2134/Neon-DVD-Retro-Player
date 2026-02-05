@@ -1,18 +1,19 @@
+
 @echo off
-title Neon Player - Building Electron App
-color 0a
+title Neon Player - Build Web
+color 0b
 
 echo ==================================================
-echo      BUILDING NEON PLAYER (ELECTRON)
+echo      NEON RETRO PLAYER - WEB BUILD
 echo ==================================================
 echo.
-echo This will compile the React app and package it
-echo into an executable (.exe) in the 'dist-electron' folder.
+echo This command compiles the project into static files
+echo located in the 'dist' folder.
 echo.
-echo Please wait, this may take a few minutes...
+echo Running 'npm run build'...
 echo.
 
-call npm run electron:build
+call npm run build
 
 if %errorlevel% neq 0 (
     color 0c
@@ -20,15 +21,18 @@ if %errorlevel% neq 0 (
     echo ==================================================
     echo      BUILD FAILED
     echo ==================================================
-    echo Check the error messages above.
-    pause
+    echo.
+    echo AI Prompt: "I tried to build the project using 'npm run build' but encountered errors. Please examine the output above and provide a solution to fix the build failure."
+    echo.
+    pause >nul
     exit
 )
 
+color 0a
 echo.
 echo ==================================================
 echo      BUILD SUCCESSFUL!
 echo ==================================================
-echo Your application is ready in the 'dist-electron' folder.
+echo Files are ready in the 'dist' folder.
 echo.
 pause

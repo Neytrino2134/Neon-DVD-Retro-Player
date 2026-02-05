@@ -183,4 +183,9 @@ export const tv = {
   sys_audio_input: "СИСТЕМНЫЙ АУДИО ВХОД",
   intensity: "ИНТЕНСИВНОСТЬ",
   thickness: "ТОЛЩИНА",
+
+  // EQ
+  equalizer: "ЭКВАЛАЙЗЕР",
+  eq_enable: "ВКЛ. ЭКВАЛАЙЗЕР",
+  eq_preset: "ПРЕСЕТ",
 };

@@ -123,33 +123,64 @@ export const useLibrary = () => {
   };
 
   const processAudioFiles = async (files: File[], targetPlaylistId = activePlaylistId): Promise<AudioTrack[]> => {
-      if (!targetPlaylistId) return [];
-      
-      const currentPl = playlists.find(p => p.id === targetPlaylistId);
+      // Robust Fallback: If target ID is missing or invalid, default to the first available playlist
+      let actualPlaylistId = targetPlaylistId;
+      if (!actualPlaylistId || !playlists.some(p => p.id === actualPlaylistId)) {
+          if (playlists.length > 0) {
+              actualPlaylistId = playlists[0].id;
+          } else {
+              // Emergency recovery if no playlists exist
+              const newId = crypto.randomUUID();
+              const newPl = { id: newId, name: 'DEFAULT', order: 0, tracks: [] };
+              await savePlaylist(newPl);
+              setPlaylists([newPl]);
+              actualPlaylistId = newId;
+          }
+      }
+
+      const currentPl = playlists.find(p => p.id === actualPlaylistId);
       const currentCount = currentPl ? currentPl.tracks.length : 0;
       const newTracks: AudioTrack[] = [];
 
       for (let i = 0; i < files.length; i++) {
           const file = files[i];
           const id = crypto.randomUUID();
-          const { tags, artworkUrl } = await parseAudioMetadata(file);
-          const name = tags.title || file.name.replace(/\.[^/.]+$/, "");
+          
+          let tags = {};
+          let artworkUrl = undefined;
+          
+          try {
+              const metadata = await parseAudioMetadata(file);
+              tags = metadata.tags;
+              artworkUrl = metadata.artworkUrl;
+          } catch (e) {
+              console.warn("Metadata parse error for", file.name, e);
+          }
+
+          const name = (tags as any).title || file.name.replace(/\.[^/.]+$/, "");
           const order = currentCount + i;
 
           const track: AudioTrack = {
-              id, playlistId: targetPlaylistId, name, url: URL.createObjectURL(file),
+              id, playlistId: actualPlaylistId, name, url: URL.createObjectURL(file),
               file, order, tags, artworkUrl, rating: 0
           };
           
           const trackForDb: StoredTrack = {
-              id, playlistId: targetPlaylistId, name, file, order, tags, rating: 0
+              id, playlistId: actualPlaylistId, name, file, order, tags, rating: 0
           };
-          await saveTrack(trackForDb);
+          
+          // Try to save to DB, but don't block UI if it fails
+          try {
+              await saveTrack(trackForDb);
+          } catch (e) {
+              console.error("Failed to save track to DB", e);
+          }
+          
           newTracks.push(track);
       }
 
       setPlaylists(prev => prev.map(pl => 
-          pl.id === targetPlaylistId ? { ...pl, tracks: [...pl.tracks, ...newTracks] } : pl
+          pl.id === actualPlaylistId ? { ...pl, tracks: [...pl.tracks, ...newTracks] } : pl
       ));
       
       return newTracks;
