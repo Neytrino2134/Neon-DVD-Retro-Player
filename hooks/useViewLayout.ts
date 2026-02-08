@@ -419,9 +419,13 @@ export const useViewLayout = (introState: number) => {
 
   // CINEMA OVERRIDE (Left)
   if (isCinema) {
-      // Dynamic Z-Index: Put behind TV (z-0) when hidden/transitioning, bring to front (z-50) when active
-      const zIndex = isLeftPanelVisible ? 'z-50' : 'z-0';
-      leftPanelClass = `absolute ${zIndex} h-[calc(100%-2rem)] top-4 left-4 rounded-xl border border-theme-border shadow-[0_0_40px_rgba(0,0,0,0.8)] backdrop-blur-xl bg-black/90 overflow-hidden transition-transform duration-500 cubic-bezier(0.2,0.8,0.2,1)`;
+      // Fix: Force z-50 to keep panel above video/black screen during exit animation.
+      // Previously z-index toggled to 0 immediately when hidden, causing it to pop behind the screen.
+      const zIndex = 'z-50';
+      // FIX: Disable transition during layout switches (isResizing) to prevent panels flying in from 0,0
+      const transitionClass = !isResizing ? 'transition-transform duration-500 cubic-bezier(0.2,0.8,0.2,1)' : '';
+      
+      leftPanelClass = `absolute ${zIndex} h-[calc(100%-2rem)] top-4 left-4 rounded-xl border border-theme-border shadow-[0_0_40px_rgba(0,0,0,0.8)] backdrop-blur-xl bg-black/90 overflow-hidden ${transitionClass}`;
       // In Cinema, width is fixed, visibility is controlled by transform slide
       leftPanelStyle = { 
           width: `${leftPanelWidth}px`, 
@@ -458,9 +462,12 @@ export const useViewLayout = (introState: number) => {
 
   // CINEMA OVERRIDE (Right)
   if (isCinema) {
-      // Dynamic Z-Index: Put behind TV (z-0) when hidden/transitioning, bring to front (z-50) when active
-      const zIndex = isRightPanelVisible ? 'z-50' : 'z-0';
-      rightPanelClass = `absolute ${zIndex} h-full top-0 right-0 overflow-hidden transition-transform duration-500 cubic-bezier(0.2,0.8,0.2,1)`;
+      // Fix: Force z-50 to keep panel above video/black screen during exit animation.
+      const zIndex = 'z-50';
+      // FIX: Disable transition during layout switches
+      const transitionClass = !isResizing ? 'transition-transform duration-500 cubic-bezier(0.2,0.8,0.2,1)' : '';
+      
+      rightPanelClass = `absolute ${zIndex} h-full top-0 right-0 overflow-hidden ${transitionClass}`;
       rightPanelStyle = { 
           width: `${rightPanelWidth}px`, 
           transform: isRightPanelVisible ? 'translateX(0)' : 'translateX(100%)' // Move completely off-screen right
@@ -475,7 +482,7 @@ export const useViewLayout = (introState: number) => {
       showCenterPanel &&
       (animSequence === 'reveal_center' || animSequence === 'idle' || animSequence === 'entering_center' || animSequence === 'switching_layout');
 
-  // Center Panel gets z-10 to stay above the hidden side panels (z-0) in Cinema Mode
+  // Center Panel gets z-10 to stay above the hidden side panels (z-0) in Cinema Mode (but below active z-50 panels)
   const screenContainerClass = `flex-grow flex flex-col relative overflow-hidden z-10
       ${!isResizing ? 'transition-all duration-1000 ease-[cubic-bezier(0.34,1.56,0.64,1)]' : ''}
       ${!isScreenVisible ? 'w-0 opacity-0 scale-95' : 'w-auto opacity-100 scale-100'}
