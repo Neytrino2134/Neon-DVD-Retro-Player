@@ -1,8 +1,8 @@
 
 import React from 'react';
-import { Timer, Zap, Layers, Aperture, Lightbulb } from 'lucide-react';
+import { Timer, Zap, Layers, Aperture, Lightbulb, Film } from 'lucide-react';
 import ModuleWrapper from '../ModuleWrapper';
-import { FpsSettings, SignalSettings, ChromaticSettings, VignetteSettings, LightFlickerSettings } from '../modules/EffectModules';
+import { FpsSettings, SignalSettings, ChromaticSettings, VignetteSettings, LightFlickerSettings, VideoColorSettings } from '../modules/EffectModules';
 import { NumberedLabel } from '../SettingsSection';
 import { EffectsConfig } from '../../../types';
 
@@ -37,6 +37,10 @@ const PostProcessingSection: React.FC<PostProcessingSectionProps> = ({
 
         <ModuleWrapper id="flicker" label={<NumberedLabel num="05" k="light_flicker" />} icon={Lightbulb} isEnabled={effectsConfig.lightFlicker.enabled} isExpanded={expandedState['flicker']} onToggleExpand={(e) => toggleExpand('flicker', e.shiftKey)} onToggleEnable={() => safeAction(() => { if (!effectsConfig.lightFlicker.enabled) toggleExpand('flicker', false, true); updateEffect('lightFlicker', { ...effectsConfig.lightFlicker, enabled: !effectsConfig.lightFlicker.enabled }); })}>
             <LightFlickerSettings config={effectsConfig.lightFlicker} update={(v) => updateEffect('lightFlicker', v)} />
+        </ModuleWrapper>
+
+        <ModuleWrapper id="video" label={<NumberedLabel num="06" k="color_grading" />} icon={Film} isEnabled={effectsConfig.videoSettings?.enabled} isExpanded={expandedState['video']} onToggleExpand={(e) => toggleExpand('video', e.shiftKey)} onToggleEnable={() => safeAction(() => { if (!effectsConfig.videoSettings?.enabled) toggleExpand('video', false, true); updateEffect('videoSettings', { ...effectsConfig.videoSettings, enabled: !effectsConfig.videoSettings?.enabled }); })}>
+            <VideoColorSettings config={effectsConfig.videoSettings} update={(v) => updateEffect('videoSettings', v)} />
         </ModuleWrapper>
     </div>
   );

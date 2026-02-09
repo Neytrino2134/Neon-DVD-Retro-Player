@@ -70,11 +70,15 @@ export const tv = {
   prog_opacity: "OPACITY",
   speed: "SPEED",
   text_size: "TEXT SIZE",
+  channel_name: "CHANNEL NAME",
+  show_border: "SHOW FRAME",
   
   dvd_saver: "DVD SAVER",
   dvd_logo_type: "LOGO TYPE",
   logo_dvd: "DVD",
   logo_neon: "NEON",
+  logo_custom: "CUSTOM",
+  upload_logo: "UPLOAD LOGO",
   sfx_volume: "SFX VOLUME",
   sfx_enabled: "SFX ENABLED",
   size: "SIZE",
@@ -152,6 +156,17 @@ export const tv = {
   light_flicker: "LIGHT FLICKER",
   flicker_intensity: "INTENSITY",
   flicker_speed: "SPEED",
+  
+  // Video Grading
+  color_grading: "COLOR GRADING",
+  video_presets: "LOOKS / PRESETS",
+  vid_brightness: "BRIGHTNESS",
+  vid_contrast: "CONTRAST",
+  vid_saturation: "SATURATION",
+  vid_grayscale: "B&W",
+  vid_sepia: "SEPIA",
+  vid_hue: "HUE SHIFT",
+  vid_warmth: "WARMTH (TINT)",
 
   // Audio & Background
   background: "BACKGROUND",
@@ -171,6 +186,14 @@ export const tv = {
   capture_audio: "CAPTURE AUDIO",
   stop_screen: "STOP SCREEN",
   start_screen: "START SCREEN",
+  fit_mode: "FIT MODE",
+  fit_cover: "COVER (CROP)",
+  fit_contain: "CONTAIN (FIT)",
+  fit_stretch: "STRETCH (FILL)",
+  screen_align: "ALIGNMENT",
+  align_left: "LEFT",
+  align_center: "CENTER",
+  align_right: "RIGHT",
   
   mixer_deck: "MIXER DECK",
   crossfade_duration: "CROSSFADE DURATION",

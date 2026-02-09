@@ -28,7 +28,7 @@ const CenterPanel: React.FC<CenterPanelProps> = ({
   };
 
   return (
-    <div className={view.screenContainerClass}>
+    <div className={view.screenContainerClass} style={view.screenContainerStyle}>
       {appState.isEditorMode ? (
         <MusicEditor
           instruments={musicEngine.instruments}
@@ -57,6 +57,8 @@ const CenterPanel: React.FC<CenterPanelProps> = ({
           isSystemAudioActive={screenCapture.isSysAudioActive}
           isMicActive={screenCapture.isMicActive}
           streamMode={appState.streamMode}
+          screenFitMode={config.screenFitMode}
+          screenAlignment={config.screenAlignment}
 
           visualizerConfig={config.visualizerConfig}
           setVisualizerConfig={config.setVisualizerConfig}

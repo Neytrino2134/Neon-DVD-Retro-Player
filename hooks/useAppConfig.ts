@@ -1,7 +1,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
-import { VisualizerConfig, DvdConfig, EffectsConfig, MarqueeConfig, PatternConfig, BackgroundMedia, BackgroundPlaylist, AppPreset, CursorStyle, WatermarkConfig, ThemeType, ControlStyle, BgTransitionType, BgAnimationType, BgHotspot, EqualizerConfig } from '../types';
-import { getAllBackgrounds, saveBackground, deleteBackground, getAllBgPlaylists, saveBgPlaylist, deleteBgPlaylistAndFiles } from '../lib/db';
+import { VisualizerConfig, DvdConfig, EffectsConfig, MarqueeConfig, PatternConfig, BackgroundMedia, BackgroundPlaylist, AppPreset, CursorStyle, WatermarkConfig, ThemeType, ControlStyle, BgTransitionType, BgAnimationType, BgHotspot, EqualizerConfig, FitMode, ScreenAlignment } from '../types';
+import { getAllBackgrounds, saveBackground, deleteBackground, getAllBgPlaylists, saveBgPlaylist, deleteBgPlaylistAndFiles, getDvdLogoById } from '../lib/db';
 import { 
   DEFAULT_VISUALIZER_CONFIG, 
   DEFAULT_REACTOR_CONFIG,
@@ -41,7 +41,20 @@ const STORAGE_KEYS = {
   USE_ALBUM_ART: 'neon_use_album_art',
   ACTIVE_BG_PLAYLIST: 'neon_active_bg_playlist',
   PLAYING_BG_PLAYLIST: 'neon_playing_bg_playlist',
-  EQUALIZER: 'neon_equalizer_config' // NEW
+  EQUALIZER: 'neon_equalizer_config',
+  SCREEN_FIT: 'neon_screen_fit', 
+  SCREEN_ALIGN: 'neon_screen_align' 
+};
+
+// Map of Main Section ID -> Array of Child Module IDs (for accordion logic)
+const SECTION_MODULES: Record<string, string[]> = {
+  sys: ['files', 'presets', 'themes', 'debug'],
+  bg: ['bg-settings', 'bg-resources', 'bg-colors', 'screen-share'],
+  sfx: ['mixer', 'ambience', 'sysaudio'],
+  waves: ['wave', 'reactor', 'sine'],
+  mod: ['marquee', 'dvd', 'leaks', 'rain', 'hologram', 'gemini', 'scan', 'cyber', 'glitch'],
+  game: ['tron'],
+  post: ['fps', 'signal', 'chromatic', 'vignette', 'flicker', 'video']
 };
 
 // --- HELPER: SAFE MERGE ---
@@ -87,6 +100,8 @@ export const useAppConfig = () => {
   const [bgAnimation, setBgAnimation] = useState<BgAnimationType>(() => getInitial(STORAGE_KEYS.BG_ANIMATION, 'none')); 
   const [isAdvancedMode, setAdvancedMode] = useState(() => getInitial(STORAGE_KEYS.ADVANCED_MODE, false));
   const [useAlbumArtAsBackground, setUseAlbumArtAsBackground] = useState(() => getInitial(STORAGE_KEYS.USE_ALBUM_ART, false));
+  const [screenFitMode, setScreenFitMode] = useState<FitMode>(() => localStorage.getItem(STORAGE_KEYS.SCREEN_FIT) as FitMode || 'cover'); 
+  const [screenAlignment, setScreenAlignment] = useState<ScreenAlignment>(() => localStorage.getItem(STORAGE_KEYS.SCREEN_ALIGN) as ScreenAlignment || 'center'); 
   
   const [marqueeConfig, setMarqueeConfig] = useState<MarqueeConfig>(() => getInitial(STORAGE_KEYS.MARQUEE, DEFAULT_MARQUEE_CONFIG));
   const [watermarkConfig, setWatermarkConfig] = useState<WatermarkConfig>(() => getInitial(STORAGE_KEYS.WATERMARK, DEFAULT_WATERMARK_CONFIG));
@@ -134,6 +149,71 @@ export const useAppConfig = () => {
     return DEFAULT_PRESETS;
   });
 
+  // --- UI PERSISTENCE STATE (LIFTED FROM SETTINGS PANEL) ---
+  const [settingsExpandedState, setSettingsExpandedState] = useState<Record<string, boolean>>({});
+  const [settingsOpenSections, setSettingsOpenSections] = useState<Record<string, boolean>>({
+      sys: true,
+      bg: true,
+      sfx: true,
+      waves: true, 
+      mod: true,
+      game: true,
+      post: true
+  });
+
+  const toggleSettingsExpand = (id: string, isAdditive: boolean, forceOpen?: boolean) => {
+        setSettingsExpandedState(prev => {
+            const isCurrentlyOpen = prev[id];
+            let newState = { ...prev };
+    
+            if (isAdditive && forceOpen === undefined) {
+                // Shift click: Toggle target, leave others alone
+                newState[id] = !isCurrentlyOpen;
+            } else {
+                // Normal click OR Force Open: Accordion behavior within the section
+                let groupIds: string[] = [];
+                for (const sectionKey in SECTION_MODULES) {
+                    if (SECTION_MODULES[sectionKey].includes(id)) {
+                        groupIds = SECTION_MODULES[sectionKey];
+                        break;
+                    }
+                }
+    
+                groupIds.forEach(siblingId => {
+                    if (siblingId !== id) {
+                        newState[siblingId] = false;
+                    }
+                });
+    
+                newState[id] = forceOpen !== undefined ? forceOpen : !isCurrentlyOpen;
+            }
+            return newState;
+        });
+  };
+
+  const toggleSettingsSection = (sectionId: string, isAdditive: boolean = false) => {
+      setSettingsOpenSections(prev => {
+          const isCurrentlyOpen = prev[sectionId];
+          let newState: Record<string, boolean> = { ...prev };
+          
+          if (!isCurrentlyOpen) {
+              setSettingsExpandedState({}); // Close internal modules when collapsing section? Optional.
+          }
+
+          if (isAdditive) {
+              newState[sectionId] = !isCurrentlyOpen;
+          } else {
+              Object.keys(prev).forEach(key => {
+                  if (key !== sectionId && prev[key]) {
+                      newState[key] = false;
+                  }
+              });
+              newState[sectionId] = true;
+          }
+          return newState;
+      });
+  };
+
   useEffect(() => {
     localStorage.setItem(STORAGE_KEYS.API_KEY, apiKey);
   }, [apiKey]);
@@ -161,7 +241,9 @@ export const useAppConfig = () => {
     localStorage.setItem(STORAGE_KEYS.BG_ANIMATION, JSON.stringify(bgAnimation)); 
     localStorage.setItem(STORAGE_KEYS.ADVANCED_MODE, JSON.stringify(isAdvancedMode));
     localStorage.setItem(STORAGE_KEYS.USE_ALBUM_ART, JSON.stringify(useAlbumArtAsBackground));
-  }, [visualizerConfig, reactorConfig, sineWaveConfig, dvdConfig, effectsConfig, bgColor, bgPattern, bgPatternConfig, showVisualizer, showVisualizer3D, showSineWave, showDvd, marqueeConfig, watermarkConfig, bgAutoplayInterval, cursorStyle, retroScreenCursorStyle, bgTransition, bgAnimation, isAdvancedMode, useAlbumArtAsBackground, equalizerConfig]);
+    localStorage.setItem(STORAGE_KEYS.SCREEN_FIT, screenFitMode);
+    localStorage.setItem(STORAGE_KEYS.SCREEN_ALIGN, screenAlignment);
+  }, [visualizerConfig, reactorConfig, sineWaveConfig, dvdConfig, effectsConfig, bgColor, bgPattern, bgPatternConfig, showVisualizer, showVisualizer3D, showSineWave, showDvd, marqueeConfig, watermarkConfig, bgAutoplayInterval, cursorStyle, retroScreenCursorStyle, bgTransition, bgAnimation, isAdvancedMode, useAlbumArtAsBackground, equalizerConfig, screenFitMode, screenAlignment]);
 
   useEffect(() => {
     localStorage.setItem(STORAGE_KEYS.PRESETS, JSON.stringify(savedPresets));
@@ -245,6 +327,23 @@ export const useAppConfig = () => {
     };
     hydrate();
   }, []);
+
+  // --- HYDRATE DVD LOGO ---
+  useEffect(() => {
+      const hydrateDvdLogo = async () => {
+          if (dvdConfig.logoType === 'custom' && dvdConfig.activeDvdLogoId) {
+              const storedLogo = await getDvdLogoById(dvdConfig.activeDvdLogoId);
+              if (storedLogo) {
+                  const url = URL.createObjectURL(storedLogo.file);
+                  setDvdConfig(prev => ({
+                      ...prev,
+                      customLogoUrl: url
+                  }));
+              }
+          }
+      };
+      hydrateDvdLogo();
+  }, []); // Run once on mount
 
   // --- ACTIONS ---
 
@@ -733,6 +832,8 @@ export const useAppConfig = () => {
     bgColor, setBgColor,
     bgPattern, setBgPattern,
     bgPatternConfig, setBgPatternConfig,
+    screenFitMode, setScreenFitMode, 
+    screenAlignment, setScreenAlignment, 
     
     // Updated BG props
     bgMedia: currentBgMedia,
@@ -769,6 +870,12 @@ export const useAppConfig = () => {
     isAdvancedMode, setAdvancedMode,
     useAlbumArtAsBackground, setUseAlbumArtAsBackground,
     updateBg,
-    updateBgMetadata // New export
+    updateBgMetadata,
+    
+    // Expanded State Props (UI Persistence)
+    settingsExpandedState,
+    settingsOpenSections,
+    toggleSettingsExpand,
+    toggleSettingsSection
   };
 };

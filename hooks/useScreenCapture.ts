@@ -31,8 +31,13 @@ export const useScreenCapture = ({ onMicStream, onSysStream, onVideoStream }: Us
       addNotification("Video Capture Stopped", "info");
     } else {
       try {
+        // Request higher resolution for 2K/4K displays
         const stream = await (navigator.mediaDevices as any).getDisplayMedia({
-          video: true,
+          video: {
+              width: { ideal: 2560 }, // Request 2K ideal
+              height: { ideal: 1440 },
+              frameRate: { ideal: 60 }
+          },
           audio: false
         });
         

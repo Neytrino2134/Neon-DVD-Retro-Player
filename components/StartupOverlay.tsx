@@ -5,7 +5,7 @@ import { APP_VERSION } from '../lib/version';
 import { Tooltip } from './ui/Tooltip';
 
 // Characters used for the glitch effect
-const GLITCH_CHARS = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789@#$%&*!??█▓▒░<>/[]{}-=_+";
+const GLITCH_CHARS = "ABCDEFGHIJKLMNOPQRSTUVWXYZАБВГДЕЁЖЗИЙКЛМНОПРСТУФХЦЧШЩЪЫЬЭЮЯ0123456789@#$%&*!??█▓▒░<>/[]{}-=_+";
 
 const MatrixText: React.FC<{ text: string; className?: string }> = ({ text, className }) => {
   const [displayText, setDisplayText] = useState(text);

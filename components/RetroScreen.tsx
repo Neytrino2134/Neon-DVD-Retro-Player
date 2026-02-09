@@ -1,6 +1,6 @@
 
 import React, { useRef, useEffect, forwardRef, useState } from 'react';
-import { AudioTrack, VisualizerConfig, EffectsConfig, DvdConfig, MarqueeConfig, PatternConfig, WatermarkConfig, BgAnimationType } from '../types';
+import { AudioTrack, VisualizerConfig, EffectsConfig, DvdConfig, MarqueeConfig, PatternConfig, WatermarkConfig, BgAnimationType, FitMode, ScreenAlignment } from '../types';
 import { useNotification } from '../contexts/NotificationContext';
 import { useGestures } from '../hooks/useGestures';
 import { useTheme } from '../contexts/ThemeContext';
@@ -59,6 +59,8 @@ interface RetroScreenProps {
   isSystemAudioActive?: boolean;
   isMicActive?: boolean; // NEW: Added mic active prop
   streamMode?: 'bg' | 'window';
+  screenFitMode?: FitMode; 
+  screenAlignment?: ScreenAlignment; // NEW
 
   visualizerConfig: VisualizerConfig;
   setVisualizerConfig?: (c: VisualizerConfig) => void; 
@@ -114,7 +116,7 @@ interface RetroScreenProps {
 const RetroScreen = forwardRef<HTMLDivElement, RetroScreenProps>((props, externalRef) => {
   const {
     analyser, isPlaying, currentTrack, tracks, onTrackSelect, bgMedia, bgColor, bgPattern = 'none', bgPatternConfig,
-    videoStream, isSystemAudioActive, isMicActive, streamMode = 'bg',
+    videoStream, isSystemAudioActive, isMicActive, streamMode = 'bg', screenFitMode = 'cover', screenAlignment = 'center',
     visualizerConfig, setVisualizerConfig, reactorConfig, sineWaveConfig, showVisualizer, showVisualizer3D, showSineWave, dvdConfig, showDvd, effectsConfig, marqueeConfig, watermarkConfig,
     progress = 0, currentTime, duration,
     focusMode, setFocusMode, isDragging,
@@ -250,7 +252,8 @@ const RetroScreen = forwardRef<HTMLDivElement, RetroScreenProps>((props, externa
   const marqueeText = React.useMemo(() => {
     const chars = ["@", "#", "$", "%", "&", "*", "!", "?", "0x", "ERR", "//"];
     const dots = ".........";
-    const brand = "► Neon Waves";
+    const channelName = marqueeConfig.channelName || "Neon Waves";
+    const brand = `► ${channelName}`;
     const r = () => chars[Math.floor(Math.random() * chars.length)];
     const gl = `${r()}${r()}${r()}`;
 
@@ -269,7 +272,7 @@ const RetroScreen = forwardRef<HTMLDivElement, RetroScreenProps>((props, externa
     }
 
     return `INSERT DISK  ${dots}  SYSTEM READY  ${dots}  ${brand}  ${dots}  WAITING FOR INPUT  ${dots} ${gl} ${dots} `;
-  }, [currentTrack, isSystemAudioActive]);
+  }, [currentTrack, isSystemAudioActive, marqueeConfig.channelName]);
 
   const watermarkAnimClass = (watermarkConfig?.flashIntensity || 0) > 0 ? "animate-text-flash" : "";
   const watermarkAnimStyle: any = { animationDuration: watermarkConfig?.flashIntensity ? `${21 - (watermarkConfig.flashIntensity * 20)}s` : '0s' };
@@ -296,6 +299,12 @@ const RetroScreen = forwardRef<HTMLDivElement, RetroScreenProps>((props, externa
       ...effectsConfig,
       pixelation: effectivePixelation
   }), [effectsConfig, effectivePixelation]);
+
+  const marqueeBorderStyle = marqueeConfig.borderEnabled ? {
+      borderTop: `2px solid ${marqueeColor}`,
+      borderBottom: `2px solid ${marqueeColor}`,
+      backgroundColor: `color-mix(in srgb, ${marqueeColor}, transparent 90%)`
+  } : {};
 
   return (
     <div className={`flex-grow flex items-center justify-center relative bg-gray-950 transition-all duration-500 ${focusMode ? 'p-0' : 'p-1 md:p-3'}`}>
@@ -351,12 +360,12 @@ const RetroScreen = forwardRef<HTMLDivElement, RetroScreenProps>((props, externa
                         <div className="absolute inset-0 w-full h-full" style={{ opacity: 1, zIndex: 0 }}>
                             {/* Keep Media Rendering even during resize to prevent white flash */}
                             {(activeStream || baseMedia) && (
-                                <MediaRenderer type={baseMedia ? baseMedia.type : 'video'} url={baseMedia?.url} stream={activeStream} bgColor={'transparent'} effects={mediaEffectsConfig} />
+                                <MediaRenderer type={baseMedia ? baseMedia.type : 'video'} url={baseMedia?.url} stream={activeStream} bgColor={'transparent'} effects={mediaEffectsConfig} fitMode={screenFitMode} alignment={screenAlignment} />
                             )}
                         </div>
                         {overlayMedia && (
                             <div className="absolute inset-0 w-full h-full" style={{ opacity: isCrossfading ? 1 : 0, transition: overlayTransitionStyle, zIndex: 1 }}>
-                                <MediaRenderer type={overlayMedia.type} url={overlayMedia.url} bgColor={'transparent'} effects={mediaEffectsConfig} />
+                                <MediaRenderer type={overlayMedia.type} url={overlayMedia.url} bgColor={'transparent'} effects={mediaEffectsConfig} fitMode={screenFitMode} alignment={screenAlignment} />
                             </div>
                         )}
                     </div>
@@ -377,6 +386,7 @@ const RetroScreen = forwardRef<HTMLDivElement, RetroScreenProps>((props, externa
                     volume={volume}
                     currentTime={currentTime}
                     duration={duration}
+                    isResizing={isResizing} // PASS RESIZE STATE FOR STABILITY
                 />
                 
                 <LightLeaksEffect config={effectsConfig.lightLeaks} />
@@ -410,7 +420,10 @@ const RetroScreen = forwardRef<HTMLDivElement, RetroScreenProps>((props, externa
                 />
 
                 {marqueeConfig.enabled && (
-                   <div className="absolute top-8 left-0 w-full h-24 z-20 pointer-events-none mix-blend-screen flex items-center">
+                   <div 
+                        className="absolute top-8 left-0 w-full h-24 z-20 pointer-events-none mix-blend-screen flex items-center"
+                        style={marqueeBorderStyle}
+                   >
                      <Marquee text={marqueeText} speed={marqueeConfig.speed} opacity={marqueeConfig.opacity} fontSize={marqueeConfig.fontSize} color={marqueeColor} className="font-mono font-bold" />
                    </div>
                 )}

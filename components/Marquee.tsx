@@ -1,5 +1,4 @@
 
-
 import React, { useEffect, useRef, useState } from 'react';
 
 interface MarqueeProps {
@@ -11,8 +10,8 @@ interface MarqueeProps {
   color?: string; // New: Hex color
 }
 
-// Characters used for the glitch effect: Blocks + Symbols
-const GLITCH_CHARS = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789@#$%&*!??█▓▒░<>/[]{}-=_+";
+// Characters used for the glitch effect: Blocks + Symbols + Cyrillic
+const GLITCH_CHARS = "ABCDEFGHIJKLMNOPQRSTUVWXYZАБВГДЕЁЖЗИЙКЛМНОПРСТУФХЦЧШЩЪЫЬЭЮЯ0123456789@#$%&*!??█▓▒░<>/[]{}-=_+";
 
 const Marquee: React.FC<MarqueeProps> = ({ text, speed, opacity, fontSize, className, color = '#00ff00' }) => {
   // We keep track of what is actually displayed (which might be glitched)

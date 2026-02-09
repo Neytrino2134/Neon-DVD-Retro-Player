@@ -1,6 +1,6 @@
 
 import React, { useState } from 'react';
-import { VisualizerConfig, EffectsConfig, DvdConfig, MarqueeConfig, PatternConfig, BackgroundMedia, AppPreset, CursorStyle, WatermarkConfig, ThemeType, ControlStyle, BgTransitionType, AmbienceFile, AmbienceConfig, BgAnimationType, BackgroundPlaylist, BgHotspot, EqualizerConfig } from '../../types';
+import { VisualizerConfig, EffectsConfig, DvdConfig, MarqueeConfig, PatternConfig, BackgroundMedia, AppPreset, CursorStyle, WatermarkConfig, ThemeType, ControlStyle, BgTransitionType, AmbienceFile, AmbienceConfig, BgAnimationType, BackgroundPlaylist, BgHotspot, EqualizerConfig, FitMode, ScreenAlignment } from '../../types';
 import { useNotification } from '../../contexts/NotificationContext';
 import { useTheme } from '../../contexts/ThemeContext';
 import { useLanguage } from '../../contexts/LanguageContext';
@@ -8,7 +8,6 @@ import { TranslatedText } from '../ui/TranslatedText';
 
 // Hooks
 import { useSettingsScroll } from '../../hooks/useSettingsScroll';
-import { useSettingsExpansion } from '../../hooks/useSettingsExpansion';
 import { useConfigUpdaters } from '../../hooks/useConfigUpdaters';
 
 // Components
@@ -138,6 +137,11 @@ interface SettingsPanelProps {
 
   streamMode?: 'bg' | 'window';
   setStreamMode?: (m: 'bg' | 'window') => void;
+  
+  screenFitMode?: FitMode; 
+  setScreenFitMode?: (m: FitMode) => void; 
+  screenAlignment?: ScreenAlignment; // NEW
+  setScreenAlignment?: (a: ScreenAlignment) => void; // NEW
 
   shuffleBgList?: () => void; 
   updateBg?: (id: string, newFile: File) => Promise<void>; 
@@ -148,6 +152,12 @@ interface SettingsPanelProps {
   setEqBand: (i: number, v: number) => void;
   setEqPreset: (id: string, bands: number[]) => void;
   toggleEq: () => void;
+
+  // New Persistence Props (Lifted state)
+  settingsExpandedState: Record<string, boolean>;
+  settingsOpenSections: Record<string, boolean>;
+  toggleSettingsExpand: (id: string, isAdditive: boolean, forceOpen?: boolean) => void;
+  toggleSettingsSection: (sectionId: string, isAdditive?: boolean) => void;
 }
 
 const SettingsPanel: React.FC<SettingsPanelProps> = (props) => {
@@ -159,7 +169,9 @@ const SettingsPanel: React.FC<SettingsPanelProps> = (props) => {
 
   // --- CUSTOM HOOKS FOR LOGIC SEPARATION ---
   const { scrollContainerRef, handleMouseDown, safeAction } = useSettingsScroll();
-  const { expandedState, openSections, toggleExpand, handleSectionToggle } = useSettingsExpansion(safeAction, scrollContainerRef);
+  
+  // NOTE: useSettingsExpansion removed here, state is passed from parent (useAppConfig)
+  
   const updaters = useConfigUpdaters(props);
 
   // Constants / Options
@@ -192,6 +204,15 @@ const SettingsPanel: React.FC<SettingsPanelProps> = (props) => {
     { value: 'circle', label: t('style_circle'), shape: 'circle' as const },
   ];
 
+  // Helper to wrap the passed toggle function with the scroll safety check
+  const safeToggleExpand = (id: string, isAdditive: boolean, forceOpen?: boolean) => {
+      safeAction(() => props.toggleSettingsExpand(id, isAdditive, forceOpen));
+  };
+
+  const safeToggleSection = (id: string, isAdditive: boolean) => {
+      safeAction(() => props.toggleSettingsSection(id, isAdditive));
+  };
+
   return (
     <div className="w-full h-full flex flex-col bg-theme-bg border-r-4 border-theme-bg shadow-inner overflow-hidden">
       
@@ -210,12 +231,12 @@ const SettingsPanel: React.FC<SettingsPanelProps> = (props) => {
         <SettingsSection 
             id="sys" 
             title={<><span className="text-theme-muted opacity-50 font-normal mr-2">1 //</span> <TranslatedText k="system_params" /></>} 
-            isOpen={openSections['sys']} 
-            onToggle={(isAdditive) => handleSectionToggle('sys', isAdditive)}
+            isOpen={props.settingsOpenSections['sys']} 
+            onToggle={(isAdditive) => safeToggleSection('sys', isAdditive)}
             stickyTop="0px"
         >
             <SystemSection 
-                expandedState={expandedState} toggleExpand={toggleExpand}
+                expandedState={props.settingsExpandedState} toggleExpand={safeToggleExpand}
                 onBgMediaUpload={props.onBgMediaUpload} onAudioUpload={props.onAudioUpload} onSfxUpload={props.onSfxUpload} onExportConfig={props.onExportConfig} sfxMap={props.sfxMap}
                 savedPresets={props.savedPresets} activePresetId={props.activePresetId} savePreset={props.savePreset} overwritePreset={props.overwritePreset} loadPreset={props.loadPreset} deletePreset={props.deletePreset} renamePreset={props.renamePreset} onResetDefault={props.onResetDefault}
                 currentTheme={currentTheme} setTheme={setTheme} cursorStyle={props.cursorStyle} setCursorStyle={props.setCursorStyle} retroScreenCursorStyle={props.retroScreenCursorStyle} setRetroScreenCursorStyle={props.setRetroScreenCursorStyle} controlStyle={controlStyle} setControlStyle={setControlStyle}
@@ -229,30 +250,32 @@ const SettingsPanel: React.FC<SettingsPanelProps> = (props) => {
         <SettingsSection 
             id="bg" 
             title={<><span className="text-theme-muted opacity-50 font-normal mr-2">2 //</span> <TranslatedText k="cat_backgrounds" /></>} 
-            isOpen={openSections['bg']} 
-            onToggle={(isAdditive) => handleSectionToggle('bg', isAdditive)}
+            isOpen={props.settingsOpenSections['bg']} 
+            onToggle={(isAdditive) => safeToggleSection('bg', isAdditive)}
             stickyTop="36px"
         >
             <BackgroundSection 
-                expandedState={expandedState} toggleExpand={toggleExpand}
+                expandedState={props.settingsExpandedState} toggleExpand={safeToggleExpand}
                 bgAnimation={props.bgAnimation} setBgAnimation={props.setBgAnimation} bgTransition={props.bgTransition} setBgTransition={props.setBgTransition}
                 bgMedia={props.bgMedia} bgList={props.bgList} currentBgIndex={props.currentBgIndex} onRemoveBg={props.onRemoveBg} onMoveBg={props.onMoveBg} onSelectBg={props.onSelectBg} onClearBgMedia={props.onClearBgMedia} shuffleBgList={props.shuffleBgList} onBgMediaUpload={props.onBgMediaUpload} onUpdateBg={props.updateBg || (async()=>{})} onUpdateMetadata={props.updateBgMetadata}
                 bgAutoplayInterval={props.bgAutoplayInterval} setBgAutoplayInterval={props.setBgAutoplayInterval} useAlbumArtAsBackground={props.useAlbumArtAsBackground || false} setUseAlbumArtAsBackground={props.setUseAlbumArtAsBackground}
                 bgColor={props.bgColor} setBgColor={props.setBgColor} bgPattern={props.bgPattern} setBgPattern={props.setBgPattern} bgPatternConfig={props.bgPatternConfig} setBgPatternConfig={props.setBgPatternConfig} onDeselectBg={props.onDeselectBg}
                 isVideoActive={props.isVideoActive} toggleVideo={props.toggleVideo} streamMode={props.streamMode} setStreamMode={props.setStreamMode}
                 bgPlaylists={props.bgPlaylists} activeBgPlaylistId={props.activeBgPlaylistId} playingBgPlaylistId={props.playingBgPlaylistId} setActiveBgPlaylistId={props.setActiveBgPlaylistId} setPlayingBgPlaylistId={props.setPlayingBgPlaylistId} addBgPlaylist={props.addBgPlaylist} removeBgPlaylist={props.removeBgPlaylist} renameBgPlaylist={props.renameBgPlaylist}
+                screenFitMode={props.screenFitMode} setScreenFitMode={props.setScreenFitMode}
+                screenAlignment={props.screenAlignment} setScreenAlignment={props.setScreenAlignment}
             />
         </SettingsSection>
 
         <SettingsSection 
             id="sfx" 
             title={<><span className="text-theme-muted opacity-50 font-normal mr-2">3 //</span> <TranslatedText k="cat_sound_effects" /></>} 
-            isOpen={openSections['sfx']} 
-            onToggle={(isAdditive) => handleSectionToggle('sfx', isAdditive)}
+            isOpen={props.settingsOpenSections['sfx']} 
+            onToggle={(isAdditive) => safeToggleSection('sfx', isAdditive)}
             stickyTop="72px"
         >
             <SoundSection 
-                expandedState={expandedState} toggleExpand={toggleExpand}
+                expandedState={props.settingsExpandedState} toggleExpand={safeToggleExpand}
                 crossfadeDuration={props.crossfadeDuration} setCrossfadeDuration={props.setCrossfadeDuration} sfxVolume={props.sfxVolume} setSfxVolume={props.setSfxVolume} smoothStart={props.smoothStart} setSmoothStart={props.setSmoothStart}
                 ambienceFiles={props.ambienceFiles} ambienceConfig={props.ambienceConfig} onAmbienceUpload={props.onAmbienceUpload} onAmbienceDelete={props.onAmbienceDelete} onAmbienceSetActive={props.onAmbienceSetActive} onAmbienceTogglePlay={props.onAmbienceTogglePlay} onAmbienceVolume={props.onAmbienceVolume}
                 isMicActive={props.isMicActive} toggleMic={props.toggleMic} isSysAudioActive={props.isSysAudioActive} toggleSysAudio={props.toggleSysAudio}
@@ -263,12 +286,12 @@ const SettingsPanel: React.FC<SettingsPanelProps> = (props) => {
         <SettingsSection 
             id="waves" 
             title={<><span className="text-theme-muted opacity-50 font-normal mr-2">4 //</span> WAVEFORMS</>} 
-            isOpen={openSections['waves']} 
-            onToggle={(isAdditive) => handleSectionToggle('waves', isAdditive)}
+            isOpen={props.settingsOpenSections['waves']} 
+            onToggle={(isAdditive) => safeToggleSection('waves', isAdditive)}
             stickyTop="108px"
         >
             <WaveformSection 
-                expandedState={expandedState} toggleExpand={toggleExpand} safeAction={safeAction}
+                expandedState={props.settingsExpandedState} toggleExpand={safeToggleExpand} safeAction={safeAction}
                 showVisualizer={props.showVisualizer} setShowVisualizer={props.setShowVisualizer} visualizerConfig={props.visualizerConfig} updateVisualizer={updaters.updateVisualizer}
                 showVisualizer3D={props.showVisualizer3D} setShowVisualizer3D={props.setShowVisualizer3D} reactorConfig={props.reactorConfig} updateReactor={updaters.updateReactor}
                 showSineWave={props.showSineWave} setShowSineWave={props.setShowSineWave} sineWaveConfig={props.sineWaveConfig} updateSineWave={updaters.updateSineWave}
@@ -278,12 +301,12 @@ const SettingsPanel: React.FC<SettingsPanelProps> = (props) => {
         <SettingsSection 
             id="mod" 
             title={<><span className="text-theme-muted opacity-50 font-normal mr-2">5 //</span> <TranslatedText k="modules" /></>} 
-            isOpen={openSections['mod']} 
-            onToggle={(isAdditive) => handleSectionToggle('mod', isAdditive)}
+            isOpen={props.settingsOpenSections['mod']} 
+            onToggle={(isAdditive) => safeToggleSection('mod', isAdditive)}
             stickyTop="144px"
         >
             <ModulesSection 
-                expandedState={expandedState} toggleExpand={toggleExpand} safeAction={safeAction}
+                expandedState={props.settingsExpandedState} toggleExpand={safeToggleExpand} safeAction={safeAction}
                 marqueeConfig={props.marqueeConfig} updateMarquee={updaters.updateMarquee}
                 showDvd={props.showDvd} setShowDvd={props.setShowDvd} dvdConfig={props.dvdConfig} updateDvd={updaters.updateDvd}
                 effectsConfig={props.effectsConfig} updateEffect={updaters.updateEffect} apiKey={props.apiKey} setApiKey={props.setApiKey}
@@ -293,12 +316,12 @@ const SettingsPanel: React.FC<SettingsPanelProps> = (props) => {
         <SettingsSection 
             id="game" 
             title={<><span className="text-theme-muted opacity-50 font-normal mr-2">6 //</span> GAME MODULES</>} 
-            isOpen={openSections['game']} 
-            onToggle={(isAdditive) => handleSectionToggle('game', isAdditive)}
+            isOpen={props.settingsOpenSections['game']} 
+            onToggle={(isAdditive) => safeToggleSection('game', isAdditive)}
             stickyTop="180px"
         >
             <GameSection 
-                expandedState={expandedState} toggleExpand={toggleExpand} safeAction={safeAction}
+                expandedState={props.settingsExpandedState} toggleExpand={safeToggleExpand} safeAction={safeAction}
                 effectsConfig={props.effectsConfig} updateEffect={updaters.updateEffect}
             />
         </SettingsSection>
@@ -306,12 +329,12 @@ const SettingsPanel: React.FC<SettingsPanelProps> = (props) => {
         <SettingsSection 
             id="post" 
             title={<><span className="text-theme-muted opacity-50 font-normal mr-2">7 //</span> <TranslatedText k="cat_screen_effects" /></>} 
-            isOpen={openSections['post']} 
-            onToggle={(isAdditive) => handleSectionToggle('post', isAdditive)}
+            isOpen={props.settingsOpenSections['post']} 
+            onToggle={(isAdditive) => safeToggleSection('post', isAdditive)}
             stickyTop="216px"
         >
             <PostProcessingSection 
-                expandedState={expandedState} toggleExpand={toggleExpand} safeAction={safeAction}
+                expandedState={props.settingsExpandedState} toggleExpand={safeToggleExpand} safeAction={safeAction}
                 effectsConfig={props.effectsConfig} updateEffect={updaters.updateEffect}
             />
         </SettingsSection>

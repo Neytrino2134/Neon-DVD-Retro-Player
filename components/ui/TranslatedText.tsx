@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef } from 'react';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { en } from '../../locales/en';
@@ -6,7 +5,7 @@ import { en } from '../../locales/en';
 type TranslationKey = keyof typeof en;
 
 // Characters used for the glitch effect
-const GLITCH_CHARS = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789@#$%&*!??█▓▒░<>/[]{}-=_+";
+const GLITCH_CHARS = "ABCDEFGHIJKLMNOPQRSTUVWXYZАБВГДЕЁЖЗИЙКЛМНОПРСТУФХЦЧШЩЪЫЬЭЮЯ0123456789@#$%&*!??█▓▒░<>/[]{}-=_+";
 
 interface TranslatedTextProps {
   k: TranslationKey; // The key from the locale file

@@ -5,14 +5,15 @@
 import { TagMetadata, BgHotspot } from '../types';
 
 const DB_NAME = 'NeonPlayerDB';
-const DB_VERSION = 6; // Incremented for BG Playlists
+const DB_VERSION = 7; // Incremented for DVD Logos
 const STORES = {
   TRACKS: 'tracks',
   PLAYLISTS: 'playlists',
   BACKGROUND: 'background',
-  BG_PLAYLISTS: 'bg_playlists', // New Store
+  BG_PLAYLISTS: 'bg_playlists', 
   SFX: 'sfx',
-  AMBIENCE: 'ambience'
+  AMBIENCE: 'ambience',
+  DVD_LOGOS: 'dvd_logos' // New Store
 };
 
 export const initDB = (): Promise<IDBDatabase> => {
@@ -64,6 +65,9 @@ export const initDB = (): Promise<IDBDatabase> => {
       }
       if (!db.objectStoreNames.contains(STORES.AMBIENCE)) {
         db.createObjectStore(STORES.AMBIENCE, { keyPath: 'id' });
+      }
+      if (!db.objectStoreNames.contains(STORES.DVD_LOGOS)) {
+        db.createObjectStore(STORES.DVD_LOGOS, { keyPath: 'id' });
       }
     };
 
@@ -384,6 +388,52 @@ export const deleteAmbience = async (id: string) => {
     const store = transaction.objectStore(STORES.AMBIENCE);
     const request = store.delete(id);
     request.onsuccess = () => resolve();
+    request.onerror = () => reject(request.error);
+  });
+};
+
+// --- DVD LOGO FUNCTIONS ---
+
+export const saveDvdLogo = async (item: { id: string; name: string; file: File }) => {
+  const db = await initDB();
+  return new Promise<void>((resolve, reject) => {
+    const transaction = db.transaction(STORES.DVD_LOGOS, 'readwrite');
+    const store = transaction.objectStore(STORES.DVD_LOGOS);
+    const request = store.put(item);
+    request.onsuccess = () => resolve();
+    request.onerror = () => reject(request.error);
+  });
+};
+
+export const getAllDvdLogos = async (): Promise<{ id: string; name: string; file: File }[]> => {
+  const db = await initDB();
+  return new Promise((resolve, reject) => {
+    const transaction = db.transaction(STORES.DVD_LOGOS, 'readonly');
+    const store = transaction.objectStore(STORES.DVD_LOGOS);
+    const request = store.getAll();
+    request.onsuccess = () => resolve(request.result || []);
+    request.onerror = () => reject(request.error);
+  });
+};
+
+export const deleteDvdLogo = async (id: string) => {
+  const db = await initDB();
+  return new Promise<void>((resolve, reject) => {
+    const transaction = db.transaction(STORES.DVD_LOGOS, 'readwrite');
+    const store = transaction.objectStore(STORES.DVD_LOGOS);
+    const request = store.delete(id);
+    request.onsuccess = () => resolve();
+    request.onerror = () => reject(request.error);
+  });
+};
+
+export const getDvdLogoById = async (id: string): Promise<{ id: string; name: string; file: File } | undefined> => {
+  const db = await initDB();
+  return new Promise((resolve, reject) => {
+    const transaction = db.transaction(STORES.DVD_LOGOS, 'readonly');
+    const store = transaction.objectStore(STORES.DVD_LOGOS);
+    const request = store.get(id);
+    request.onsuccess = () => resolve(request.result);
     request.onerror = () => reject(request.error);
   });
 };

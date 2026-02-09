@@ -37,6 +37,12 @@ const NoiseOverlay: React.FC<NoiseOverlayProps> = ({ opacity, pixelation }) => {
       const renderW = Math.ceil(rectW / scale);
       const renderH = Math.ceil(rectH / scale);
 
+      // CRITICAL FIX: Prevent crash if dimensions are invalid (e.g. during layout transitions)
+      if (renderW <= 0 || renderH <= 0) {
+          animationId = requestAnimationFrame(render);
+          return;
+      }
+
       if (canvas.width !== renderW || canvas.height !== renderH) {
         canvas.width = renderW;
         canvas.height = renderH;
@@ -45,26 +51,30 @@ const NoiseOverlay: React.FC<NoiseOverlayProps> = ({ opacity, pixelation }) => {
       // Optimization: Use ImageData + Uint32Array instead of fillRect loop
       // fillRect is very slow for thousands of particles.
       if (opacity > 0) {
-        const imageData = ctx.createImageData(renderW, renderH);
-        const buffer32 = new Uint32Array(imageData.data.buffer);
-        const len = buffer32.length;
-        
-        // Threshold for noise density (e.g. 15% of pixels are noise)
-        // We use Math.random() in a simplified way or just loop
-        // To be super fast, we can skip pixels.
-        
-        // Alpha calculation: 0xAABBGGRR
-        // We want white (FFFFFF) with Alpha.
-        const alphaInt = Math.floor(opacity * 255);
-        const pixelValue = (alphaInt << 24) | 0x00FFFFFF;
+        try {
+            const imageData = ctx.createImageData(renderW, renderH);
+            const buffer32 = new Uint32Array(imageData.data.buffer);
+            const len = buffer32.length;
+            
+            // Threshold for noise density (e.g. 15% of pixels are noise)
+            // We use Math.random() in a simplified way or just loop
+            // To be super fast, we can skip pixels.
+            
+            // Alpha calculation: 0xAABBGGRR
+            // We want white (FFFFFF) with Alpha.
+            const alphaInt = Math.floor(opacity * 255);
+            const pixelValue = (alphaInt << 24) | 0x00FFFFFF;
 
-        for (let i = 0; i < len; i++) {
-           if (Math.random() < 0.15) {
-               buffer32[i] = pixelValue;
-           }
+            for (let i = 0; i < len; i++) {
+               if (Math.random() < 0.15) {
+                   buffer32[i] = pixelValue;
+               }
+            }
+            
+            ctx.putImageData(imageData, 0, 0);
+        } catch (e) {
+            // Fallback or silence error during resize
         }
-        
-        ctx.putImageData(imageData, 0, 0);
       } else {
         ctx.clearRect(0, 0, renderW, renderH);
       }

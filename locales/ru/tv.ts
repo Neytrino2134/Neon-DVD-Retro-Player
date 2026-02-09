@@ -69,11 +69,15 @@ export const tv = {
   prog_opacity: "ПРОЗРАЧНОСТЬ",
   speed: "СКОРОСТЬ",
   text_size: "РАЗМЕР ТЕКСТА",
+  channel_name: "ИМЯ КАНАЛА",
+  show_border: "ПОКАЗАТЬ РАМКУ",
   
   dvd_saver: "DVD ЗАСТАВКА",
   dvd_logo_type: "ТИП ЛОГОТИПА",
   logo_dvd: "DVD",
   logo_neon: "NEON",
+  logo_custom: "СВОЙ",
+  upload_logo: "ЗАГРУЗИТЬ ЛОГО",
   sfx_volume: "ГРОМКОСТЬ SFX",
   sfx_enabled: "SFX ВКЛЮЧЕН",
   size: "РАЗМЕР",
@@ -151,6 +155,17 @@ export const tv = {
   light_flicker: "МЕРЦАНИЕ СВЕТА",
   flicker_intensity: "ИНТЕНСИВНОСТЬ",
   flicker_speed: "СКОРОСТЬ",
+  
+  // Video Grading
+  color_grading: "ЦВЕТОКОРРЕКЦИЯ",
+  video_presets: "ПРЕСЕТЫ / ВИД",
+  vid_brightness: "ЯРКОСТЬ",
+  vid_contrast: "КОНТРАСТ",
+  vid_saturation: "НАСЫЩЕННОСТЬ",
+  vid_grayscale: "Ч/Б",
+  vid_sepia: "СЕПИЯ",
+  vid_hue: "ОТТЕНОК",
+  vid_warmth: "ТЕПЛОТА (ТИНТ)",
 
   // Audio & Background
   background: "ФОН",
@@ -170,6 +185,14 @@ export const tv = {
   capture_audio: "ЗАХВАТ АУДИО",
   stop_screen: "СТОП ЭКРАН",
   start_screen: "СТАРТ ЭКРАН",
+  fit_mode: "РЕЖИМ ЗАПОЛНЕНИЯ",
+  fit_cover: "ПОКРЫТИЕ (ОБРЕЗКА)",
+  fit_contain: "ВПИСАТЬ (ЦЕЛИКОМ)",
+  fit_stretch: "РАСТЯНУТЬ (ПОЛНОСТЬЮ)",
+  screen_align: "ВЫРАВНИВАНИЕ",
+  align_left: "СЛЕВА",
+  align_center: "ЦЕНТР",
+  align_right: "СПРАВА",
   
   mixer_deck: "МИКШЕР",
   crossfade_duration: "ДЛИТЕЛЬНОСТЬ КРОССФЕЙДА",

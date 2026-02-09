@@ -7,7 +7,13 @@ import { DEFAULT_EQUALIZER_CONFIG } from '../config/defaults';
 
 export const useAudioPlayer = () => {
   const lib = useLibrary(); // Logic for DB and Playlists
-  const [volume, setVolumeState] = useState(0.75);
+  
+  // Volume with Persistence
+  const [volume, setVolumeState] = useState(() => {
+      const saved = localStorage.getItem('neon_main_volume');
+      return saved ? parseFloat(saved) : 0.75;
+  });
+  
   const audio = useWebAudio(volume); // Logic for AudioContext
 
   // --- PLAYBACK STATE ---
@@ -25,6 +31,9 @@ export const useAudioPlayer = () => {
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
+
+  // Initialization flag to prevent overwriting localStorage before load
+  const [isRestored, setIsRestored] = useState(false);
 
   // Settings
   const [crossfadeDuration, setCrossfadeDuration] = useState(3);
@@ -47,16 +56,48 @@ export const useAudioPlayer = () => {
   // Refs for logic
   const hasTriggeredAutoMixRef = useRef(false);
 
-  // --- PERSISTENCE ---
+  // --- PERSISTENCE (Only save if restored) ---
   useEffect(() => {
-      if (playingPlaylistId) localStorage.setItem('neon_playing_playlist', playingPlaylistId);
-  }, [playingPlaylistId]);
+      if (isRestored && playingPlaylistId) {
+          localStorage.setItem('neon_playing_playlist', playingPlaylistId);
+      }
+  }, [playingPlaylistId, isRestored]);
 
   useEffect(() => {
-      if (currentTrackIndex >= 0) {
+      if (isRestored && currentTrackIndex >= 0) {
           localStorage.setItem('neon_track_index', currentTrackIndex.toString());
       }
-  }, [currentTrackIndex]);
+  }, [currentTrackIndex, isRestored]);
+
+  // Save Current Time periodically (every 2 seconds) or on unmount
+  useEffect(() => {
+      if (!isRestored) return;
+      const interval = setInterval(() => {
+          if (isPlaying) {
+              localStorage.setItem('neon_track_time', currentTime.toString());
+          }
+      }, 2000);
+      
+      // Also save on pause
+      if (!isPlaying) {
+          localStorage.setItem('neon_track_time', currentTime.toString());
+      }
+
+      return () => clearInterval(interval);
+  }, [currentTime, isPlaying, isRestored]);
+
+  // Handle Window Unload to save exact state
+  useEffect(() => {
+      const handleUnload = () => {
+          if (isRestored) {
+              localStorage.setItem('neon_track_index', currentTrackIndex.toString());
+              localStorage.setItem('neon_track_time', currentTime.toString());
+              localStorage.setItem('neon_playing_playlist', playingPlaylistId);
+          }
+      };
+      window.addEventListener('beforeunload', handleUnload);
+      return () => window.removeEventListener('beforeunload', handleUnload);
+  }, [currentTrackIndex, currentTime, playingPlaylistId, isRestored]);
 
   useEffect(() => {
       localStorage.setItem('neon_is_shuffle', String(isShuffle));
@@ -72,11 +113,13 @@ export const useAudioPlayer = () => {
 
   // --- RESTORE STATE ON LOAD ---
   useEffect(() => {
-      if (lib.isReady && lib.playlists.length > 0) {
+      if (lib.isReady && lib.playlists.length > 0 && !isRestored) {
           const savedPlayingId = localStorage.getItem('neon_playing_playlist');
           const savedIndexStr = localStorage.getItem('neon_track_index');
-          let savedIndex = parseInt(savedIndexStr || '0', 10);
+          const savedTimeStr = localStorage.getItem('neon_track_time');
           
+          let savedIndex = parseInt(savedIndexStr || '0', 10);
+          let savedTime = parseFloat(savedTimeStr || '0');
           let targetPlayingId = savedPlayingId;
           
           // Verify ID still exists
@@ -94,8 +137,22 @@ export const useAudioPlayer = () => {
               setCurrentTrack(track);
               setCurrentTrackIndex(savedIndex);
               
-              if (audioRefA.current) audioRefA.current.src = track.url;
+              // Restore Time and Source
+              if (audioRefA.current) {
+                  audioRefA.current.src = track.url;
+                  // Set current time safely
+                  if (isFinite(savedTime)) {
+                      audioRefA.current.currentTime = savedTime;
+                      setCurrentTime(savedTime);
+                  }
+              }
           }
+          
+          // Mark as restored so we can start saving updates
+          setIsRestored(true);
+      } else if (lib.isReady && lib.playlists.length === 0) {
+          // If library is ready but empty, we still mark restored to allow normal ops
+          setIsRestored(true);
       }
   }, [lib.isReady]); // Run only when library finishes loading DB
 
@@ -159,6 +216,7 @@ export const useAudioPlayer = () => {
 
   const setVolume = (vol: number) => {
       setVolumeState(vol);
+      localStorage.setItem('neon_main_volume', vol.toString());
       // Actual gain update handled by useEffect in useWebAudio
   };
 
@@ -243,6 +301,8 @@ export const useAudioPlayer = () => {
       }
       setIsPlaying(false);
       setCurrentTime(0);
+      // Reset time in storage on stop
+      localStorage.setItem('neon_track_time', '0');
       
       if (audio.gainNodeRef.current && audio.audioContextRef.current) {
           try {

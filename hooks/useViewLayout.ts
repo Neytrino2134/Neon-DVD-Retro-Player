@@ -10,6 +10,7 @@ export type AnimSequence =
   | 'exiting_default'   // Fade out/scale down from big mode
   | 'exiting_mini'      // Fade out/scale down from mini mode
   | 'exiting_center'    // New: Fade out/scale down to center (generic exit)
+  | 'exiting_focus'     // New: Fade out from Focus/Cinema mode
   | 'loading'           // New: Spinner state (App hidden)
   | 'entering_center'   // New: Scale up from center (generic enter)
   | 'void_layout'       // Layout mounted but hidden (preparation phase)
@@ -303,8 +304,6 @@ export const useViewLayout = (introState: number) => {
               await wait(700);
 
               // 3. LOCK TRANSITIONS
-              // This is the critical fix. We switch to 'switching_layout' which sets 
-              // 'transition: none' in the style calculators below.
               // This prevents the browser from animating the width jump (0 -> 460) when we flip the switch.
               setAnimSequence('switching_layout');
 
@@ -313,12 +312,54 @@ export const useViewLayout = (introState: number) => {
               setShowCenterPanel(true);
               
               // 5. Allow DOM to settle in the new Cinema state (where panels are absolute and off-screen)
-              // without transition artifacts
               await wait(50);
 
               if (ipc) ipc.send('set-full-mode');
-          } 
-          // 4. PLAYER FOCUS MODE
+          }
+          // 4. RESTORING FROM PLAYER FOCUS
+          else if (targetMode === 'default' && viewMode === 'player-focus') {
+              if (ipc) ipc.send('set-full-mode');
+              
+              // NEW: CINEMATIC RESTORE SEQUENCE
+              
+              // 1. Fade Out (Dive to Darkness)
+              setAnimSequence('exiting_focus');
+              await wait(600); // Fade out duration
+
+              // 2. Void State (Reset View Mode behind curtain)
+              setAnimSequence('void_layout');
+              setViewMode('default');
+              
+              // Calculate target visibility based on screen size
+              const w = window.innerWidth;
+              const bp = getBreakpoint(w);
+              setCurrentBreakpoint(bp);
+              const shouldShowLeft = bp === 'desktop';
+              const shouldShowCenter = bp !== 'mobile';
+              const shouldShowRight = true;
+
+              // Force all visible logic to true so they mount, but are hidden by 'void_layout' opacity
+              setShowLeftPanel(shouldShowLeft);
+              setShowCenterPanel(shouldShowCenter);
+              setShowRightPanel(shouldShowRight);
+              
+              await wait(400); // Hold in darkness
+
+              // 3. Reveal Sequence
+              if (shouldShowLeft) {
+                  setAnimSequence('reveal_left');
+                  await wait(500); // Slide in left
+              }
+              
+              setAnimSequence('reveal_right');
+              await wait(500); // Slide in right (Player)
+
+              if (shouldShowCenter) {
+                  setAnimSequence('reveal_center');
+                  await wait(600); // Pop in center
+              }
+          }
+          // 5. PLAYER FOCUS MODE
           else if (targetMode === 'player-focus') {
               setViewMode('player-focus');
               setShowLeftPanel(false);
@@ -385,8 +426,8 @@ export const useViewLayout = (introState: number) => {
   };
 
   // Updated Transition Styles
-  if (animSequence === 'exiting_center') {
-      masterStyle = { opacity: 0, transform: 'scale(0.5)', transition: 'opacity 0.5s ease-in, transform 0.5s ease-in' };
+  if (animSequence === 'exiting_center' || animSequence === 'exiting_focus') {
+      masterStyle = { opacity: 0, transform: 'scale(0.95)', transition: 'opacity 0.5s ease-in, transform 0.5s ease-in' };
   } else if (animSequence === 'loading') {
       masterStyle = { opacity: 0, transform: 'scale(0.5)', transition: 'none' };
   } else if (animSequence === 'entering_center') {
@@ -395,6 +436,9 @@ export const useViewLayout = (introState: number) => {
       masterStyle = { opacity: 0, transform: 'scale(0.95)', transition: 'opacity 0.5s ease, transform 0.5s ease' };
   } else if (animSequence === 'void_layout') {
       masterStyle = { opacity: 0, transform: 'scale(1)', transition: 'none' };
+  } else if (animSequence === 'reveal_left' || animSequence === 'reveal_right' || animSequence === 'reveal_center') {
+      // During reveal steps, we control individual opacities, master is visible
+      masterStyle = { opacity: 1, transform: 'scale(1)', transition: 'none' };
   }
 
   // --- LEFT PANEL LOGIC ---
@@ -417,10 +461,22 @@ export const useViewLayout = (introState: number) => {
       transition: isResizing ? 'none' : 'transform 0.7s cubic-bezier(0.25,1,0.5,1)'
   };
 
+  // Override for Reveal Animation
+  if (animSequence === 'void_layout') {
+      leftPanelInnerStyle.transform = 'translateX(-100%)';
+      leftPanelInnerStyle.opacity = 0;
+  } else if (animSequence === 'reveal_left') {
+      leftPanelInnerStyle.transform = 'translateX(0)';
+      leftPanelInnerStyle.opacity = 1;
+      leftPanelInnerStyle.transition = 'transform 0.5s cubic-bezier(0.2,0.8,0.2,1), opacity 0.5s ease-out';
+  } else if (animSequence === 'reveal_right' || animSequence === 'reveal_center') {
+      leftPanelInnerStyle.transform = 'translateX(0)';
+      leftPanelInnerStyle.opacity = 1;
+  }
+
   // CINEMA OVERRIDE (Left)
   if (isCinema) {
       // Fix: Force z-50 to keep panel above video/black screen during exit animation.
-      // Previously z-index toggled to 0 immediately when hidden, causing it to pop behind the screen.
       const zIndex = 'z-50';
       // FIX: Disable transition during layout switches (isResizing) to prevent panels flying in from 0,0
       const transitionClass = !isResizing ? 'transition-transform duration-500 cubic-bezier(0.2,0.8,0.2,1)' : '';
@@ -460,6 +516,19 @@ export const useViewLayout = (introState: number) => {
       transition: isResizing ? 'none' : 'transform 0.7s cubic-bezier(0.25,1,0.5,1)'
   };
 
+  // Override for Reveal Animation
+  if (animSequence === 'void_layout' || animSequence === 'reveal_left') {
+      rightPanelInnerStyle.transform = 'translateX(100%)';
+      rightPanelInnerStyle.opacity = 0;
+  } else if (animSequence === 'reveal_right') {
+      rightPanelInnerStyle.transform = 'translateX(0)';
+      rightPanelInnerStyle.opacity = 1;
+      rightPanelInnerStyle.transition = 'transform 0.5s cubic-bezier(0.2,0.8,0.2,1), opacity 0.5s ease-out';
+  } else if (animSequence === 'reveal_center') {
+      rightPanelInnerStyle.transform = 'translateX(0)';
+      rightPanelInnerStyle.opacity = 1;
+  }
+
   // CINEMA OVERRIDE (Right)
   if (isCinema) {
       // Fix: Force z-50 to keep panel above video/black screen during exit animation.
@@ -483,10 +552,28 @@ export const useViewLayout = (introState: number) => {
       (animSequence === 'reveal_center' || animSequence === 'idle' || animSequence === 'entering_center' || animSequence === 'switching_layout');
 
   // Center Panel gets z-10 to stay above the hidden side panels (z-0) in Cinema Mode (but below active z-50 panels)
+  // Logic for pop-in animation
+  let screenScale = 1;
+  let screenOpacity = 1;
+  
+  if (animSequence === 'void_layout' || animSequence === 'reveal_left' || animSequence === 'reveal_right') {
+      screenScale = 0.9;
+      screenOpacity = 0;
+  } else if (animSequence === 'reveal_center') {
+      screenScale = 1;
+      screenOpacity = 1;
+  }
+
   const screenContainerClass = `flex-grow flex flex-col relative overflow-hidden z-10
       ${!isResizing ? 'transition-all duration-1000 ease-[cubic-bezier(0.34,1.56,0.64,1)]' : ''}
-      ${!isScreenVisible ? 'w-0 opacity-0 scale-95' : 'w-auto opacity-100 scale-100'}
+      ${!isScreenVisible ? 'w-0 opacity-0 scale-95' : 'w-auto'}
   `;
+  
+  // Apply inline styles for specific reveal control
+  const screenContainerStyle = {
+      opacity: !isScreenVisible ? 0 : screenOpacity,
+      transform: !isScreenVisible ? 'scale(0.95)' : `scale(${screenScale})`
+  };
 
   return {
     viewMode,
@@ -510,6 +597,7 @@ export const useViewLayout = (introState: number) => {
     rightPanelStyle,
     rightPanelInnerStyle,
     screenContainerClass,
+    screenContainerStyle, // Exported new style object
     isResizing,
     leftPanelWidth,
     rightPanelWidth,

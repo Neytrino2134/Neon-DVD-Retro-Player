@@ -5,7 +5,7 @@ import ModuleWrapper from '../ModuleWrapper';
 import { BgConfigModule, BgResourceModule, BgColorModule } from '../BackgroundSettings';
 import { ScreenVideoModule } from '../modules/ScreenSettings';
 import { NumberedLabel } from '../SettingsSection';
-import { BackgroundMedia, PatternConfig, BgTransitionType, BgAnimationType, BackgroundPlaylist, BgHotspot } from '../../../types';
+import { BackgroundMedia, PatternConfig, BgTransitionType, BgAnimationType, BackgroundPlaylist, BgHotspot, FitMode, ScreenAlignment } from '../../../types';
 
 interface BackgroundSectionProps {
   expandedState: Record<string, boolean>;
@@ -49,6 +49,10 @@ interface BackgroundSectionProps {
   toggleVideo: () => void;
   streamMode?: 'bg' | 'window';
   setStreamMode?: (m: 'bg' | 'window') => void;
+  screenFitMode?: FitMode;
+  setScreenFitMode?: (m: FitMode) => void;
+  screenAlignment?: ScreenAlignment; // NEW
+  setScreenAlignment?: (a: ScreenAlignment) => void; // NEW
 }
 
 const BackgroundSection: React.FC<BackgroundSectionProps> = ({
@@ -59,7 +63,7 @@ const BackgroundSection: React.FC<BackgroundSectionProps> = ({
   currentBgIndex, onRemoveBg, onMoveBg, onSelectBg, onClearBgMedia, shuffleBgList, onBgMediaUpload, onUpdateBg, onUpdateMetadata,
   bgAutoplayInterval, setBgAutoplayInterval, useAlbumArtAsBackground, setUseAlbumArtAsBackground,
   bgColor, setBgColor, bgPattern, setBgPattern, bgPatternConfig, setBgPatternConfig, onDeselectBg,
-  isVideoActive, toggleVideo, streamMode, setStreamMode
+  isVideoActive, toggleVideo, streamMode, setStreamMode, screenFitMode, setScreenFitMode, screenAlignment, setScreenAlignment
 }) => {
   return (
     <>
@@ -69,6 +73,10 @@ const BackgroundSection: React.FC<BackgroundSectionProps> = ({
                 setBgAnimation={setBgAnimation}
                 bgTransition={bgTransition}
                 setBgTransition={setBgTransition}
+                screenFitMode={screenFitMode || 'cover'}
+                setScreenFitMode={setScreenFitMode || (() => {})}
+                screenAlignment={screenAlignment || 'center'}
+                setScreenAlignment={setScreenAlignment || (() => {})}
             />
         </ModuleWrapper>
 

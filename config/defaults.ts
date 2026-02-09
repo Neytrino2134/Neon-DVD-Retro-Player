@@ -53,6 +53,17 @@ export const DEFAULT_EFFECTS_CONFIG: EffectsConfig = {
   },
   lightLeaks: { enabled: false, intensity: 0.5, speed: 0.5, number: 6 },
   lightFlicker: { enabled: false, intensity: 0.3, speed: 0.5 }, // Default: Off, moderate intensity
+  videoSettings: {
+    enabled: false,
+    brightness: 1.0,
+    contrast: 1.0,
+    saturation: 1.0,
+    grayscale: 0,
+    sepia: 0,
+    hueRotate: 0,
+    warmth: 0,
+    preset: 'none'
+  },
   rain: { enabled: false, intensity: 0.5, speed: 1.0, size: 1.0, direction: 0, wind: 0, gustiness: 0.5, opacity: 0.5, wander: 0.1 },
   tron: { 
     enabled: false, 
@@ -79,7 +90,7 @@ export const DEFAULT_EFFECTS_CONFIG: EffectsConfig = {
 
 export const DEFAULT_MARQUEE_CONFIG: MarqueeConfig = {
   enabled: true, style: 'matrix', showProgress: true, progressMode: 'blocks', progressHeight: 20, progressOpacity: 0.6,
-  speed: 1, opacity: 0.9, fontSize: 40
+  speed: 1, opacity: 0.9, fontSize: 40, channelName: 'Neon Waves', borderEnabled: false
 };
 
 export const DEFAULT_WATERMARK_CONFIG: WatermarkConfig = { 

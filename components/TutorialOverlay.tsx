@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef } from 'react';
 import { Terminal, ChevronRight, MousePointer2, Globe } from 'lucide-react';
 import { VisualizerConfig } from '../types';
@@ -29,7 +28,7 @@ interface TutorialStep {
   placement?: 'left' | 'right' | 'bottom-center' | 'top-center'; // Added top-center
 }
 
-const GLITCH_CHARS = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789@#$%&*!??█▓▒░<>/[]{}-=_+";
+const GLITCH_CHARS = "ABCDEFGHIJKLMNOPQRSTUVWXYZАБВГДЕЁЖЗИЙКЛМНОПРСТУФХЦЧШЩЪЫЬЭЮЯ0123456789@#$%&*!??█▓▒░<>/[]{}-=_+";
 
 const TutorialOverlay: React.FC<TutorialOverlayProps> = ({
   onComplete,

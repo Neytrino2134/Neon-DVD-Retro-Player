@@ -1,4 +1,3 @@
-
 import { AppPreset } from '../types';
 import { 
   DEFAULT_VISUALIZER_CONFIG, 
@@ -153,6 +152,17 @@ export const OCEAN_BLUE_PRESET: AppPreset = {
         enabled: false,
         intensity: 0.3,
         speed: 0.5
+      },
+      videoSettings: {
+        enabled: false,
+        brightness: 1.0,
+        contrast: 1.0,
+        saturation: 1.0,
+        grayscale: 0,
+        sepia: 0,
+        hueRotate: 0,
+        warmth: 0,
+        preset: 'none'
       },
       rain: {
         enabled: false,

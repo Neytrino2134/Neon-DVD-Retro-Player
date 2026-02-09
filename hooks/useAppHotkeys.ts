@@ -88,6 +88,7 @@ export const useAppHotkeys = ({
       const target = e.target as HTMLElement;
       
       // Ctrl+Shift+R: Force System Cursor (Emergency Recovery)
+      // This is allowed even in inputs in case something goes wrong
       if (e.ctrlKey && e.shiftKey && (e.code === 'KeyR')) {
           e.preventDefault();
           e.stopPropagation();
@@ -95,6 +96,11 @@ export const useAppHotkeys = ({
           addNotification("DEV: SYSTEM CURSOR FORCED", "warning");
           return;
       }
+
+      // --- INPUT FIELD PROTECTION ---
+      // MOVED UP: Prevent any other hotkeys (Shift+F, etc) if typing.
+      // We allow Ctrl/Alt/Meta combos (like Ctrl+C, Ctrl+V) to pass through to the browser/input.
+      if ((target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.tagName === 'SELECT') && !e.ctrlKey && !e.altKey && !e.metaKey) return;
 
       // Shift + F: Toggle Fullscreen (GLOBAL, Works during Boot)
       if (e.code === 'KeyF' && e.shiftKey) {
@@ -139,10 +145,6 @@ export const useAppHotkeys = ({
           }
           return;
       }
-
-      // --- INPUT FIELD PROTECTION ---
-      // Allow keys if modifier is held (e.g. Ctrl+C in input)
-      if ((target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.tagName === 'SELECT') && !e.ctrlKey && !e.altKey && !e.metaKey) return;
 
       if (e.repeat) return;
 
@@ -233,13 +235,9 @@ export const useAppHotkeys = ({
           player.nextTrack();
       }
       else if (e.code === 'KeyS') {
-          if (e.shiftKey) {
-              // Shift + S: Stop Playback
-              if (isPlaylistLocked) return;
-              player.stop();
-              addNotification("STOPPED", "info");
-          } else if (!hasModifier) {
-              // S: Toggle System Panel (Left)
+          // S: Toggle System Panel (Left)
+          // Ensure Shift is NOT held, to allow Shift+S to remain free
+          if (!hasModifier && !e.shiftKey) {
               toggleLeftPanel();
           }
       } 
@@ -288,6 +286,16 @@ export const useAppHotkeys = ({
       }
       else if (e.code === 'Space') {
         e.preventDefault();
+        
+        // Shift + Space: Stop Playback
+        if (e.shiftKey) {
+             if (isPlaylistLocked) return;
+             player.stop();
+             addNotification("STOPPED", "info");
+             return;
+        }
+
+        // Just Space: Play/Pause
         // If Locked: Only allow starting playback. Do NOT allow pausing.
         if (isPlaylistLocked && player.isPlaying) {
             addNotification("CONTROLS LOCKED", "warning");

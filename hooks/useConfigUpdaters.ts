@@ -45,8 +45,12 @@ export const useConfigUpdaters = ({
     setMarqueeConfig({ ...marqueeConfig, [key]: value });
   };
 
-  const updateDvd = (key: keyof DvdConfig, value: any) => {
-    setDvdConfig({ ...dvdConfig, [key]: value });
+  const updateDvd = (key: keyof DvdConfig | Partial<DvdConfig>, value?: any) => {
+    if (typeof key === 'object' && key !== null) {
+        setDvdConfig({ ...dvdConfig, ...key });
+    } else {
+        setDvdConfig({ ...dvdConfig, [key as keyof DvdConfig]: value });
+    }
   };
 
   const updateEffect = (key: keyof EffectsConfig, value: any) => {

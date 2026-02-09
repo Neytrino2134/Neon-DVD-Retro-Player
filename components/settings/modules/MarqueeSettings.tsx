@@ -1,8 +1,9 @@
 
 import React, { useState } from 'react';
-import { Clock, ChevronDown } from 'lucide-react';
+import { Clock, ChevronDown, Frame, Type } from 'lucide-react';
 import RangeControl from '../RangeControl';
 import CustomSelect from '../CustomSelect';
+import ToggleSwitch from '../ToggleSwitch';
 import { MarqueeConfig } from '../../../types';
 import { useLanguage } from '../../../contexts/LanguageContext';
 import { useTheme } from '../../../contexts/ThemeContext';
@@ -18,7 +19,7 @@ const MarqueeSettings: React.FC<MarqueeSettingsProps> = ({ config, update }) => 
   const [expandTimeScale, setExpandTimeScale] = useState(true);
 
   const styleOptions = [
-    { value: 'theme-sync', label: t('style_theme_sync') }, // New Option
+    { value: 'theme-sync', label: t('style_theme_sync') }, 
     { value: 'retro', label: t('style_retro') },
     { value: 'blue', label: t('style_blue') },
     { value: 'pink', label: t('style_pink') },
@@ -47,6 +48,28 @@ const MarqueeSettings: React.FC<MarqueeSettingsProps> = ({ config, update }) => 
 
   return (
     <div className="pt-2">
+        {/* Channel Name Input */}
+        <div className="mb-4 bg-black/20 p-2 rounded border border-theme-border">
+            <label className="text-theme-text font-mono text-[10px] block mb-2 tracking-widest uppercase opacity-70 flex items-center gap-2">
+                <Type size={12} /> {t('channel_name')}
+            </label>
+            <input 
+                type="text" 
+                value={config.channelName || 'Neon Waves'}
+                onChange={(e) => update('channelName', e.target.value)}
+                placeholder="Neon Waves"
+                className="w-full bg-black/50 border-b border-theme-muted/50 focus:border-theme-primary outline-none text-xs font-mono text-theme-text placeholder-theme-muted/30 px-1 py-1 transition-colors"
+            />
+        </div>
+
+        <ToggleSwitch 
+            label={t('show_border')} 
+            icon={Frame} 
+            value={config.borderEnabled || false} 
+            onChange={(v) => update('borderEnabled', v)} 
+            color="green"
+        />
+
         <CustomSelect 
             label={t('visual_style')} 
             value={config.style || 'matrix'} 

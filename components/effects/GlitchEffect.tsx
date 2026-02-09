@@ -1,4 +1,3 @@
-
 import React, { useEffect, useRef } from 'react';
 import { EffectsConfig } from '../../types';
 
@@ -61,7 +60,7 @@ const GLITCH_PHRASES_V1 = [
   "UNAUTHORIZED", "DISCONNECT", "404", "RETRYING..."
 ];
 
-const GLITCH_CHARS = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%^&*()_+-=[]{}|;':,./<>?";
+const GLITCH_CHARS = "ABCDEFGHIJKLMNOPQRSTUVWXYZАБВГДЕЁЖЗИЙКЛМНОПРСТУФХЦЧШЩЪЫЬЭЮЯ0123456789!@#$%^&*()_+-=[]{}|;':,./<>?";
 
 const GLITCH_PHRASES_V2 = [
   "SIGNAL LOST", "INSERT DISK", "CONNECTION ERROR", "NO SIGNAL", "SYSTEM FAILURE", 

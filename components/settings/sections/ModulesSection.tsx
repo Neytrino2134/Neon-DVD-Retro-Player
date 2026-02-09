@@ -20,7 +20,7 @@ interface ModulesSectionProps {
   showDvd: boolean;
   setShowDvd: (v: boolean) => void;
   dvdConfig: DvdConfig;
-  updateDvd: (k: keyof DvdConfig, v: any) => void;
+  updateDvd: (k: keyof DvdConfig | Partial<DvdConfig>, v?: any) => void;
   effectsConfig: EffectsConfig;
   updateEffect: (k: keyof EffectsConfig, v: any) => void;
   apiKey: string;

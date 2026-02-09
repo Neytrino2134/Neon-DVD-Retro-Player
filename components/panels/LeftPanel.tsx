@@ -186,6 +186,14 @@ const LeftPanel: React.FC<LeftPanelProps> = (props) => {
             setEqBand={player.setEqBand}
             setEqPreset={player.setEqPreset}
             toggleEq={player.toggleEq}
+            // Fit Mode
+            screenFitMode={config.screenFitMode}
+            setScreenFitMode={config.setScreenFitMode}
+            // Lifted State
+            settingsExpandedState={config.settingsExpandedState}
+            settingsOpenSections={config.settingsOpenSections}
+            toggleSettingsExpand={config.toggleSettingsExpand}
+            toggleSettingsSection={config.toggleSettingsSection}
           />
         )}
 

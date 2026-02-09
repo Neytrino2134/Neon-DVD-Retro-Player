@@ -1,6 +1,6 @@
 
 import React, { useEffect, useRef } from 'react';
-import { EffectsConfig } from '../types';
+import { EffectsConfig, FitMode, ScreenAlignment } from '../types';
 
 interface MediaRendererProps {
   type: 'image' | 'video' | 'color';
@@ -8,9 +8,11 @@ interface MediaRendererProps {
   stream?: MediaStream | null; // NEW: Live Stream
   bgColor: string;
   effects: EffectsConfig;
+  fitMode?: FitMode; 
+  alignment?: ScreenAlignment; // NEW
 }
 
-const MediaRenderer: React.FC<MediaRendererProps> = ({ type, url, stream, bgColor, effects }) => {
+const MediaRenderer: React.FC<MediaRendererProps> = ({ type, url, stream, bgColor, effects, fitMode = 'cover', alignment = 'center' }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   
   // Ref for Image
@@ -120,7 +122,23 @@ const MediaRenderer: React.FC<MediaRendererProps> = ({ type, url, stream, bgColo
       const drawW = Math.ceil(w / scaleEffect);
       const drawH = Math.ceil(h / scaleEffect);
       
-      ctx.imageSmoothingEnabled = false;
+      // --- OPTIMIZATION FOR TEXT READABILITY ---
+      if (stream && scaleEffect <= 1.5) {
+          ctx.imageSmoothingEnabled = true;
+          ctx.imageSmoothingQuality = 'high';
+      } else {
+          ctx.imageSmoothingEnabled = false;
+      }
+
+      // --- COLOR GRADING ---
+      const vidSettings = effects.videoSettings;
+      if (vidSettings && vidSettings.enabled) {
+          const { brightness, contrast, saturation, grayscale, sepia, hueRotate } = vidSettings;
+          // Apply filter BEFORE drawing
+          ctx.filter = `brightness(${brightness}) contrast(${contrast}) saturate(${saturation}) grayscale(${grayscale}) sepia(${sepia}) hue-rotate(${hueRotate}deg)`;
+      } else {
+          ctx.filter = 'none';
+      }
 
       // --- LOGIC SPLIT: VIDEO VS IMAGE/COLOR ---
       
@@ -131,48 +149,80 @@ const MediaRenderer: React.FC<MediaRendererProps> = ({ type, url, stream, bgColo
           videoSource = fileVideoRef.current;
       }
 
+      const drawContent = (srcW: number, srcH: number, drawable: CanvasImageSource) => {
+          let renderX = 0, renderY = 0, renderW = drawW, renderH = drawH;
+
+          // 1. Calculate Target Dimensions based on Fit Mode
+          if (fitMode === 'stretch') {
+              renderW = drawW;
+              renderH = drawH;
+          } else {
+              const srcRatio = srcW / srcH;
+              const dstRatio = drawW / drawH;
+              
+              if (fitMode === 'contain') {
+                  // Contain: Scale down to fit completely within canvas
+                  if (dstRatio > srcRatio) {
+                      // Canvas is wider than image (fit height)
+                      renderH = drawH;
+                      renderW = drawH * srcRatio;
+                  } else {
+                      // Canvas is taller than image (fit width)
+                      renderW = drawW;
+                      renderH = drawW / srcRatio;
+                  }
+              } else {
+                  // Cover: Scale up to fill canvas completely (crop)
+                  if (dstRatio > srcRatio) {
+                      // Canvas is wider than image (match width, crop height)
+                      renderW = drawW;
+                      renderH = drawW / srcRatio;
+                  } else {
+                      // Canvas is taller than image (match height, crop width)
+                      renderH = drawH;
+                      renderW = drawH * srcRatio;
+                  }
+              }
+          }
+
+          // 2. Calculate Position based on Alignment (X Axis)
+          if (alignment === 'left') {
+              renderX = 0;
+          } else if (alignment === 'right') {
+              renderX = drawW - renderW;
+          } else {
+              // Center
+              renderX = (drawW - renderW) / 2;
+          }
+
+          // 3. Y Axis Alignment (Center by default)
+          // renderY can be positive (centering small image) or negative (centering crop)
+          renderY = (drawH - renderH) / 2;
+
+          ctx.drawImage(drawable, renderX, renderY, renderW, renderH);
+      };
+
       if (videoSource) {
-          // --- VIDEO RENDERING (PERSISTENT FRAME) ---
-          // Fix for Loop Blinking: We DO NOT clear the canvas for video.
-          // If the video is looping and drops a frame, the previous frame remains on canvas, preventing the black flash.
-          
+          // --- VIDEO RENDERING ---
+          // Clear only if using contain mode to show background bars
+          if (fitMode === 'contain') {
+              ctx.clearRect(0, 0, drawW, drawH);
+          }
+
           if (videoSource.readyState >= 2) {
               const srcW = videoSource.videoWidth;
               const srcH = videoSource.videoHeight;
 
               if (srcW && srcH) {
-                  // "Cover" logic
-                  const srcRatio = srcW / srcH;
-                  const dstRatio = drawW / drawH;
-                  
-                  let renderX = 0, renderY = 0, renderW = drawW, renderH = drawH;
-
-                  if (dstRatio > srcRatio) {
-                      renderW = drawW;
-                      renderH = drawW / srcRatio;
-                      renderY = (drawH - renderH) / 2; 
-                  } else {
-                      renderH = drawH;
-                      renderW = drawH * srcRatio;
-                      renderX = (drawW - renderW) / 2;
-                  }
-
-                  // Keep-alive: Ensure it's playing if it paused itself unexpectedly (browser optimization)
                   if (videoSource.paused && !stream) videoSource.play().catch(() => {});
-
-                  ctx.drawImage(videoSource, renderX, renderY, renderW, renderH);
-
-                  if (scaleEffect > 1) {
-                      ctx.drawImage(canvas, 0, 0, drawW, drawH, 0, 0, w, h);
-                  }
+                  drawContent(srcW, srcH, videoSource);
               }
           }
-          // If readyState < 2, we do NOTHING. This leaves the old frame visible.
       } else {
           // --- IMAGE / COLOR RENDERING ---
-          // For static content, we clear and redraw to support transparency/bg color changes.
-          
           ctx.clearRect(0, 0, w, h);
+          
+          // Apply filter to solid color too if image
           ctx.fillStyle = bgColor;
           ctx.fillRect(0, 0, w, h);
 
@@ -182,35 +232,42 @@ const MediaRenderer: React.FC<MediaRendererProps> = ({ type, url, stream, bgColo
               const srcH = img.naturalHeight;
 
               if (srcW && srcH) {
-                  // "Cover" logic
-                  const srcRatio = srcW / srcH;
-                  const dstRatio = drawW / drawH;
-                  
-                  let renderX = 0, renderY = 0, renderW = drawW, renderH = drawH;
-
-                  if (dstRatio > srcRatio) {
-                      renderW = drawW;
-                      renderH = drawW / srcRatio;
-                      renderY = (drawH - renderH) / 2; 
-                  } else {
-                      renderH = drawH;
-                      renderW = drawH * srcRatio;
-                      renderX = (drawW - renderW) / 2;
-                  }
-
-                  ctx.drawImage(img, renderX, renderY, renderW, renderH);
-
-                  if (scaleEffect > 1) {
-                      ctx.drawImage(canvas, 0, 0, drawW, drawH, 0, 0, w, h);
-                  }
+                  drawContent(srcW, srcH, img);
               }
           }
+      }
+
+      // --- APPLY WARMTH / TINT ---
+      // We apply this as an overlay AFTER the filter but BEFORE scaling up
+      if (vidSettings && vidSettings.enabled && vidSettings.warmth !== 0) {
+          const warmth = vidSettings.warmth;
+          ctx.filter = 'none'; // Ensure filter is off for overlay
+          
+          // Use 'overlay' or 'soft-light' for cinematic tint
+          ctx.globalCompositeOperation = 'overlay';
+          
+          if (warmth > 0) {
+              // Warm (Orange/Amber)
+              ctx.fillStyle = `rgba(255, 150, 0, ${warmth * 0.3})`;
+          } else {
+              // Cool (Blue/Cyan)
+              ctx.fillStyle = `rgba(0, 100, 255, ${Math.abs(warmth) * 0.3})`;
+          }
+          
+          ctx.fillRect(0, 0, drawW, drawH);
+          ctx.globalCompositeOperation = 'source-over'; // Reset
+      }
+
+      // Scale up if needed (Pixelation)
+      if (scaleEffect > 1) {
+          ctx.filter = 'none'; // Ensure no double filter
+          ctx.drawImage(canvas, 0, 0, drawW, drawH, 0, 0, w, h);
       }
     };
 
     animationRef.current = requestAnimationFrame(render);
     return () => cancelAnimationFrame(animationRef.current);
-  }, [type, url, stream, bgColor, effects]);
+  }, [type, url, stream, bgColor, effects, fitMode, alignment]);
 
   return <canvas ref={canvasRef} className="absolute inset-0 w-full h-full object-cover z-0" />;
 };

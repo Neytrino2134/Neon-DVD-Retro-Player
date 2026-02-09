@@ -125,6 +125,7 @@ const HologramHelp: React.FC<HologramHelpProps> = ({ onClose }) => {
           icon: Command,
           items: [
               { key: "Space", desc: isRu ? "Старт / Пауза" : "Play / Pause" },
+              { key: "Shift + Space", desc: isRu ? "Стоп" : "Stop" },
               { key: "- / =", desc: isRu ? "Пред / След трек" : "Prev / Next Track" },
               { key: "PgUp / PgDn", desc: isRu ? "Смена темы" : "Change Theme" },
               { key: "' / \\", desc: isRu ? "Смена фона" : "Change Background" }
@@ -135,7 +136,6 @@ const HologramHelp: React.FC<HologramHelpProps> = ({ onClose }) => {
           icon: Monitor,
           items: [
               { key: "S", desc: isRu ? "Системная панель" : renderLabel("System Panel", "S") },
-              { key: "Shift + S", desc: isRu ? "Стоп" : renderLabel("Stop", "S") },
               { key: "L", desc: isRu ? "Список треков (Вкл/Выкл)" : renderLabel("Playlist (Toggle)", "L") },
               { key: "Shift + L", desc: isRu ? "Блок. плейлиста" : renderLabel("Lock Playlist", "L") },
               { key: "P", desc: isRu ? "Плеер (Панель)" : renderLabel("Player Panel", "P") },

@@ -1,7 +1,7 @@
 
 import React, { useState, useRef, useMemo } from 'react';
 import { List, ChevronDown, ChevronUp, Timer, Trash2, RefreshCw, Disc, Upload, Power, Shuffle, Plus, X, Play, Image as ImageIcon, Video, Wand2 } from 'lucide-react';
-import { BackgroundMedia, PatternConfig, BgTransitionType, BgAnimationType, BackgroundPlaylist, BgHotspot } from '../../types';
+import { BackgroundMedia, PatternConfig, BgTransitionType, BgAnimationType, BackgroundPlaylist, BgHotspot, FitMode, ScreenAlignment } from '../../types';
 import RangeControl from './RangeControl';
 import CustomSelect from './CustomSelect';
 import ToggleSwitch from './ToggleSwitch';
@@ -50,13 +50,21 @@ interface BgConfigModuleProps {
   setBgAnimation: (a: BgAnimationType) => void;
   bgTransition: BgTransitionType;
   setBgTransition: (t: BgTransitionType) => void;
+  screenFitMode: FitMode;
+  setScreenFitMode: (m: FitMode) => void;
+  screenAlignment: ScreenAlignment; // NEW
+  setScreenAlignment: (a: ScreenAlignment) => void; // NEW
 }
 
 export const BgConfigModule: React.FC<BgConfigModuleProps> = ({
   bgAnimation,
   setBgAnimation,
   bgTransition,
-  setBgTransition
+  setBgTransition,
+  screenFitMode,
+  setScreenFitMode,
+  screenAlignment,
+  setScreenAlignment
 }) => {
   const { t } = useLanguage();
 
@@ -75,6 +83,18 @@ export const BgConfigModule: React.FC<BgConfigModuleProps> = ({
       { value: 'chaos', label: t('anim_chaos') }
   ];
 
+  const fitOptions = [
+      { value: 'cover', label: t('fit_cover') },
+      { value: 'contain', label: t('fit_contain') },
+      { value: 'stretch', label: t('fit_stretch') }
+  ];
+
+  const alignOptions = [
+      { value: 'left', label: t('align_left') },
+      { value: 'center', label: t('align_center') },
+      { value: 'right', label: t('align_right') }
+  ];
+
   return (
     <div className="pt-2 space-y-3">
         <CustomSelect 
@@ -89,6 +109,22 @@ export const BgConfigModule: React.FC<BgConfigModuleProps> = ({
             options={transitionOptions}
             onChange={(v) => setBgTransition(v as BgTransitionType)}
         />
+        <CustomSelect 
+            label={t('fit_mode')} 
+            value={screenFitMode || 'cover'} 
+            options={fitOptions} 
+            onChange={(v) => setScreenFitMode(v as FitMode)} 
+        />
+        
+        {/* Show alignment for Cover AND Contain */}
+        {(screenFitMode === 'cover' || screenFitMode === 'contain') && (
+            <CustomSelect 
+                label={t('screen_align')} 
+                value={screenAlignment || 'center'} 
+                options={alignOptions} 
+                onChange={(v) => setScreenAlignment(v as ScreenAlignment)} 
+            />
+        )}
     </div>
   );
 };

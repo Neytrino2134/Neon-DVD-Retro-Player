@@ -20,6 +20,18 @@ export interface TronConfig {
   roundMode?: boolean; // NEW: Enable competitive round mode linked to track time
 }
 
+export interface VideoColorConfig {
+  enabled: boolean;
+  brightness: number; // 0.0 to 3.0 (def 1.0)
+  contrast: number;   // 0.0 to 3.0 (def 1.0)
+  saturation: number; // 0.0 to 3.0 (def 1.0)
+  grayscale: number;  // 0.0 to 1.0 (def 0)
+  sepia: number;      // 0.0 to 1.0 (def 0)
+  hueRotate: number;  // 0 to 360 (def 0)
+  warmth: number;     // -1.0 (Blue) to 1.0 (Orange) (def 0)
+  preset: string;     // ID of current preset
+}
+
 export interface EffectsConfig {
   fps: number;
   showFps: boolean; // NEW: Show FPS Counter
@@ -75,6 +87,7 @@ export interface EffectsConfig {
     intensity: number; // How much brightness/darkness changes
     speed: number; // How erratic the flicker is
   };
+  videoSettings: VideoColorConfig; // NEW: Video Color Grading
   rain: RainConfig; // NEW: Rain Effect
   tron: TronConfig; // NEW: Tron Game
   vignette: {
@@ -224,6 +237,8 @@ export type ThemeType = 'neon-retro' | 'neon-blue' | 'neon-pink' | 'warm-cozy' |
 export type ControlStyle = 'default' | 'round' | 'circle';
 export type BgTransitionType = 'glitch' | 'leaks' | 'none';
 export type BgAnimationType = 'none' | 'zoom' | 'sway' | 'handheld' | 'cinematic' | 'chaos'; // NEW
+export type FitMode = 'cover' | 'contain' | 'stretch'; // NEW: Background/Screen fit mode
+export type ScreenAlignment = 'center' | 'left' | 'right'; // NEW: Alignment for crop mode
 
 // NEW: View Mode for Application Layout
 export type ViewMode = 'default' | 'cinema' | 'mini' | 'player-focus';
@@ -260,7 +275,9 @@ export interface DvdConfig {
   speed: number;
   opacity: number;
   enableSfx: boolean;
-  logoType: 'dvd' | 'neon_waves';
+  logoType: 'dvd' | 'neon_waves' | 'custom';
+  customLogoUrl?: string; // NEW: For user uploaded logo
+  activeDvdLogoId?: string; // NEW: ID of the selected logo in DB to restore on reload
 }
 
 export interface MarqueeConfig {
@@ -273,6 +290,8 @@ export interface MarqueeConfig {
   speed: number;
   opacity: number;
   fontSize: number;
+  channelName?: string; // NEW: Custom text for "Neon Waves" replacement
+  borderEnabled?: boolean; // NEW: Show frame/border around marquee
 }
 
 export interface WatermarkConfig {

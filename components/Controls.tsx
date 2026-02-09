@@ -447,6 +447,17 @@ const Controls: React.FC<ControlsProps> = ({
                             </button>
                         </Tooltip>
                     )}
+
+                    {isElectron && (
+                        <Tooltip content="CLOSE APP" position="bottom-right">
+                            <button 
+                                onClick={handleClose}
+                                className="text-theme-muted hover:text-red-500 transition-colors p-2 hover:bg-white/5 rounded-full"
+                            >
+                                <X size={18} />
+                            </button>
+                        </Tooltip>
+                    )}
                 </div>
             </div>
             )}
