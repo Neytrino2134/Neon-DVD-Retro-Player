@@ -1,6 +1,6 @@
 
 import { useState, useEffect, useCallback } from 'react';
-import { VisualizerConfig, DvdConfig, EffectsConfig, MarqueeConfig, PatternConfig, BackgroundMedia, BackgroundPlaylist, AppPreset, CursorStyle, WatermarkConfig, ThemeType, ControlStyle, BgTransitionType, BgAnimationType, BgHotspot, EqualizerConfig, FitMode, ScreenAlignment } from '../types';
+import { VisualizerConfig, DvdConfig, EffectsConfig, MarqueeConfig, PatternConfig, BackgroundMedia, BackgroundPlaylist, AppPreset, CursorStyle, WatermarkConfig, ThemeType, ControlStyle, BgTransitionType, BgAnimationType, BgHotspot, EqualizerConfig, FitMode, ScreenAlignment, YouTubeAuthConfig } from '../types';
 import { getAllBackgrounds, saveBackground, deleteBackground, getAllBgPlaylists, saveBgPlaylist, deleteBgPlaylistAndFiles, getDvdLogoById } from '../lib/db';
 import { 
   DEFAULT_VISUALIZER_CONFIG, 
@@ -10,7 +10,8 @@ import {
   DEFAULT_EFFECTS_CONFIG, 
   DEFAULT_MARQUEE_CONFIG, 
   DEFAULT_WATERMARK_CONFIG,
-  DEFAULT_EQUALIZER_CONFIG
+  DEFAULT_EQUALIZER_CONFIG,
+  DEFAULT_YOUTUBE_AUTH_CONFIG
 } from '../config/defaults';
 import { DEFAULT_PRESETS, DEFAULT_SYSTEM_PRESET } from '../config/presets';
 
@@ -43,16 +44,17 @@ const STORAGE_KEYS = {
   PLAYING_BG_PLAYLIST: 'neon_playing_bg_playlist',
   EQUALIZER: 'neon_equalizer_config',
   SCREEN_FIT: 'neon_screen_fit', 
-  SCREEN_ALIGN: 'neon_screen_align' 
+  SCREEN_ALIGN: 'neon_screen_align',
+  YOUTUBE_AUTH: 'neon_youtube_auth' // New Key
 };
 
 // Map of Main Section ID -> Array of Child Module IDs (for accordion logic)
 const SECTION_MODULES: Record<string, string[]> = {
-  sys: ['files', 'presets', 'themes', 'debug'],
+  sys: ['files', 'presets', 'themes', 'youtube_auth', 'debug'], // Added youtube_auth
   bg: ['bg-settings', 'bg-resources', 'bg-colors', 'screen-share'],
   sfx: ['mixer', 'ambience', 'sysaudio'],
   waves: ['wave', 'reactor', 'sine'],
-  mod: ['marquee', 'dvd', 'leaks', 'rain', 'hologram', 'gemini', 'scan', 'cyber', 'glitch'],
+  mod: ['marquee', 'dvd', 'leaks', 'rain', 'hologram', 'gemini', 'youtube_chat', 'scan', 'cyber', 'glitch'], // Added youtube_chat
   game: ['tron'],
   post: ['fps', 'signal', 'chromatic', 'vignette', 'flicker', 'video']
 };
@@ -106,6 +108,7 @@ export const useAppConfig = () => {
   const [marqueeConfig, setMarqueeConfig] = useState<MarqueeConfig>(() => getInitial(STORAGE_KEYS.MARQUEE, DEFAULT_MARQUEE_CONFIG));
   const [watermarkConfig, setWatermarkConfig] = useState<WatermarkConfig>(() => getInitial(STORAGE_KEYS.WATERMARK, DEFAULT_WATERMARK_CONFIG));
   const [equalizerConfig, setEqualizerConfig] = useState<EqualizerConfig>(() => getInitial(STORAGE_KEYS.EQUALIZER, DEFAULT_EQUALIZER_CONFIG));
+  const [youTubeConfig, setYouTubeConfig] = useState<YouTubeAuthConfig>(() => getInitial(STORAGE_KEYS.YOUTUBE_AUTH, DEFAULT_YOUTUBE_AUTH_CONFIG));
   
   // Independent Configs
   const [visualizerConfig, setVisualizerConfig] = useState<VisualizerConfig>(() => getInitial(STORAGE_KEYS.VISUALIZER, DEFAULT_VISUALIZER_CONFIG));
@@ -214,6 +217,44 @@ export const useAppConfig = () => {
       });
   };
 
+  // --- HOTKEY LISTENERS FOR SECTIONS ---
+  useEffect(() => {
+      const handleToggleSection = (e: CustomEvent) => {
+          const sectionId = e.detail;
+          if (sectionId && SECTION_MODULES[sectionId]) { 
+              toggleSettingsSection(sectionId, false);
+          }
+      };
+
+      const handleToggleModule = (e: CustomEvent) => {
+          const moduleId = e.detail;
+          if (moduleId) {
+              // Expand module
+              toggleSettingsExpand(moduleId, false, true); 
+              
+              // Ensure parent section is open
+              let parentSection = '';
+              for (const [sec, modules] of Object.entries(SECTION_MODULES)) {
+                  if (modules.includes(moduleId)) {
+                      parentSection = sec;
+                      break;
+                  }
+              }
+              if (parentSection) {
+                  setSettingsOpenSections(prev => ({ ...prev, [parentSection]: true }));
+              }
+          }
+      };
+
+      window.addEventListener('neon-toggle-section', handleToggleSection as EventListener);
+      window.addEventListener('neon-toggle-module', handleToggleModule as EventListener);
+
+      return () => {
+          window.removeEventListener('neon-toggle-section', handleToggleSection as EventListener);
+          window.removeEventListener('neon-toggle-module', handleToggleModule as EventListener);
+      };
+  }, []);
+
   useEffect(() => {
     localStorage.setItem(STORAGE_KEYS.API_KEY, apiKey);
   }, [apiKey]);
@@ -243,7 +284,8 @@ export const useAppConfig = () => {
     localStorage.setItem(STORAGE_KEYS.USE_ALBUM_ART, JSON.stringify(useAlbumArtAsBackground));
     localStorage.setItem(STORAGE_KEYS.SCREEN_FIT, screenFitMode);
     localStorage.setItem(STORAGE_KEYS.SCREEN_ALIGN, screenAlignment);
-  }, [visualizerConfig, reactorConfig, sineWaveConfig, dvdConfig, effectsConfig, bgColor, bgPattern, bgPatternConfig, showVisualizer, showVisualizer3D, showSineWave, showDvd, marqueeConfig, watermarkConfig, bgAutoplayInterval, cursorStyle, retroScreenCursorStyle, bgTransition, bgAnimation, isAdvancedMode, useAlbumArtAsBackground, equalizerConfig, screenFitMode, screenAlignment]);
+    localStorage.setItem(STORAGE_KEYS.YOUTUBE_AUTH, JSON.stringify(youTubeConfig));
+  }, [visualizerConfig, reactorConfig, sineWaveConfig, dvdConfig, effectsConfig, bgColor, bgPattern, bgPatternConfig, showVisualizer, showVisualizer3D, showSineWave, showDvd, marqueeConfig, watermarkConfig, bgAutoplayInterval, cursorStyle, retroScreenCursorStyle, bgTransition, bgAnimation, isAdvancedMode, useAlbumArtAsBackground, equalizerConfig, screenFitMode, screenAlignment, youTubeConfig]);
 
   useEffect(() => {
     localStorage.setItem(STORAGE_KEYS.PRESETS, JSON.stringify(savedPresets));
@@ -634,7 +676,8 @@ export const useAppConfig = () => {
         bgTransition,
         bgAnimation,
         ambienceConfig: undefined,
-        equalizerConfig // Save EQ
+        equalizerConfig, // Save EQ
+        youtubeAuth: youTubeConfig // Save YouTube Auth State
       }
     };
     
@@ -669,7 +712,8 @@ export const useAppConfig = () => {
                     controlStyle: controlStyle || p.config.controlStyle,
                     bgTransition,
                     bgAnimation,
-                    equalizerConfig // Save EQ
+                    equalizerConfig, // Save EQ
+                    youtubeAuth: youTubeConfig // Save Auth
                   }
               };
           }
@@ -693,6 +737,7 @@ export const useAppConfig = () => {
     const safeWatermark = safeMerge(DEFAULT_WATERMARK_CONFIG, c.watermarkConfig || {});
     const safePatternConfig = safeMerge({ intensity: 0.25, scale: 1.0 }, c.bgPatternConfig);
     const safeEqualizer = safeMerge(DEFAULT_EQUALIZER_CONFIG, c.equalizerConfig || {});
+    const safeYouTube = safeMerge(DEFAULT_YOUTUBE_AUTH_CONFIG, c.youtubeAuth || {});
 
     setVisualizerConfig(safeVisualizer);
     setReactorConfig(safeReactor);
@@ -702,6 +747,7 @@ export const useAppConfig = () => {
     setMarqueeConfig(safeMarquee);
     setWatermarkConfig(safeWatermark);
     setEqualizerConfig(safeEqualizer);
+    setYouTubeConfig(safeYouTube);
     
     setBgColor(c.bgColor);
     setBgPattern(c.bgPattern);
@@ -760,7 +806,8 @@ export const useAppConfig = () => {
         controlStyle: currentControlStyle,
         bgTransition,
         bgAnimation,
-        equalizerConfig
+        equalizerConfig,
+        youtubeAuth: youTubeConfig
       };
       
       const blob = new Blob([JSON.stringify(configToExport, null, 2)], { type: 'application/json' });
@@ -834,6 +881,7 @@ export const useAppConfig = () => {
     bgPatternConfig, setBgPatternConfig,
     screenFitMode, setScreenFitMode, 
     screenAlignment, setScreenAlignment, 
+    youTubeConfig, setYouTubeConfig, // Export YouTube
     
     // Updated BG props
     bgMedia: currentBgMedia,

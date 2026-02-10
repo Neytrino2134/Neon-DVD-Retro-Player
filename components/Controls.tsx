@@ -78,6 +78,9 @@ interface ControlsProps {
   isPlayerFocus?: boolean;
   onToggleFullscreen?: () => void;
   isFullscreen?: boolean;
+
+  // Mute Prop
+  onToggleMute?: () => void;
 }
 
 const Controls: React.FC<ControlsProps> = ({
@@ -130,7 +133,8 @@ const Controls: React.FC<ControlsProps> = ({
   onTogglePlayerFocus,
   isPlayerFocus,
   onToggleFullscreen,
-  isFullscreen
+  isFullscreen,
+  onToggleMute
 }) => {
   // Drag State shared between TrackList and PlaylistTabs
   const [draggedTrackIds, setDraggedTrackIds] = useState<string[]>([]);
@@ -475,7 +479,11 @@ const Controls: React.FC<ControlsProps> = ({
         {/* Control Grid - Needs app-no-drag in mini mode to be clickable */}
         <div className={`flex gap-4 mb-4 shrink-0 relative z-10 px-4 h-44 ${isMini ? 'app-no-drag' : ''}`}>
             {/* Volume Control */}
-            <VolumeControl volume={volume} onVolumeChange={onVolumeChange} />
+            <VolumeControl 
+                volume={volume} 
+                onVolumeChange={onVolumeChange} 
+                onToggleMute={onToggleMute}
+            />
             
             {/* Transport */}
             <TransportControls 

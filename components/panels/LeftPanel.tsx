@@ -189,6 +189,11 @@ const LeftPanel: React.FC<LeftPanelProps> = (props) => {
             // Fit Mode
             screenFitMode={config.screenFitMode}
             setScreenFitMode={config.setScreenFitMode}
+            screenAlignment={config.screenAlignment}
+            setScreenAlignment={config.setScreenAlignment}
+            // YouTube Auth
+            youTubeConfig={config.youTubeConfig}
+            setYouTubeConfig={config.setYouTubeConfig}
             // Lifted State
             settingsExpandedState={config.settingsExpandedState}
             settingsOpenSections={config.settingsOpenSections}

@@ -1,5 +1,5 @@
 
-import { VisualizerConfig, DvdConfig, EffectsConfig, MarqueeConfig, WatermarkConfig, EqualizerConfig } from '../types';
+import { VisualizerConfig, DvdConfig, EffectsConfig, MarqueeConfig, WatermarkConfig, EqualizerConfig, YouTubeAuthConfig, YouTubeChatConfig } from '../types';
 
 export const DEFAULT_VISUALIZER_CONFIG: VisualizerConfig = {
   style: 'blue', position: 'bottom', barCount: 128, sensitivity: 1.5, fillOpacity: 0.3,
@@ -30,6 +30,22 @@ export const DEFAULT_DVD_CONFIG: DvdConfig = {
   size: 150, speed: 2, opacity: 0.7, enableSfx: false, logoType: 'neon_waves' 
 };
 
+export const DEFAULT_YOUTUBE_AUTH_CONFIG: YouTubeAuthConfig = {
+  clientId: '',
+  isConnected: false
+};
+
+export const DEFAULT_YOUTUBE_CHAT_CONFIG: YouTubeChatConfig = {
+  enabled: false,
+  opacity: 0.9,
+  scale: 1.0,
+  width: 350,
+  speed: 1.0,
+  color: 'theme',
+  showAvatars: true,
+  maxMessages: 20
+};
+
 export const DEFAULT_EFFECTS_CONFIG: EffectsConfig = {
   fps: 60, 
   showFps: false,
@@ -51,6 +67,7 @@ export const DEFAULT_EFFECTS_CONFIG: EffectsConfig = {
     enabled: false, opacity: 0.9, scale: 1.0, width: 350, typingSpeed: 1.0,
     categories: { system: false, interactive: true, music: true, motivational: true, philosophy: true, space: true }
   },
+  youtubeChat: DEFAULT_YOUTUBE_CHAT_CONFIG,
   lightLeaks: { enabled: false, intensity: 0.5, speed: 0.5, number: 6 },
   lightFlicker: { enabled: false, intensity: 0.3, speed: 0.5 }, // Default: Off, moderate intensity
   videoSettings: {

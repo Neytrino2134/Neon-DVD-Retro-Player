@@ -1,15 +1,17 @@
 
 import React, { useState } from 'react';
-import { Files, Save, Palette, Bug, MousePointer2, Sliders, Stamp, Lock, ChevronDown } from 'lucide-react';
+import { Files, Save, Palette, Bug, MousePointer2, Sliders, Stamp, Lock, ChevronDown, Youtube } from 'lucide-react';
 import ModuleWrapper from '../ModuleWrapper';
 import FileManagement from '../modules/FileManagement';
 import ConfigManager from '../modules/ConfigManager';
 import { DebugSettings } from '../modules/EffectModules';
+import YouTubeAuthSettings from '../modules/YouTubeAuthSettings'; // NEW
 import CustomSelect from '../CustomSelect';
 import RangeControl from '../RangeControl';
 import { TranslatedText } from '../../ui/TranslatedText';
 import { NumberedLabel } from '../SettingsSection';
-import { AppPreset, ThemeType, CursorStyle, ControlStyle, WatermarkConfig, EffectsConfig } from '../../../types';
+import { AppPreset, ThemeType, CursorStyle, ControlStyle, WatermarkConfig, EffectsConfig, YouTubeAuthConfig } from '../../../types';
+import { useLanguage } from '../../../contexts/LanguageContext';
 
 interface SystemSectionProps {
   expandedState: Record<string, boolean>;
@@ -41,6 +43,8 @@ interface SystemSectionProps {
   isAdvancedMode?: boolean;
   debugConfig: EffectsConfig['debugConsole'];
   updateDebugConfig: (v: EffectsConfig['debugConsole']) => void;
+  youTubeConfig: YouTubeAuthConfig; // NEW
+  setYouTubeConfig: (config: YouTubeAuthConfig) => void; // NEW
   // Options (passed from parent or defined here)
   themeOptions: any[];
   cursorOptions: any[];
@@ -54,10 +58,40 @@ const SystemSection: React.FC<SystemSectionProps> = ({
   currentTheme, setTheme, cursorStyle, setCursorStyle, retroScreenCursorStyle, setRetroScreenCursorStyle, controlStyle, setControlStyle,
   watermarkConfig, setWatermarkConfig, isAdvancedMode,
   debugConfig, updateDebugConfig,
-  themeOptions, cursorOptions, controlStyleOptions
+  youTubeConfig, setYouTubeConfig,
+  themeOptions, cursorOptions: _cursorOptions, controlStyleOptions
 }) => {
   const [expandWatermark, setExpandWatermark] = useState(false);
   const innerWrapperRadius = controlStyle === 'round' || controlStyle === 'circle' ? 'rounded-lg' : 'rounded';
+
+  // We override the cursorOptions here to include the new one, since parent might not pass it yet or dynamic update is easier here
+  // Actually, let's just append it to the options list if not present, or redefine. 
+  // For safety and consistency with other files, redefining locally using the props as base structure but ensuring 'sound-wave' is there.
+  // Actually, easiest is to just inject it into the array passed to CustomSelect if it's not dynamic.
+  // The SettingsPanel passes standard options. Let's assume we modify the list here or the parent.
+  // Let's modify the list passed to CustomSelect.
+  
+  // Actually, SystemSection receives options from SettingsPanel.tsx. I should probably just add it there? 
+  // Wait, I am editing SystemSection.tsx. It's cleaner to just define the extended options here if I can use the hook t().
+  // But wait, SettingsPanel.tsx defines them. 
+  // Let's redefine cursorOptions here to include sound-wave, ignoring the prop for cursorOptions to be safe.
+  
+  const { t } = useLanguage();
+
+  const localCursorOptions = [
+    { value: 'theme-sync', label: t('style_theme_sync'), color: 'theme' }, 
+    { value: 'default', label: t('cursor_default'), color: '#00f3ff' },
+    { value: 'music-flow', label: t('cursor_music'), color: '#ff00ff' }, 
+    { value: 'dos-terminal', label: t('cursor_dos'), color: '#00ff00' }, 
+    { value: 'sound-wave', label: t('cursor_sound_wave'), color: 'theme' }, // NEW
+    { value: 'classic-blue', label: t('cursor_classic'), color: '#00f3ff' },
+    { value: 'classic-warm', label: t('cursor_warm'), color: '#ff8c00' },
+    { value: 'classic-white', label: t('cursor_white'), color: '#ffffff' },
+    { value: 'classic-ocean', label: t('cursor_ocean'), color: '#4B8CA8' },
+    { value: 'crosshair', label: t('cursor_crosshair'), color: '#ff3333' },
+    { value: 'rounded', label: t('cursor_rounded'), color: 'theme' },
+    { value: 'system', label: t('cursor_system'), color: '#ffffff' }, 
+  ];
 
   return (
     <>
@@ -89,8 +123,8 @@ const SystemSection: React.FC<SystemSectionProps> = ({
                   </div>
                   <div className="h-px bg-theme-border mb-3 opacity-50"></div>
                   <div className="space-y-1">
-                      <CustomSelect label={<TranslatedText k="cursor_style" />} value={cursorStyle} options={cursorOptions} onChange={(v) => setCursorStyle(v as CursorStyle)} />
-                      <CustomSelect label={<TranslatedText k="retro_cursor_style" />} value={retroScreenCursorStyle} options={cursorOptions} onChange={(v) => setRetroScreenCursorStyle(v as CursorStyle)} />
+                      <CustomSelect label={<TranslatedText k="cursor_style" />} value={cursorStyle} options={localCursorOptions} onChange={(v) => setCursorStyle(v as CursorStyle)} />
+                      <CustomSelect label={<TranslatedText k="retro_cursor_style" />} value={retroScreenCursorStyle} options={localCursorOptions} onChange={(v) => setRetroScreenCursorStyle(v as CursorStyle)} />
                   </div>
               </div>
 
@@ -142,7 +176,12 @@ const SystemSection: React.FC<SystemSectionProps> = ({
           </div>
       </ModuleWrapper>
 
-      <ModuleWrapper id="debug" label={<NumberedLabel num="04" k="debug_console" />} icon={Bug} isEnabled={true} isAlwaysOn={true} isExpanded={expandedState['debug']} onToggleExpand={(e) => toggleExpand('debug', e.shiftKey)} onToggleEnable={() => {}}>
+      {/* NEW: YouTube Auth Module */}
+      <ModuleWrapper id="youtube_auth" label={<NumberedLabel num="04" k="youtube_auth" />} icon={Youtube} isEnabled={true} isAlwaysOn={true} isExpanded={expandedState['youtube_auth']} onToggleExpand={(e) => toggleExpand('youtube_auth', e.shiftKey)} onToggleEnable={() => {}}>
+          <YouTubeAuthSettings config={youTubeConfig} setYouTubeConfig={setYouTubeConfig} />
+      </ModuleWrapper>
+
+      <ModuleWrapper id="debug" label={<NumberedLabel num="05" k="debug_console" />} icon={Bug} isEnabled={true} isAlwaysOn={true} isExpanded={expandedState['debug']} onToggleExpand={(e) => toggleExpand('debug', e.shiftKey)} onToggleEnable={() => {}}>
           <DebugSettings config={debugConfig} update={updateDebugConfig} />
       </ModuleWrapper>
     </>

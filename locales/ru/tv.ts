@@ -134,6 +134,11 @@ export const tv = {
   width: "ШИРИНА",
   print_speed: "СКОРОСТЬ ПЕЧАТИ",
   
+  youtube_chat: "ЧАТ ЗРИТЕЛЕЙ",
+  yt_show_avatars: "АВАТАРКИ",
+  yt_max_messages: "МАКС СООБЩЕНИЙ",
+  yt_scroll_speed: "СКОРОСТЬ СКРОЛЛА",
+  
   // Post Process
   scanlines: "СКАНЛАЙНЫ",
   cyber_hack: "КИБЕР ВЗЛОМ",
@@ -174,6 +179,9 @@ export const tv = {
   trans_glitch: "ГЛИТЧ",
   trans_leaks: "УТЕЧКИ",
   trans_none: "НЕТ",
+  trans_crossfade: "НАПЛЫВ", // NEW
+  trans_black: "ЧЕРЕЗ ЧЕРНЫЙ", // NEW
+  trans_blur: "ЧЕРЕЗ БЛЮР", // NEW
   anim_none: "НЕТ",
   anim_zoom: "ЗУМ",
   anim_sway: "КАЧАНИЕ",

@@ -1,6 +1,6 @@
 
-import React, { useRef, useState, useEffect } from 'react';
-import { FolderOpen, Lock, Unlock, ArrowDownAZ, Shuffle, Trash2, Upload, Music, Activity, Disc, Hash, Mic2, ThumbsUp, ThumbsDown, Star, ListOrdered } from 'lucide-react';
+import React, { useRef, useState, useEffect, useMemo } from 'react';
+import { FolderOpen, Lock, Unlock, ArrowDownAZ, Shuffle, Trash2, Upload, Music, Activity, Disc, Hash, Mic2, ThumbsUp, ThumbsDown, Star, ListOrdered, ChevronDown, ChevronRight } from 'lucide-react';
 import { Tooltip } from '../ui/Tooltip';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { AudioTrack, VisualizerConfig } from '../../types';
@@ -149,11 +149,25 @@ export const TrackList: React.FC<TrackListProps> = ({
   const dragLeaveTimeoutRef = useRef<number | null>(null);
   const listHoverRef = useRef(false);
 
+  // Album Collapse State
+  const [collapsedAlbums, setCollapsedAlbums] = useState<Set<string>>(new Set());
+
+  // Calculate album stats for headers
+  const albumStats = useMemo(() => {
+      const stats: Record<string, number> = {};
+      tracks.forEach(t => {
+          const name = (t.tags?.album || "").trim() || "Unknown Album";
+          stats[name] = (stats[name] || 0) + 1;
+      });
+      return stats;
+  }, [tracks]);
+
   useEffect(() => {
       setSelectedTrackIds(new Set());
       setLastSelectedTrackIndex(-1);
       setIsListDragOver(false);
       setDropIndicator(null);
+      setCollapsedAlbums(new Set()); // Reset collapses on playlist switch
       if (dragLeaveTimeoutRef.current) {
           window.clearTimeout(dragLeaveTimeoutRef.current);
           dragLeaveTimeoutRef.current = null;
@@ -165,6 +179,15 @@ export const TrackList: React.FC<TrackListProps> = ({
           if (dragLeaveTimeoutRef.current) window.clearTimeout(dragLeaveTimeoutRef.current);
       };
   }, []);
+
+  const toggleAlbum = (albumName: string) => {
+      setCollapsedAlbums(prev => {
+          const next = new Set(prev);
+          if (next.has(albumName)) next.delete(albumName);
+          else next.add(albumName);
+          return next;
+      });
+  };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files.length > 0) {
@@ -217,11 +240,9 @@ export const TrackList: React.FC<TrackListProps> = ({
       removeTracks(activePlaylistId, [id]);
   };
 
-  // NEW: Rate Handler with strict propagation stopping
-  // UPDATED: No longer disabled by playlist lock
   const handleRate = (e: React.MouseEvent, id: string, delta: number) => {
       e.preventDefault();
-      e.stopPropagation(); // CRITICAL: Stop click from bubbling to track selection
+      e.stopPropagation(); 
       onRateTrack(id, delta);
   };
 
@@ -231,8 +252,6 @@ export const TrackList: React.FC<TrackListProps> = ({
               handleDeleteSelected();
           }
           if ((e.ctrlKey || e.metaKey) && (e.code === 'KeyA')) {
-              // Allow Select All even when locked? 
-              // Usually fine, selection doesn't harm. But if user tries to delete, it's blocked above.
               if (listHoverRef.current && tracks.length > 0) {
                   e.preventDefault(); 
                   const allIds = new Set(tracks.map(t => t.id));
@@ -555,128 +574,138 @@ export const TrackList: React.FC<TrackListProps> = ({
                 const rating = track.rating || 0;
 
                 // --- ALBUM HEADER LOGIC ---
-                // Determine if this track starts a new album group
                 const currentAlbumName = (track.tags?.album || "").trim() || "Unknown Album";
                 const prevAlbumName = (tracks[index - 1]?.tags?.album || "").trim() || "Unknown Album";
                 
-                // Show header if: It's the first track OR the album name changed from previous track
                 const showAlbumHeader = index === 0 || currentAlbumName !== prevAlbumName;
                 const albumYear = track.tags?.year;
+                const isCollapsed = collapsedAlbums.has(currentAlbumName);
                 
                 return (
                 <React.Fragment key={track.id}>
                     {/* Visual Separator for Albums */}
                     {showAlbumHeader && (
-                        <div className="mt-3 mb-1 px-2 flex items-center justify-between group/header select-none pointer-events-none relative z-10">
-                            <div className="flex items-center gap-2 overflow-hidden">
+                        <div 
+                            className="mt-3 mb-1 px-2 flex items-center justify-between group/header select-none relative z-10 cursor-pointer hover:bg-white/5 py-1 rounded transition-colors"
+                            onClick={() => toggleAlbum(currentAlbumName)}
+                        >
+                            <div className="flex items-center gap-2 overflow-hidden flex-1 min-w-0">
+                                <div className="text-theme-secondary shrink-0 transition-transform duration-200">
+                                    {isCollapsed ? <ChevronRight size={14} /> : <ChevronDown size={14} />}
+                                </div>
                                 <Disc size={10} className="text-theme-secondary shrink-0 opacity-70" />
                                 <span className="text-[10px] font-mono font-bold text-theme-secondary uppercase tracking-wider truncate opacity-90">
                                     {currentAlbumName}
                                 </span>
+                                <span className="text-[9px] font-mono text-theme-muted opacity-50 px-1 shrink-0">
+                                    ({albumStats[currentAlbumName] || 0})
+                                </span>
                                 {albumYear && (
-                                    <span className="text-[9px] font-mono text-theme-muted opacity-50 border border-theme-border px-1 rounded">
+                                    <span className="text-[9px] font-mono text-theme-muted opacity-50 border border-theme-border px-1 rounded shrink-0">
                                         {albumYear}
                                     </span>
                                 )}
                             </div>
-                            <div className="h-px bg-theme-border/30 flex-1 ml-3"></div>
+                            <div className="h-px bg-theme-border/30 w-12 ml-3"></div>
                         </div>
                     )}
 
-                    <div
-                        className="relative pb-0.5" 
-                        draggable={!isPlaylistLocked}
-                        onDragStart={(e) => handleTrackDragStart(e, index, track.id)}
-                        onDragOver={(e) => handleTrackDragOver(e, index)}
-                        onDragLeave={handleTrackDragLeave}
-                        onDrop={(e) => handleTrackDrop(e, index)}
-                        onClick={(e) => handleTrackClick(e, index, track.id)}
-                        onDoubleClick={() => handleTrackDoubleClick(index)}
-                    >
-                        <div 
-                            className={`
-                                group flex items-center px-2 py-1.5 rounded transition-all cursor-pointer relative overflow-visible shrink-0 z-10
-                                ${isPlayingTrack 
-                                ? 'bg-theme-primary/10 border-l-2 border-theme-primary' 
-                                : isSelected 
-                                    ? 'bg-theme-primary/40 text-white shadow-[inset_0_0_10px_rgba(255,255,255,0.05)]' 
-                                    : 'text-theme-muted hover:bg-theme-primary/10 hover:text-theme-text'}
-                            `}
+                    {!isCollapsed && (
+                        <div
+                            className="relative pb-0.5" 
+                            draggable={!isPlaylistLocked}
+                            onDragStart={(e) => handleTrackDragStart(e, index, track.id)}
+                            onDragOver={(e) => handleTrackDragOver(e, index)}
+                            onDragLeave={handleTrackDragLeave}
+                            onDrop={(e) => handleTrackDrop(e, index)}
+                            onClick={(e) => handleTrackClick(e, index, track.id)}
+                            onDoubleClick={() => handleTrackDoubleClick(index)}
                         >
-                            {/* Drop Indicator Lines */}
-                            {isLineAbove && (
-                                <div className="absolute -top-0.5 left-0 right-0 h-0.5 bg-theme-accent shadow-[0_0_10px_var(--color-accent)] z-50 pointer-events-none"></div>
-                            )}
-                            {isLineBelow && (
-                                <div className="absolute -bottom-0.5 left-0 right-0 h-0.5 bg-theme-accent shadow-[0_0_10px_var(--color-accent)] z-50 pointer-events-none"></div>
-                            )}
+                            <div 
+                                className={`
+                                    group flex items-center px-2 py-1.5 rounded transition-all cursor-pointer relative overflow-visible shrink-0 z-10
+                                    ${isPlayingTrack 
+                                    ? 'bg-theme-primary/10 border-l-2 border-theme-primary' 
+                                    : isSelected 
+                                        ? 'bg-theme-primary/40 text-white shadow-[inset_0_0_10px_rgba(255,255,255,0.05)]' 
+                                        : 'text-theme-muted hover:bg-theme-primary/10 hover:text-theme-text'}
+                                `}
+                            >
+                                {/* Drop Indicator Lines */}
+                                {isLineAbove && (
+                                    <div className="absolute -top-0.5 left-0 right-0 h-0.5 bg-theme-accent shadow-[0_0_10px_var(--color-accent)] z-50 pointer-events-none"></div>
+                                )}
+                                {isLineBelow && (
+                                    <div className="absolute -bottom-0.5 left-0 right-0 h-0.5 bg-theme-accent shadow-[0_0_10px_var(--color-accent)] z-50 pointer-events-none"></div>
+                                )}
 
-                            {/* COLUMN 1: NUMBER */}
-                            <div className={`w-8 text-center text-[10px] font-mono shrink-0 ${isPlayingTrack ? 'text-theme-primary font-bold' : 'opacity-50'}`}>
-                                {isPlayingTrack ? <Activity size={10} className="inline animate-pulse"/> : String(index + 1).padStart(2, '0')}
-                            </div>
+                                {/* COLUMN 1: NUMBER */}
+                                <div className={`w-8 text-center text-[10px] font-mono shrink-0 ${isPlayingTrack ? 'text-theme-primary font-bold' : 'opacity-50'}`}>
+                                    {isPlayingTrack ? <Activity size={10} className="inline animate-pulse"/> : String(index + 1).padStart(2, '0')}
+                                </div>
 
-                            {/* COLUMN 2: ARTWORK */}
-                            <div className="w-8 h-8 rounded overflow-hidden bg-black/50 shrink-0 border border-theme-border mr-3 flex items-center justify-center">
-                                {track.artworkUrl ? (
-                                    <img src={track.artworkUrl} alt="" className="w-full h-full object-cover" />
-                                ) : (
-                                    <Disc size={12} className="opacity-20" />
+                                {/* COLUMN 2: ARTWORK */}
+                                <div className="w-8 h-8 rounded overflow-hidden bg-black/50 shrink-0 border border-theme-border mr-3 flex items-center justify-center">
+                                    {track.artworkUrl ? (
+                                        <img src={track.artworkUrl} alt="" className="w-full h-full object-cover" />
+                                    ) : (
+                                        <Disc size={12} className="opacity-20" />
+                                    )}
+                                </div>
+
+                                {/* COLUMN 3: TITLE & ARTIST */}
+                                <div className="flex-1 min-w-0 flex flex-col justify-center">
+                                    <span className={`block text-xs font-mono truncate w-full select-none ${isPlayingTrack ? 'text-theme-primary font-bold' : 'text-theme-text'}`}>
+                                        {title}
+                                    </span>
+                                    <span className="block text-[9px] font-mono truncate w-full select-none opacity-50">
+                                        {artist}
+                                    </span>
+                                </div>
+
+                                {/* COLUMN 4: ALBUM (MD+) */}
+                                <div className="w-24 hidden md:block text-[9px] font-mono opacity-40 truncate px-2">
+                                    {album}
+                                </div>
+
+                                {/* COLUMN 5: RATING (NEW) */}
+                                <div 
+                                    className="w-20 flex items-center justify-center gap-1 opacity-60 group-hover:opacity-100 transition-opacity"
+                                    // Stop double click propagation on the container too, just in case
+                                    onDoubleClick={(e) => e.stopPropagation()}
+                                >
+                                    <button 
+                                        onClick={(e) => handleRate(e, track.id, -1)}
+                                        onDoubleClick={(e) => e.stopPropagation()} // Extra safety
+                                        className={`p-0.5 hover:scale-110 transition-transform hover:text-red-500`}
+                                    >
+                                        <ThumbsDown size={10} />
+                                    </button>
+                                    <span className={`text-[10px] font-mono font-bold w-6 text-center ${rating > 0 ? 'text-green-500' : rating < 0 ? 'text-red-500' : 'text-theme-muted'}`}>
+                                        {rating > 0 ? `+${rating}` : rating}
+                                    </span>
+                                    <button 
+                                        onClick={(e) => handleRate(e, track.id, 1)}
+                                        onDoubleClick={(e) => e.stopPropagation()} // Extra safety
+                                        className={`p-0.5 hover:scale-110 transition-transform hover:text-green-500`}
+                                    >
+                                        <ThumbsUp size={10} />
+                                    </button>
+                                </div>
+                                
+                                {/* DELETE ACTION */}
+                                {!isPlaylistLocked && (
+                                    <button 
+                                        onClick={(e) => handleDeleteTrack(e, track.id)}
+                                        className="text-theme-muted/50 hover:text-red-500 transition-colors p-1 cursor-pointer ml-2"
+                                        title="Delete Track"
+                                    >
+                                        <Trash2 size={12} />
+                                    </button>
                                 )}
                             </div>
-
-                            {/* COLUMN 3: TITLE & ARTIST */}
-                            <div className="flex-1 min-w-0 flex flex-col justify-center">
-                                <span className={`block text-xs font-mono truncate w-full select-none ${isPlayingTrack ? 'text-theme-primary font-bold' : 'text-theme-text'}`}>
-                                    {title}
-                                </span>
-                                <span className="block text-[9px] font-mono truncate w-full select-none opacity-50">
-                                    {artist}
-                                </span>
-                            </div>
-
-                            {/* COLUMN 4: ALBUM (MD+) */}
-                            <div className="w-24 hidden md:block text-[9px] font-mono opacity-40 truncate px-2">
-                                {album}
-                            </div>
-
-                            {/* COLUMN 5: RATING (NEW) */}
-                            <div 
-                                className="w-20 flex items-center justify-center gap-1 opacity-60 group-hover:opacity-100 transition-opacity"
-                                // Stop double click propagation on the container too, just in case
-                                onDoubleClick={(e) => e.stopPropagation()}
-                            >
-                                <button 
-                                    onClick={(e) => handleRate(e, track.id, -1)}
-                                    onDoubleClick={(e) => e.stopPropagation()} // Extra safety
-                                    className={`p-0.5 hover:scale-110 transition-transform hover:text-red-500`}
-                                >
-                                    <ThumbsDown size={10} />
-                                </button>
-                                <span className={`text-[10px] font-mono font-bold w-6 text-center ${rating > 0 ? 'text-green-500' : rating < 0 ? 'text-red-500' : 'text-theme-muted'}`}>
-                                    {rating > 0 ? `+${rating}` : rating}
-                                </span>
-                                <button 
-                                    onClick={(e) => handleRate(e, track.id, 1)}
-                                    onDoubleClick={(e) => e.stopPropagation()} // Extra safety
-                                    className={`p-0.5 hover:scale-110 transition-transform hover:text-green-500`}
-                                >
-                                    <ThumbsUp size={10} />
-                                </button>
-                            </div>
-                            
-                            {/* DELETE ACTION */}
-                            {!isPlaylistLocked && (
-                                <button 
-                                    onClick={(e) => handleDeleteTrack(e, track.id)}
-                                    className="text-theme-muted/50 hover:text-red-500 transition-colors p-1 cursor-pointer ml-2"
-                                    title="Delete Track"
-                                >
-                                    <Trash2 size={12} />
-                                </button>
-                            )}
                         </div>
-                    </div>
+                    )}
                 </React.Fragment>
             )})}
             

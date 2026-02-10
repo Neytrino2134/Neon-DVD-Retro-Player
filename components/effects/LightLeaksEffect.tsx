@@ -29,7 +29,7 @@ const LightLeaksEffect: React.FC<LightLeaksEffectProps> = ({ config }) => {
   const noisePatternRef = useRef<CanvasPattern | null>(null);
   
   // Master opacity for smooth transitions (0 to 1)
-  // Initialize to 1.0 if enabled to prevent fade-in flicker on remounts (e.g. Cinema Mode transition)
+  // Initialize to 1.0 if enabled to prevent fade-in flicker on remounts
   const fadeLevelRef = useRef<number>(config.enabled ? 1.0 : 0.0);
   
   // Time tracking for delta
@@ -128,7 +128,9 @@ const LightLeaksEffect: React.FC<LightLeaksEffectProps> = ({ config }) => {
         const targetFade = cfg.enabled ? 1.0 : 0.0;
         
         // Time-based smooth damp
-        const smoothSpeed = 3.0; 
+        // Lowered from 3.0 to 0.8 for smoother, slower fade
+        // This ensures the "leaks" linger longer during transitions, hiding the video jerkiness underneath
+        const smoothSpeed = 0.8; 
         const t = 1.0 - Math.exp(-smoothSpeed * safeDt);
         
         fadeLevelRef.current += (targetFade - fadeLevelRef.current) * t;

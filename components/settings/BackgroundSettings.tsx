@@ -1,5 +1,5 @@
 
-import React, { useState, useRef, useMemo } from 'react';
+import React, { useState, useRef, useMemo, useEffect } from 'react';
 import { List, ChevronDown, ChevronUp, Timer, Trash2, RefreshCw, Disc, Upload, Power, Shuffle, Plus, X, Play, Image as ImageIcon, Video, Wand2 } from 'lucide-react';
 import { BackgroundMedia, PatternConfig, BgTransitionType, BgAnimationType, BackgroundPlaylist, BgHotspot, FitMode, ScreenAlignment } from '../../types';
 import RangeControl from './RangeControl';
@@ -71,6 +71,9 @@ export const BgConfigModule: React.FC<BgConfigModuleProps> = ({
   const transitionOptions = [
       { value: 'glitch', label: t('trans_glitch') },
       { value: 'leaks', label: t('trans_leaks') },
+      { value: 'crossfade', label: t('trans_crossfade') }, // NEW
+      { value: 'black', label: t('trans_black') }, // NEW
+      { value: 'blur', label: t('trans_blur') }, // NEW
       { value: 'none', label: t('trans_none') }
   ];
 
@@ -166,11 +169,42 @@ export const BgResourceModule: React.FC<BgResourceModuleProps> = ({
 }) => {
   const { t } = useLanguage();
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const tabsContainerRef = useRef<HTMLDivElement>(null);
   
   const [showBgList, setShowBgList] = useState(true);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editingName, setEditingName] = useState("");
   const [showEditor, setShowEditor] = useState(false);
+
+  // Auto-scroll to active tab
+  useEffect(() => {
+    if (tabsContainerRef.current) {
+      const container = tabsContainerRef.current;
+      const activeTab = container.querySelector(`[data-tab-id="${activeBgPlaylistId}"]`) as HTMLElement;
+      
+      if (activeTab) {
+        const containerWidth = container.clientWidth;
+        const tabWidth = activeTab.offsetWidth;
+        const tabLeft = activeTab.offsetLeft;
+        const scrollLeft = tabLeft - (containerWidth / 2) + (tabWidth / 2);
+        container.scrollTo({ left: scrollLeft, behavior: 'smooth' });
+      }
+    }
+  }, [activeBgPlaylistId, bgPlaylists.length]);
+
+  // Horizontal Wheel Scroll
+  useEffect(() => {
+      const tabsEl = tabsContainerRef.current;
+      const onTabsWheel = (e: WheelEvent) => {
+          if (e.shiftKey) return;
+          e.preventDefault();
+          if (tabsContainerRef.current) {
+              tabsContainerRef.current.scrollLeft += e.deltaY;
+          }
+      };
+      if (tabsEl) tabsEl.addEventListener('wheel', onTabsWheel, { passive: false });
+      return () => { if (tabsEl) tabsEl.removeEventListener('wheel', onTabsWheel); };
+  }, []);
 
   const isTimerOn = bgAutoplayInterval > 0;
   
@@ -221,7 +255,10 @@ export const BgResourceModule: React.FC<BgResourceModuleProps> = ({
                 <div className="overflow-hidden">
                   
                   {/* --- PLAYLIST TABS --- */}
-                  <div className="flex items-end gap-1 overflow-x-auto no-scrollbar scroll-smooth pl-2 pt-2 border-b border-theme-border bg-black/20">
+                  <div 
+                      ref={tabsContainerRef}
+                      className="flex items-end gap-1 overflow-x-auto no-scrollbar scroll-smooth pl-2 pt-2 border-b border-theme-border bg-black/20"
+                  >
                       {bgPlaylists.map(playlist => {
                           const isActive = playlist.id === activeBgPlaylistId;
                           const isPlaying = playlist.id === playingBgPlaylistId;
@@ -229,6 +266,7 @@ export const BgResourceModule: React.FC<BgResourceModuleProps> = ({
                           return (
                               <div
                                   key={playlist.id}
+                                  data-tab-id={playlist.id}
                                   onClick={() => setActiveBgPlaylistId(playlist.id)}
                                   onDoubleClick={() => startRename(playlist.id, playlist.name)}
                                   className={`

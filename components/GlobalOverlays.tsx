@@ -23,21 +23,27 @@ const GlobalOverlays: React.FC<GlobalOverlaysProps> = ({
   system, view, recorder, config, player, appState, playSFX, stopAllSFX, autoLaunchRef, addNotification
 }) => {
   
-  const shouldShowLoader = view.animSequence === 'loading' || view.animSequence.includes('exiting') || view.animSequence.includes('entering');
-  const loaderOpacity = (view.animSequence === 'loading' || view.animSequence.includes('exiting')) ? 'opacity-100' : 'opacity-0';
+  // Show loader overlay ONLY for specific loading states
+  // We do NOT show it for 'exiting_focus', 'void_layout' or 'reveal_*' phases,
+  // because we want a clean dark screen (app fades out to body bg) for cinematic transitions.
+  const shouldShowLoader = 
+      view.animSequence === 'loading' || 
+      view.animSequence === 'exiting_mini' || // Keep loader for mini mode switch as it's a layout swap
+      view.animSequence === 'exiting_center'; // Keep for simple exits
+
+  const loaderOpacity = shouldShowLoader ? 'opacity-100' : 'opacity-0';
+  const pointerEvents = shouldShowLoader ? 'pointer-events-auto' : 'pointer-events-none';
 
   return (
     <>
       {/* LOADING SPINNER */}
-      {shouldShowLoader && (
-          <div className={`fixed inset-0 z-[100000] bg-[#030712] flex items-center justify-center transition-opacity duration-500 ${loaderOpacity}`}>
-              <div className="flex flex-col items-center justify-center">
-                  <div className="relative">
-                      <div className="w-12 h-12 rounded-full border-4 border-transparent border-t-theme-primary animate-spin"></div>
-                  </div>
+      <div className={`fixed inset-0 z-[100000] bg-[#030712] flex items-center justify-center transition-opacity duration-500 ${loaderOpacity} ${pointerEvents}`}>
+          <div className="flex flex-col items-center justify-center">
+              <div className="relative">
+                  <div className="w-12 h-12 rounded-full border-4 border-transparent border-t-theme-primary animate-spin"></div>
               </div>
           </div>
-      )}
+      </div>
 
       {/* STARTUP */}
       <StartupOverlay

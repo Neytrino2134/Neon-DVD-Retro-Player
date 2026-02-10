@@ -32,6 +32,26 @@ export interface VideoColorConfig {
   preset: string;     // ID of current preset
 }
 
+// NEW: YouTube Authentication Config
+export interface YouTubeAuthConfig {
+  clientId: string;
+  isConnected: boolean;
+  channelName?: string;
+  channelAvatar?: string;
+}
+
+// NEW: YouTube Chat Visual Config
+export interface YouTubeChatConfig {
+  enabled: boolean;
+  opacity: number;
+  scale: number;
+  width: number;
+  speed: number; // Scroll speed
+  color: string;
+  showAvatars: boolean;
+  maxMessages: number;
+}
+
 export interface EffectsConfig {
   fps: number;
   showFps: boolean; // NEW: Show FPS Counter
@@ -76,6 +96,7 @@ export interface EffectsConfig {
     categories: Record<HologramCategory, boolean>;
   };
   geminiChat: GeminiChatConfig; // NEW
+  youtubeChat: YouTubeChatConfig; // NEW: YouTube Chat Module
   lightLeaks: {
     enabled: boolean;
     intensity: number; // Opacity
@@ -231,11 +252,11 @@ export const NEON_COLORS = [
 export type VisualizerStyle = 'retro' | 'blue' | 'pink' | 'matrix' | 'inferno' | 'warm' | 'gray' | 'ocean' | 'theme-blue' | 'theme-sync' | 'neon-gradient';
 export type VisualizerPosition = 'center' | 'top' | 'bottom' | 'circle';
 export type TipColor = 'white' | 'blue' | 'pink' | 'green' | 'purple' | 'yellow' | 'red';
-export type CursorStyle = 'default' | 'music-flow' | 'classic-blue' | 'classic-warm' | 'classic-white' | 'classic-ocean' | 'theme-sync' | 'dos-terminal' | 'system' | 'crosshair' | 'rounded';
+export type CursorStyle = 'default' | 'music-flow' | 'classic-blue' | 'classic-warm' | 'classic-white' | 'classic-ocean' | 'theme-sync' | 'dos-terminal' | 'system' | 'crosshair' | 'rounded' | 'sound-wave';
 
 export type ThemeType = 'neon-retro' | 'neon-blue' | 'neon-pink' | 'warm-cozy' | 'neutral-gray' | 'neutral-ocean';
 export type ControlStyle = 'default' | 'round' | 'circle';
-export type BgTransitionType = 'glitch' | 'leaks' | 'none';
+export type BgTransitionType = 'glitch' | 'leaks' | 'none' | 'crossfade' | 'black' | 'blur'; // UPDATED
 export type BgAnimationType = 'none' | 'zoom' | 'sway' | 'handheld' | 'cinematic' | 'chaos'; // NEW
 export type FitMode = 'cover' | 'contain' | 'stretch'; // NEW: Background/Screen fit mode
 export type ScreenAlignment = 'center' | 'left' | 'right'; // NEW: Alignment for crop mode
@@ -362,5 +383,6 @@ export interface AppPreset {
     ambienceConfig?: AmbienceConfig; // NEW
     equalizerConfig?: EqualizerConfig; // NEW: EQ
     bgAnimation?: BgAnimationType; // NEW
+    youtubeAuth?: YouTubeAuthConfig; // NEW: Presets can save login state (though tokens shouldn't be shared)
   }
 }

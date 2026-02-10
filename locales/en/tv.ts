@@ -135,6 +135,11 @@ export const tv = {
   width: "WIDTH",
   print_speed: "PRINT SPEED",
   
+  youtube_chat: "VIEWER CHAT",
+  yt_show_avatars: "SHOW AVATARS",
+  yt_max_messages: "MAX MESSAGES",
+  yt_scroll_speed: "SCROLL SPEED",
+  
   // Post Process
   scanlines: "SCANLINES",
   cyber_hack: "CYBER HACK",
@@ -175,6 +180,9 @@ export const tv = {
   trans_glitch: "GLITCH",
   trans_leaks: "LEAKS",
   trans_none: "NONE",
+  trans_crossfade: "CROSSFADE", // NEW
+  trans_black: "FADE TO BLACK", // NEW
+  trans_blur: "BLUR PASS", // NEW
   anim_none: "NONE",
   anim_zoom: "ZOOM",
   anim_sway: "SWAY",

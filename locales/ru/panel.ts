@@ -29,6 +29,7 @@ export const panel = {
   cursor_ocean: "ОКЕАН",
   cursor_crosshair: "ПРИЦЕЛ",
   cursor_rounded: "ОКРУГЛЫЙ",
+  cursor_sound_wave: "ЗВУКОВАЯ ВОЛНА",
   cursor_system: "СИСТЕМНЫЙ",
   
   // Control Styles
@@ -40,4 +41,15 @@ export const panel = {
   cat_backgrounds: "ФОНЫ",
   cat_sound_effects: "ЗВУКОВЫЕ ЭФФЕКТЫ",
   cat_screen_effects: "ЭФФЕКТЫ ЭКРАНА",
+  
+  // YouTube Auth
+  youtube_auth: "YOUTUBE LIVE",
+  yt_connect_title: "ПОДКЛЮЧЕНИЕ АККАУНТА",
+  yt_client_id: "CLIENT ID",
+  yt_connect_btn: "ВОЙТИ",
+  yt_disconnect_btn: "ВЫЙТИ",
+  yt_status: "СТАТУС",
+  yt_connected: "ПОДКЛЮЧЕНО",
+  yt_disconnected: "ОТКЛЮЧЕНО",
+  yt_channel: "КАНАЛ",
 };

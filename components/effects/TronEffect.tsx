@@ -341,15 +341,6 @@ const TronEffect: React.FC<TronEffectProps> = ({ config, analyser, isPlaying, vi
             // We do NOT call initGrid here. We just show a "glitch" or empty screen.
             ctx.clearRect(0, 0, canvas.width, canvas.height);
             
-            // Draw a temporary "SYSTEM UNSTABLE" or Grid during resize
-            // Using a simple pattern prevents memory alloc issues
-            ctx.strokeStyle = '#00f3ff';
-            ctx.globalAlpha = 0.2;
-            ctx.beginPath();
-            ctx.moveTo(0, 0); ctx.lineTo(canvas.width, canvas.height);
-            ctx.moveTo(canvas.width, 0); ctx.lineTo(0, canvas.height);
-            ctx.stroke();
-
             // Debounce the actual reset
             if (resizeTimerRef.current) window.clearTimeout(resizeTimerRef.current);
             resizeTimerRef.current = window.setTimeout(() => {

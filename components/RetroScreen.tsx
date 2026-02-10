@@ -6,7 +6,7 @@ import { useGestures } from '../hooks/useGestures';
 import { useTheme } from '../contexts/ThemeContext';
 import { useMediaTransition } from '../hooks/useMediaTransition';
 import { useScreenHotkeys } from '../hooks/useScreenHotkeys';
-import { Monitor } from 'lucide-react';
+import { Monitor, VolumeX, Volume2 } from 'lucide-react';
 
 // Core Components
 import DvdLogo from './DvdLogo';
@@ -113,6 +113,33 @@ interface RetroScreenProps {
   isPlaylistLocked?: boolean;
 }
 
+// Internal Component for Volume OSD
+const VolumeOSD: React.FC<{ volume: number; visible: boolean }> = ({ volume, visible }) => {
+    const isMuted = volume === 0;
+    // Only show if visible OR if muted (persistent mute icon)
+    if (!visible && !isMuted) return null;
+
+    const percent = Math.round(volume * 100);
+    const color = isMuted ? 'text-red-500' : 'text-theme-primary';
+    const borderColor = isMuted ? 'border-red-500' : 'border-theme-primary';
+    const bgClass = isMuted ? 'bg-red-500/10' : 'bg-theme-primary/10';
+
+    return (
+        <div className={`absolute top-20 right-4 z-50 flex items-center gap-3 transition-opacity duration-300 ${visible || isMuted ? 'opacity-100' : 'opacity-0'}`}>
+            <div className={`flex items-center gap-2 px-3 py-1.5 rounded border backdrop-blur-md shadow-lg ${borderColor} ${bgClass} ${color}`}>
+                {isMuted ? <VolumeX size={16} /> : <Volume2 size={16} />}
+                
+                {/* Show text only if not muted, or if OSD is active even when muted */}
+                {(visible || !isMuted) && (
+                    <span className="font-mono text-xs font-bold tracking-widest min-w-[30px] text-right">
+                        {isMuted ? 'MUTE' : `${percent}%`}
+                    </span>
+                )}
+            </div>
+        </div>
+    );
+};
+
 const RetroScreen = forwardRef<HTMLDivElement, RetroScreenProps>((props, externalRef) => {
   const {
     analyser, isPlaying, currentTrack, tracks, onTrackSelect, bgMedia, bgColor, bgPattern = 'none', bgPatternConfig,
@@ -135,6 +162,10 @@ const RetroScreen = forwardRef<HTMLDivElement, RetroScreenProps>((props, externa
   
   const [showPlaylist, setShowPlaylist] = useState(false);
   const [showHelp, setShowHelp] = useState(false); 
+  
+  // Volume OSD State
+  const [isVolOSDVisible, setIsVolOSDVisible] = useState(false);
+  const volOSDTimerRef = useRef<number | null>(null);
 
   const internalRef = useRef<HTMLDivElement>(null);
   const containerRef = (externalRef as React.RefObject<HTMLDivElement>) || internalRef;
@@ -160,6 +191,13 @@ const RetroScreen = forwardRef<HTMLDivElement, RetroScreenProps>((props, externa
           const direction = e.deltaY > 0 ? -1 : 1;
           const newVol = Math.max(0, Math.min(1, volume + (step * direction)));
           onVolumeChange(newVol);
+          
+          // Trigger OSD
+          setIsVolOSDVisible(true);
+          if (volOSDTimerRef.current) clearTimeout(volOSDTimerRef.current);
+          volOSDTimerRef.current = window.setTimeout(() => {
+              setIsVolOSDVisible(false);
+          }, 1500);
       }
   };
 
@@ -292,6 +330,7 @@ const RetroScreen = forwardRef<HTMLDivElement, RetroScreenProps>((props, externa
   let transitionDuration = '2.0s';
   if (bgTransition === 'leaks') transitionDuration = '1.0s'; 
   else if (bgTransition === 'glitch') transitionDuration = '1.2s';
+  else if (bgTransition === 'crossfade') transitionDuration = '2.0s'; // Slow smooth mix
 
   const overlayTransitionStyle = `opacity ${transitionDuration} ease-in-out`;
 
@@ -305,6 +344,22 @@ const RetroScreen = forwardRef<HTMLDivElement, RetroScreenProps>((props, externa
       borderBottom: `2px solid ${marqueeColor}`,
       backgroundColor: `color-mix(in srgb, ${marqueeColor}, transparent 90%)`
   } : {};
+
+  // --- TRANSITION STYLE LOGIC ---
+  // Apply opacity/filter to Base Layer for sequential transitions (Black/Blur)
+  let baseLayerStyle: React.CSSProperties = { opacity: 1, zIndex: 0, transition: 'opacity 1s ease-in-out, filter 1s ease-in-out' };
+  
+  if (bgTransition === 'black' && transitionPhase === 'out') {
+      baseLayerStyle.opacity = 0;
+  }
+  if (bgTransition === 'blur') {
+      if (transitionPhase === 'out') {
+          baseLayerStyle.opacity = 0;
+          baseLayerStyle.filter = 'blur(40px)';
+      } else {
+          baseLayerStyle.filter = 'blur(0px)';
+      }
+  }
 
   return (
     <div className={`flex-grow flex items-center justify-center relative bg-gray-950 transition-all duration-500 ${focusMode ? 'p-0' : 'p-1 md:p-3'}`}>
@@ -323,6 +378,7 @@ const RetroScreen = forwardRef<HTMLDivElement, RetroScreenProps>((props, externa
       >
          <div ref={containerRef} className="relative w-full h-full overflow-hidden bg-black">
             <NotificationOverlay color={marqueeColor} />
+            <VolumeOSD volume={volume} visible={isVolOSDVisible} />
 
             <ScreenTopBar 
                 rebootPhase={rebootPhase}
@@ -357,7 +413,7 @@ const RetroScreen = forwardRef<HTMLDivElement, RetroScreenProps>((props, externa
 
                     {/* MEDIA LAYERS */}
                     <div className={`absolute inset-0 w-full h-full ${animClass}`}>
-                        <div className="absolute inset-0 w-full h-full" style={{ opacity: 1, zIndex: 0 }}>
+                        <div className="absolute inset-0 w-full h-full" style={baseLayerStyle}>
                             {/* Keep Media Rendering even during resize to prevent white flash */}
                             {(activeStream || baseMedia) && (
                                 <MediaRenderer type={baseMedia ? baseMedia.type : 'video'} url={baseMedia?.url} stream={activeStream} bgColor={'transparent'} effects={mediaEffectsConfig} fitMode={screenFitMode} alignment={screenAlignment} />

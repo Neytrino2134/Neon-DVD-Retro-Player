@@ -12,14 +12,18 @@ interface MediaRendererProps {
   alignment?: ScreenAlignment; // NEW
 }
 
+const CROSSFADE_DURATION = 1.0; // Seconds for seamless loop overlap
+
 const MediaRenderer: React.FC<MediaRendererProps> = ({ type, url, stream, bgColor, effects, fitMode = 'cover', alignment = 'center' }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   
   // Ref for Image
   const imageRef = useRef<HTMLImageElement | null>(null);
   
-  // Ref for Single File Video (Native Loop)
-  const fileVideoRef = useRef<HTMLVideoElement | null>(null);
+  // Refs for Seamless Video Looping (Double Buffering)
+  const fileVideoRefA = useRef<HTMLVideoElement | null>(null);
+  const fileVideoRefB = useRef<HTMLVideoElement | null>(null);
+  const activeVideoRef = useRef<'A' | 'B'>('A');
 
   // Ref for Live Stream
   const streamVideoRef = useRef<HTMLVideoElement | null>(null);
@@ -30,18 +34,27 @@ const MediaRenderer: React.FC<MediaRendererProps> = ({ type, url, stream, bgColo
   // --- 1. SETUP MEDIA SOURCES ---
   useEffect(() => {
     // CLEANUP PREVIOUS
-    if (fileVideoRef.current) {
-        fileVideoRef.current.pause();
-        fileVideoRef.current.removeAttribute('src');
-        fileVideoRef.current.load();
-        fileVideoRef.current = null;
-    }
+    const cleanupVideo = (v: HTMLVideoElement | null) => {
+        if (v) {
+            v.pause();
+            v.removeAttribute('src');
+            v.load();
+        }
+    };
+    cleanupVideo(fileVideoRefA.current);
+    cleanupVideo(fileVideoRefB.current);
+    fileVideoRefA.current = null;
+    fileVideoRefB.current = null;
+
     if (streamVideoRef.current) {
         streamVideoRef.current.pause();
         streamVideoRef.current.srcObject = null;
         streamVideoRef.current = null;
     }
     imageRef.current = null;
+
+    // RESET STATE
+    activeVideoRef.current = 'A';
 
     if (stream) {
         // --- LIVE STREAM MODE ---
@@ -55,19 +68,26 @@ const MediaRenderer: React.FC<MediaRendererProps> = ({ type, url, stream, bgColo
         streamVideoRef.current = v;
 
     } else if (type === 'video' && url) {
-      // --- FILE VIDEO MODE (NATIVE LOOP) ---
-      const v = document.createElement('video');
-      v.src = url;
-      v.muted = true;
-      v.loop = true; // Native seamless loop
-      v.playsInline = true;
-      v.autoplay = true;
-      v.preload = 'auto'; // Important for buffer
+      // --- FILE VIDEO MODE (SEAMLESS LOOP SETUP) ---
+      // We create TWO video elements to crossfade between end and start
+      const setupVideo = () => {
+          const v = document.createElement('video');
+          v.src = url;
+          v.muted = true;
+          v.loop = false; // We handle loop manually
+          v.playsInline = true;
+          v.preload = 'auto';
+          return v;
+      };
 
-      // Optimization: Force hardware acceleration hints if possible
-      v.play().catch(e => console.warn("Video play failed", e));
+      const vA = setupVideo();
+      const vB = setupVideo();
+
+      // Start the first one
+      vA.play().catch(e => console.warn("Video play failed", e));
       
-      fileVideoRef.current = v;
+      fileVideoRefA.current = vA;
+      fileVideoRefB.current = vB;
 
     } else if (type === 'image' && url) {
       // --- IMAGE MODE ---
@@ -78,12 +98,8 @@ const MediaRenderer: React.FC<MediaRendererProps> = ({ type, url, stream, bgColo
     
     // Cleanup on unmount or prop change
     return () => {
-      if (fileVideoRef.current) {
-        fileVideoRef.current.pause();
-        fileVideoRef.current.removeAttribute('src');
-        fileVideoRef.current.load();
-        fileVideoRef.current = null;
-      }
+      cleanupVideo(fileVideoRefA.current);
+      cleanupVideo(fileVideoRefB.current);
       if (streamVideoRef.current) {
           streamVideoRef.current.pause();
           streamVideoRef.current.srcObject = null;
@@ -140,15 +156,7 @@ const MediaRenderer: React.FC<MediaRendererProps> = ({ type, url, stream, bgColo
           ctx.filter = 'none';
       }
 
-      // --- LOGIC SPLIT: VIDEO VS IMAGE/COLOR ---
-      
-      let videoSource: HTMLVideoElement | null = null;
-      if (stream && streamVideoRef.current) {
-          videoSource = streamVideoRef.current;
-      } else if (type === 'video' && fileVideoRef.current) {
-          videoSource = fileVideoRef.current;
-      }
-
+      // --- DRAW HELPER ---
       const drawContent = (srcW: number, srcH: number, drawable: CanvasImageSource) => {
           let renderX = 0, renderY = 0, renderW = drawW, renderH = drawH;
 
@@ -161,24 +169,20 @@ const MediaRenderer: React.FC<MediaRendererProps> = ({ type, url, stream, bgColo
               const dstRatio = drawW / drawH;
               
               if (fitMode === 'contain') {
-                  // Contain: Scale down to fit completely within canvas
+                  // Contain
                   if (dstRatio > srcRatio) {
-                      // Canvas is wider than image (fit height)
                       renderH = drawH;
                       renderW = drawH * srcRatio;
                   } else {
-                      // Canvas is taller than image (fit width)
                       renderW = drawW;
                       renderH = drawW / srcRatio;
                   }
               } else {
-                  // Cover: Scale up to fill canvas completely (crop)
+                  // Cover
                   if (dstRatio > srcRatio) {
-                      // Canvas is wider than image (match width, crop height)
                       renderW = drawW;
                       renderH = drawW / srcRatio;
                   } else {
-                      // Canvas is taller than image (match height, crop width)
                       renderH = drawH;
                       renderW = drawH * srcRatio;
                   }
@@ -191,76 +195,110 @@ const MediaRenderer: React.FC<MediaRendererProps> = ({ type, url, stream, bgColo
           } else if (alignment === 'right') {
               renderX = drawW - renderW;
           } else {
-              // Center
               renderX = (drawW - renderW) / 2;
           }
 
           // 3. Y Axis Alignment (Center by default)
-          // renderY can be positive (centering small image) or negative (centering crop)
           renderY = (drawH - renderH) / 2;
 
           ctx.drawImage(drawable, renderX, renderY, renderW, renderH);
       };
 
-      if (videoSource) {
-          // --- VIDEO RENDERING ---
-          // Clear only if using contain mode to show background bars
-          if (fitMode === 'contain') {
-              ctx.clearRect(0, 0, drawW, drawH);
+      // --- RENDER LOGIC ---
+
+      if (stream && streamVideoRef.current) {
+          // --- LIVE STREAM ---
+          if (fitMode === 'contain') ctx.clearRect(0, 0, drawW, drawH);
+          const v = streamVideoRef.current;
+          if (v.readyState >= 2) {
+              drawContent(v.videoWidth, v.videoHeight, v);
           }
 
-          if (videoSource.readyState >= 2) {
-              const srcW = videoSource.videoWidth;
-              const srcH = videoSource.videoHeight;
+      } else if (type === 'video' && fileVideoRefA.current && fileVideoRefB.current) {
+          // --- SEAMLESS LOOPING VIDEO ---
+          if (fitMode === 'contain') ctx.clearRect(0, 0, drawW, drawH);
 
-              if (srcW && srcH) {
-                  if (videoSource.paused && !stream) videoSource.play().catch(() => {});
-                  drawContent(srcW, srcH, videoSource);
+          const activeRef = activeVideoRef.current; // 'A' or 'B'
+          const activeV = activeRef === 'A' ? fileVideoRefA.current : fileVideoRefB.current;
+          const nextV = activeRef === 'A' ? fileVideoRefB.current : fileVideoRefA.current;
+
+          if (activeV && activeV.readyState >= 2) {
+              const duration = activeV.duration;
+              const currentTime = activeV.currentTime;
+              const timeLeft = duration - currentTime;
+
+              // 1. Draw Active Video
+              drawContent(activeV.videoWidth, activeV.videoHeight, activeV);
+
+              // 2. Check for Crossfade
+              if (timeLeft <= CROSSFADE_DURATION && duration > CROSSFADE_DURATION) {
+                  // Start next video if not playing
+                  if (nextV.paused) {
+                      nextV.currentTime = 0;
+                      nextV.play().catch(() => {});
+                  }
+
+                  // Draw next video on top with opacity
+                  if (nextV.readyState >= 2) {
+                      const opacity = 1 - (timeLeft / CROSSFADE_DURATION);
+                      ctx.globalAlpha = Math.max(0, Math.min(1, opacity));
+                      
+                      // Draw Next Layer
+                      drawContent(nextV.videoWidth, nextV.videoHeight, nextV);
+                      
+                      // Reset Alpha
+                      ctx.globalAlpha = 1.0;
+                  }
+              }
+
+              // 3. Swap Logic (When active finishes)
+              // Use a small threshold before actual end to ensure visual continuity
+              if (activeV.ended || currentTime >= duration - 0.05) {
+                  // Swap Roles
+                  activeVideoRef.current = activeRef === 'A' ? 'B' : 'A';
+                  
+                  // Stop old video and reset
+                  activeV.pause();
+                  activeV.currentTime = 0;
+                  
+                  // Ensure new active is playing (redundant safety)
+                  if (nextV.paused) nextV.play().catch(() => {});
               }
           }
+
       } else {
-          // --- IMAGE / COLOR RENDERING ---
+          // --- IMAGE / COLOR ---
           ctx.clearRect(0, 0, w, h);
-          
-          // Apply filter to solid color too if image
           ctx.fillStyle = bgColor;
           ctx.fillRect(0, 0, w, h);
 
           if (type === 'image' && imageRef.current && imageRef.current.complete) {
               const img = imageRef.current;
-              const srcW = img.naturalWidth;
-              const srcH = img.naturalHeight;
-
-              if (srcW && srcH) {
-                  drawContent(srcW, srcH, img);
+              if (img.naturalWidth && img.naturalHeight) {
+                  drawContent(img.naturalWidth, img.naturalHeight, img);
               }
           }
       }
 
       // --- APPLY WARMTH / TINT ---
-      // We apply this as an overlay AFTER the filter but BEFORE scaling up
       if (vidSettings && vidSettings.enabled && vidSettings.warmth !== 0) {
           const warmth = vidSettings.warmth;
-          ctx.filter = 'none'; // Ensure filter is off for overlay
-          
-          // Use 'overlay' or 'soft-light' for cinematic tint
+          ctx.filter = 'none'; 
           ctx.globalCompositeOperation = 'overlay';
           
           if (warmth > 0) {
-              // Warm (Orange/Amber)
               ctx.fillStyle = `rgba(255, 150, 0, ${warmth * 0.3})`;
           } else {
-              // Cool (Blue/Cyan)
               ctx.fillStyle = `rgba(0, 100, 255, ${Math.abs(warmth) * 0.3})`;
           }
           
           ctx.fillRect(0, 0, drawW, drawH);
-          ctx.globalCompositeOperation = 'source-over'; // Reset
+          ctx.globalCompositeOperation = 'source-over'; 
       }
 
       // Scale up if needed (Pixelation)
       if (scaleEffect > 1) {
-          ctx.filter = 'none'; // Ensure no double filter
+          ctx.filter = 'none'; 
           ctx.drawImage(canvas, 0, 0, drawW, drawH, 0, 0, w, h);
       }
     };

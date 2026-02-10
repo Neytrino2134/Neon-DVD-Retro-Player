@@ -17,6 +17,8 @@ export type AnimSequence =
   | 'reveal_left'       // System panel slides in
   | 'reveal_right'      // Player panel slides in
   | 'reveal_center'     // Screen pops in
+  | 'unfolding_setup'   // NEW: Prepare layout invisible/offset for smooth exit
+  | 'unfolding_active'  // NEW: Smooth expansion from Cinema (slide in)
   | 'switching_layout'; // NEW: Transition lock for layout mode swapping
 
 type Breakpoint = 'mobile' | 'tablet' | 'desktop';
@@ -42,7 +44,7 @@ export const useViewLayout = (introState: number) => {
   const [animSequence, setAnimSequence] = useState<AnimSequence>('idle');
   const [isFullscreen, setIsFullscreen] = useState(false);
 
-  // Ref to block responsive resize logic during animation transitions
+  // Ref to block responsive logic during animation transitions
   const isTransitioningRef = useRef(false);
   
   // Resizing Refs (Manual Drag Handles)
@@ -58,7 +60,10 @@ export const useViewLayout = (introState: number) => {
   const isResizing = animSequence.startsWith('exiting') || 
                      animSequence === 'void_layout' || 
                      animSequence === 'loading' || 
-                     animSequence === 'switching_layout' || // Disable transitions during layout switch
+                     animSequence === 'entering_center' ||
+                     animSequence.startsWith('reveal_') ||
+                     animSequence === 'unfolding_active' ||
+                     animSequence === 'switching_layout' || 
                      isResizingLeft.current || 
                      isResizingRight.current;
 
@@ -209,17 +214,16 @@ export const useViewLayout = (introState: number) => {
       isTransitioningRef.current = true; // LOCK responsive logic
 
       try {
-          // 1. SWITCHING TO MINI MODE
+          // 1. SWITCHING TO MINI MODE (Zoom Out -> Dark -> Zoom In)
           if (targetMode === 'mini' && viewMode !== 'mini') {
               playSFX('WHOOSH_IN.mp3');
-              // Transition Step 1: Scale down into darkness
+              // Step 1: Zoom Out current view into darkness
               setAnimSequence('exiting_center');
               await wait(600); 
 
-              // Transition Step 2: Show Loader
-              setAnimSequence('loading');
-              await wait(800); // Simulate load time
-
+              // Step 2: Dark State (Void)
+              setAnimSequence('void_layout');
+              
               if (ipc) ipc.send('set-mini-mode');
               
               setViewMode('mini');
@@ -227,140 +231,97 @@ export const useViewLayout = (introState: number) => {
               setShowCenterPanel(false); 
               setShowRightPanel(true);
               
-              // Transition Step 3: Reveal from center
+              await wait(100);
+
+              // Step 3: Zoom In new view
               setAnimSequence('entering_center'); 
               await wait(600); 
           } 
           
-          // 2. SWITCHING TO DEFAULT/FULL MODE (FROM MINI OR CINEMA)
-          else if (targetMode === 'default' && (viewMode === 'mini' || viewMode === 'cinema')) {
-              const wasCinema = viewMode === 'cinema';
-
-              if (viewMode === 'mini') {
-                  playSFX('WHOOSH_OUT.mp3'); 
-                  // Transition Step 1: Scale down into darkness
-                  setAnimSequence('exiting_center');
-                  await wait(600); 
-
-                  // Transition Step 2: Show Loader
-                  setAnimSequence('loading');
-                  await wait(800); 
-              } else if (wasCinema) {
-                  // EXITING CINEMA MODE - SMOOTH FIX
-                  // 1. Disable transitions temporarily to prevent "squeezing" artifact
-                  setAnimSequence('switching_layout');
-                  
-                  // 2. Ensure panels are closed logically so they snap to 0px width when we switch to Default
-                  setShowLeftPanel(false);
-                  setShowCenterPanel(true);
-                  setShowRightPanel(false);
-                  
-                  await wait(50);
-              }
-
-              if (ipc) ipc.send('set-full-mode');
+          // 2. RESTORING FROM MINI MODE (Fade Sequence)
+          else if (targetMode === 'default' && viewMode === 'mini') {
+              playSFX('WHOOSH_OUT.mp3');
               
-              setViewMode('default');
-              
-              // Recalculate layout based on current width
-              const w = window.innerWidth;
-              const bp = getBreakpoint(w);
-              setCurrentBreakpoint(bp);
+              // Fade out Mini
+              setAnimSequence('exiting_center');
+              await wait(600);
 
-              // 3. Reveal Animation
-              if (wasCinema) {
-                  // Wait for DOM to stabilize in Default mode with 0px side panels
-                  await wait(50);
-                  
-                  // Re-enable transitions
-                  setAnimSequence('idle');
-                  
-                  // Trigger slide-in animation
-                  const shouldShowLeft = bp === 'desktop';
-                  const shouldShowCenter = bp !== 'mobile';
-                  setShowLeftPanel(shouldShowLeft);
-                  setShowCenterPanel(shouldShowCenter);
-                  setShowRightPanel(true);
-              } else {
-                  // From Mini: Standard reveal
-                  setAnimSequence('entering_center');
-                  await wait(600);
-                  
-                  // Restore panels
-                  const shouldShowLeft = bp === 'desktop';
-                  const shouldShowCenter = bp !== 'mobile';
-                  setShowLeftPanel(shouldShowLeft);
-                  setShowCenterPanel(shouldShowCenter);
-                  setShowRightPanel(true);
-              }
-          }
-          // 3. ENTERING CINEMA MODE
-          else if (targetMode === 'cinema') {
-              // 1. Collapse panels smoothly while still in Default mode
-              setShowLeftPanel(false);
-              setShowRightPanel(false);
-              
-              // 2. Wait for collapse animation (match CSS duration ~700ms)
-              await wait(700);
-
-              // 3. LOCK TRANSITIONS
-              // This prevents the browser from animating the width jump (0 -> 460) when we flip the switch.
-              setAnimSequence('switching_layout');
-
-              // 4. Switch state to Cinema
-              setViewMode('cinema');
-              setShowCenterPanel(true);
-              
-              // 5. Allow DOM to settle in the new Cinema state (where panels are absolute and off-screen)
-              await wait(50);
-
-              if (ipc) ipc.send('set-full-mode');
-          }
-          // 4. RESTORING FROM PLAYER FOCUS
-          else if (targetMode === 'default' && viewMode === 'player-focus') {
-              if (ipc) ipc.send('set-full-mode');
-              
-              // NEW: CINEMATIC RESTORE SEQUENCE
-              
-              // 1. Fade Out (Dive to Darkness)
-              setAnimSequence('exiting_focus');
-              await wait(600); // Fade out duration
-
-              // 2. Void State (Reset View Mode behind curtain)
               setAnimSequence('void_layout');
+              if (ipc) ipc.send('set-full-mode');
+              
               setViewMode('default');
               
-              // Calculate target visibility based on screen size
+              // Restore Layout based on screen size
               const w = window.innerWidth;
               const bp = getBreakpoint(w);
               setCurrentBreakpoint(bp);
+              setShowLeftPanel(bp === 'desktop');
+              setShowCenterPanel(bp !== 'mobile');
+              setShowRightPanel(true);
+
+              await wait(100);
+
+              // Cinematic Reveal
+              if (bp === 'desktop') {
+                  setAnimSequence('reveal_left');
+                  await wait(400);
+              }
+              setAnimSequence('reveal_right');
+              await wait(400);
+              if (bp !== 'mobile') {
+                  setAnimSequence('reveal_center');
+                  await wait(500);
+              }
+          }
+
+          // 3. RESTORING FROM CINEMA / FOCUS (Smooth Slide In from Sides)
+          else if (targetMode === 'default' && (viewMode === 'cinema' || viewMode === 'player-focus')) {
+              // PREPARE LAYOUT (Invisible but present)
+              // We switch to Default mode but force the panels to be translated off-screen initially
+              setAnimSequence('unfolding_setup');
+              setViewMode('default');
+              
+              if (ipc) ipc.send('set-full-mode');
+
+              const w = window.innerWidth;
+              const bp = getBreakpoint(w);
+              setCurrentBreakpoint(bp);
+
               const shouldShowLeft = bp === 'desktop';
               const shouldShowCenter = bp !== 'mobile';
               const shouldShowRight = true;
 
-              // Force all visible logic to true so they mount, but are hidden by 'void_layout' opacity
               setShowLeftPanel(shouldShowLeft);
               setShowCenterPanel(shouldShowCenter);
               setShowRightPanel(shouldShowRight);
-              
-              await wait(400); // Hold in darkness
 
-              // 3. Reveal Sequence
-              if (shouldShowLeft) {
-                  setAnimSequence('reveal_left');
-                  await wait(500); // Slide in left
-              }
-              
-              setAnimSequence('reveal_right');
-              await wait(500); // Slide in right (Player)
+              // Brief wait to let React render the DOM in the 'default' layout structure
+              // The 'unfolding_setup' phase will keep them visually translated out
+              await wait(50);
 
-              if (shouldShowCenter) {
-                  setAnimSequence('reveal_center');
-                  await wait(600); // Pop in center
-              }
+              // ANIMATE IN
+              // Now we switch to 'unfolding_active' which transitions transform to 0
+              setAnimSequence('unfolding_active');
+              
+              // Wait for CSS transitions (0.7s)
+              await wait(750);
           }
-          // 5. PLAYER FOCUS MODE
+
+          // 4. ENTERING CINEMA MODE
+          else if (targetMode === 'cinema') {
+              // NO SFX HERE
+              setShowLeftPanel(false);
+              setShowRightPanel(false);
+              await wait(700); // Wait for panels to slide out
+              setAnimSequence('switching_layout');
+              setViewMode('cinema');
+              setShowCenterPanel(true);
+              await wait(50);
+              if (ipc) ipc.send('set-full-mode');
+          }
+          // 5. ENTERING PLAYER FOCUS
           else if (targetMode === 'player-focus') {
+              // NO SFX HERE
               setViewMode('player-focus');
               setShowLeftPanel(false);
               setShowCenterPanel(false);
@@ -369,28 +330,19 @@ export const useViewLayout = (introState: number) => {
           }
           else {
               setViewMode(targetMode);
-              if (targetMode === 'default') {
-                  const bp = getBreakpoint(window.innerWidth);
-                  setShowLeftPanel(bp === 'desktop');
-                  setShowCenterPanel(bp !== 'mobile');
-                  setShowRightPanel(true);
-              }
           }
       } catch (err) {
           console.error("View transition error", err);
-          // Fallback to default safe state
           setViewMode('default');
           setShowLeftPanel(true);
           setShowCenterPanel(true);
           setShowRightPanel(true);
       } finally {
-          // Always restore idle state if not explicitly loading
           if (animSequence !== 'loading') {
               setAnimSequence('idle');
           }
-          isTransitioningRef.current = false; // UNLOCK
+          isTransitioningRef.current = false; 
           
-          // Trigger a manual resize event to ensure Canvases update dimensions after animation
           setTimeout(() => {
               window.dispatchEvent(new Event('resize'));
           }, 100);
@@ -425,19 +377,16 @@ export const useViewLayout = (introState: number) => {
       transition: isResizing ? 'none' : 'opacity 0.6s ease-in-out, transform 0.6s ease-in-out' 
   };
 
-  // Updated Transition Styles
+  // Exit/Enter Transitions
   if (animSequence === 'exiting_center' || animSequence === 'exiting_focus') {
       masterStyle = { opacity: 0, transform: 'scale(0.95)', transition: 'opacity 0.5s ease-in, transform 0.5s ease-in' };
-  } else if (animSequence === 'loading') {
-      masterStyle = { opacity: 0, transform: 'scale(0.5)', transition: 'none' };
   } else if (animSequence === 'entering_center') {
       masterStyle = { opacity: 1, transform: 'scale(1)', transition: 'opacity 0.5s ease-out, transform 0.5s ease-out' };
-  } else if (animSequence === 'exiting_mini' || animSequence === 'exiting_default') {
-      masterStyle = { opacity: 0, transform: 'scale(0.95)', transition: 'opacity 0.5s ease, transform 0.5s ease' };
   } else if (animSequence === 'void_layout') {
-      masterStyle = { opacity: 0, transform: 'scale(1)', transition: 'none' };
-  } else if (animSequence === 'reveal_left' || animSequence === 'reveal_right' || animSequence === 'reveal_center') {
-      // During reveal steps, we control individual opacities, master is visible
+      // Just hide everything, DOM is present but invisible
+      masterStyle = { opacity: 1, transform: 'scale(1)', transition: 'none' };
+  } else if (animSequence.startsWith('reveal_') || animSequence === 'unfolding_setup' || animSequence === 'unfolding_active') {
+      // Master remains visible, individual panels animate
       masterStyle = { opacity: 1, transform: 'scale(1)', transition: 'none' };
   }
 
@@ -447,7 +396,7 @@ export const useViewLayout = (introState: number) => {
       showLeftPanel && 
       viewMode !== 'mini' && 
       viewMode !== 'player-focus' &&
-      (animSequence === 'reveal_left' || animSequence === 'reveal_right' || animSequence === 'reveal_center' || animSequence === 'idle' || animSequence === 'entering_center');
+      (animSequence === 'idle' || animSequence === 'entering_center' || animSequence === 'unfolding_setup' || animSequence === 'unfolding_active' || animSequence.startsWith('reveal_'));
 
   let leftPanelClass = `shrink-0 z-20 overflow-hidden ${!isResizing ? 'transition-[width] duration-700 ease-[cubic-bezier(0.25,1,0.5,1)]' : ''}`;
   let leftPanelStyle: React.CSSProperties = { width: isLeftPanelVisible ? `${leftPanelWidth}px` : '0px' };
@@ -456,33 +405,42 @@ export const useViewLayout = (introState: number) => {
   let leftPanelInnerStyle: React.CSSProperties = {
       width: `${leftPanelWidth}px`,
       height: '100%',
-      // In default mode, translate inner content to create sliding effect. 
+      // Default: Slide out to left if hidden.
       transform: (!isCinema && !isLeftPanelVisible) ? 'translateX(-100%)' : 'translateX(0)',
       transition: isResizing ? 'none' : 'transform 0.7s cubic-bezier(0.25,1,0.5,1)'
   };
 
-  // Override for Reveal Animation
+  // SEQUENTIAL REVEAL & UNFOLDING OVERRIDES
   if (animSequence === 'void_layout') {
       leftPanelInnerStyle.transform = 'translateX(-100%)';
       leftPanelInnerStyle.opacity = 0;
   } else if (animSequence === 'reveal_left') {
+      // Animate In
       leftPanelInnerStyle.transform = 'translateX(0)';
       leftPanelInnerStyle.opacity = 1;
       leftPanelInnerStyle.transition = 'transform 0.5s cubic-bezier(0.2,0.8,0.2,1), opacity 0.5s ease-out';
   } else if (animSequence === 'reveal_right' || animSequence === 'reveal_center') {
+      // Already In
       leftPanelInnerStyle.transform = 'translateX(0)';
       leftPanelInnerStyle.opacity = 1;
+  } 
+  // UNFOLDING LOGIC (Smooth Exit from Cinema)
+  else if (animSequence === 'unfolding_setup') {
+      // Step 1: Force panel to start off-screen instantly (no transition)
+      // This happens while viewMode is 'default' but we haven't animated yet
+      leftPanelInnerStyle.transform = 'translateX(-100%)';
+      leftPanelInnerStyle.transition = 'none'; 
+  } else if (animSequence === 'unfolding_active') {
+      // Step 2: Animate smoothly to on-screen
+      leftPanelInnerStyle.transform = 'translateX(0)';
+      leftPanelInnerStyle.transition = 'transform 0.7s cubic-bezier(0.25,1,0.5,1)';
   }
 
   // CINEMA OVERRIDE (Left)
   if (isCinema) {
-      // Fix: Force z-50 to keep panel above video/black screen during exit animation.
       const zIndex = 'z-50';
-      // FIX: Disable transition during layout switches (isResizing) to prevent panels flying in from 0,0
       const transitionClass = !isResizing ? 'transition-transform duration-500 cubic-bezier(0.2,0.8,0.2,1)' : '';
-      
       leftPanelClass = `absolute ${zIndex} h-[calc(100%-2rem)] top-4 left-4 rounded-xl border border-theme-border shadow-[0_0_40px_rgba(0,0,0,0.8)] backdrop-blur-xl bg-black/90 overflow-hidden ${transitionClass}`;
-      // In Cinema, width is fixed, visibility is controlled by transform slide
       leftPanelStyle = { 
           width: `${leftPanelWidth}px`, 
           transform: isLeftPanelVisible ? 'translateX(0)' : 'translateX(-120%)'
@@ -491,12 +449,12 @@ export const useViewLayout = (introState: number) => {
 
   // --- RIGHT PANEL LOGIC ---
   const isRightPanelVisible = 
-      (viewMode === 'mini' && (animSequence === 'reveal_right' || animSequence === 'reveal_center' || animSequence === 'idle' || animSequence === 'entering_center')) || 
+      (viewMode === 'mini' && (animSequence === 'idle' || animSequence === 'entering_center')) || 
       (viewMode === 'player-focus') ||
       (
           introState >= 1 &&
           showRightPanel && 
-          (animSequence === 'reveal_right' || animSequence === 'reveal_center' || animSequence === 'idle' || animSequence === 'entering_center')
+          (animSequence === 'idle' || animSequence === 'entering_center' || animSequence === 'unfolding_setup' || animSequence === 'unfolding_active' || animSequence.startsWith('reveal_'))
       );
 
   let rightPanelClass = `shrink-0 z-20 overflow-hidden ${!isResizing ? 'transition-[width] duration-700 ease-[cubic-bezier(0.25,1,0.5,1)]' : ''}`;
@@ -516,30 +474,40 @@ export const useViewLayout = (introState: number) => {
       transition: isResizing ? 'none' : 'transform 0.7s cubic-bezier(0.25,1,0.5,1)'
   };
 
-  // Override for Reveal Animation
+  // SEQUENTIAL REVEAL & UNFOLDING OVERRIDES
   if (animSequence === 'void_layout' || animSequence === 'reveal_left') {
+      // Hidden state
       rightPanelInnerStyle.transform = 'translateX(100%)';
       rightPanelInnerStyle.opacity = 0;
   } else if (animSequence === 'reveal_right') {
+      // Animate In
       rightPanelInnerStyle.transform = 'translateX(0)';
       rightPanelInnerStyle.opacity = 1;
       rightPanelInnerStyle.transition = 'transform 0.5s cubic-bezier(0.2,0.8,0.2,1), opacity 0.5s ease-out';
   } else if (animSequence === 'reveal_center') {
+      // Already In
       rightPanelInnerStyle.transform = 'translateX(0)';
       rightPanelInnerStyle.opacity = 1;
+  }
+  // UNFOLDING LOGIC (Smooth Exit from Cinema)
+  else if (animSequence === 'unfolding_setup') {
+      // Step 1: Force off-screen
+      rightPanelInnerStyle.transform = 'translateX(100%)';
+      rightPanelInnerStyle.transition = 'none'; 
+  } else if (animSequence === 'unfolding_active') {
+      // Step 2: Animate in
+      rightPanelInnerStyle.transform = 'translateX(0)';
+      rightPanelInnerStyle.transition = 'transform 0.7s cubic-bezier(0.25,1,0.5,1)';
   }
 
   // CINEMA OVERRIDE (Right)
   if (isCinema) {
-      // Fix: Force z-50 to keep panel above video/black screen during exit animation.
       const zIndex = 'z-50';
-      // FIX: Disable transition during layout switches
       const transitionClass = !isResizing ? 'transition-transform duration-500 cubic-bezier(0.2,0.8,0.2,1)' : '';
-      
       rightPanelClass = `absolute ${zIndex} h-full top-0 right-0 overflow-hidden ${transitionClass}`;
       rightPanelStyle = { 
           width: `${rightPanelWidth}px`, 
-          transform: isRightPanelVisible ? 'translateX(0)' : 'translateX(100%)' // Move completely off-screen right
+          transform: isRightPanelVisible ? 'translateX(0)' : 'translateX(100%)' 
       };
   }
 
@@ -549,30 +517,32 @@ export const useViewLayout = (introState: number) => {
       viewMode !== 'mini' && 
       viewMode !== 'player-focus' &&
       showCenterPanel &&
-      (animSequence === 'reveal_center' || animSequence === 'idle' || animSequence === 'entering_center' || animSequence === 'switching_layout');
+      (animSequence === 'idle' || animSequence === 'entering_center' || animSequence === 'switching_layout' || animSequence === 'reveal_center' || animSequence === 'unfolding_setup' || animSequence === 'unfolding_active');
 
-  // Center Panel gets z-10 to stay above the hidden side panels (z-0) in Cinema Mode (but below active z-50 panels)
-  // Logic for pop-in animation
   let screenScale = 1;
   let screenOpacity = 1;
   
   if (animSequence === 'void_layout' || animSequence === 'reveal_left' || animSequence === 'reveal_right') {
-      screenScale = 0.9;
+      screenScale = 0.5; // Start small for boot sequence or mini transition
       screenOpacity = 0;
   } else if (animSequence === 'reveal_center') {
       screenScale = 1;
       screenOpacity = 1;
   }
+  
+  // NOTE: For 'unfolding_setup' and 'unfolding_active', we purposely keep scale 1 and opacity 1.
+  // The center panel simply stays visible while side panels slide in around it.
 
   const screenContainerClass = `flex-grow flex flex-col relative overflow-hidden z-10
-      ${!isResizing ? 'transition-all duration-1000 ease-[cubic-bezier(0.34,1.56,0.64,1)]' : ''}
+      ${!isResizing ? 'transition-all duration-700 ease-[cubic-bezier(0.34,1.56,0.64,1)]' : ''}
       ${!isScreenVisible ? 'w-0 opacity-0 scale-95' : 'w-auto'}
   `;
   
-  // Apply inline styles for specific reveal control
+  // Explicit inline styles for the reveal animation
   const screenContainerStyle = {
       opacity: !isScreenVisible ? 0 : screenOpacity,
-      transform: !isScreenVisible ? 'scale(0.95)' : `scale(${screenScale})`
+      transform: !isScreenVisible ? 'scale(0.95)' : `scale(${screenScale})`,
+      transition: (animSequence === 'reveal_center') ? 'transform 0.6s cubic-bezier(0.34,1.56,0.64,1), opacity 0.5s ease-out' : undefined
   };
 
   return {
@@ -597,7 +567,7 @@ export const useViewLayout = (introState: number) => {
     rightPanelStyle,
     rightPanelInnerStyle,
     screenContainerClass,
-    screenContainerStyle, // Exported new style object
+    screenContainerStyle, 
     isResizing,
     leftPanelWidth,
     rightPanelWidth,

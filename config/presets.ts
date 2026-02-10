@@ -1,3 +1,4 @@
+
 import { AppPreset } from '../types';
 import { 
   DEFAULT_VISUALIZER_CONFIG, 
@@ -6,7 +7,8 @@ import {
   DEFAULT_DVD_CONFIG, 
   DEFAULT_EFFECTS_CONFIG, 
   DEFAULT_MARQUEE_CONFIG, 
-  DEFAULT_WATERMARK_CONFIG 
+  DEFAULT_WATERMARK_CONFIG,
+  DEFAULT_YOUTUBE_CHAT_CONFIG 
 } from './defaults';
 
 const timestamp = Date.now();
@@ -142,6 +144,7 @@ export const OCEAN_BLUE_PRESET: AppPreset = {
           space: true
         }
       },
+      youtubeChat: DEFAULT_YOUTUBE_CHAT_CONFIG,
       lightLeaks: {
         enabled: false,
         intensity: 0.5,
@@ -190,7 +193,10 @@ export const OCEAN_BLUE_PRESET: AppPreset = {
         glowEnabled: false,
         glowIntensity: 0.5,
         bgEnabled: false,
-        bgPattern: 'grid'
+        bgPattern: 'grid',
+        erasureSpeed: 2,
+        speedVariance: 0.5,
+        roundMode: false
       },
       vignette: {
         enabled: true,
@@ -217,7 +223,9 @@ export const OCEAN_BLUE_PRESET: AppPreset = {
       progressOpacity: 0.6,
       speed: 1,
       opacity: 0.9,
-      fontSize: 40
+      fontSize: 40,
+      channelName: 'Neon Waves',
+      borderEnabled: false
     },
     watermarkConfig: {
       scale: 1,

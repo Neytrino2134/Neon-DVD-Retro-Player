@@ -1,6 +1,6 @@
 
 import React, { useState } from 'react';
-import { VisualizerConfig, EffectsConfig, DvdConfig, MarqueeConfig, PatternConfig, BackgroundMedia, AppPreset, CursorStyle, WatermarkConfig, ThemeType, ControlStyle, BgTransitionType, AmbienceFile, AmbienceConfig, BgAnimationType, BackgroundPlaylist, BgHotspot, EqualizerConfig, FitMode, ScreenAlignment } from '../../types';
+import { VisualizerConfig, EffectsConfig, DvdConfig, MarqueeConfig, PatternConfig, BackgroundMedia, AppPreset, CursorStyle, WatermarkConfig, ThemeType, ControlStyle, BgTransitionType, AmbienceFile, AmbienceConfig, BgAnimationType, BackgroundPlaylist, BgHotspot, EqualizerConfig, FitMode, ScreenAlignment, YouTubeAuthConfig } from '../../types';
 import { useNotification } from '../../contexts/NotificationContext';
 import { useTheme } from '../../contexts/ThemeContext';
 import { useLanguage } from '../../contexts/LanguageContext';
@@ -153,6 +153,10 @@ interface SettingsPanelProps {
   setEqPreset: (id: string, bands: number[]) => void;
   toggleEq: () => void;
 
+  // YouTube
+  youTubeConfig: YouTubeAuthConfig; // NEW
+  setYouTubeConfig: (config: YouTubeAuthConfig) => void; // NEW
+
   // New Persistence Props (Lifted state)
   settingsExpandedState: Record<string, boolean>;
   settingsOpenSections: Record<string, boolean>;
@@ -173,6 +177,25 @@ const SettingsPanel: React.FC<SettingsPanelProps> = (props) => {
   // NOTE: useSettingsExpansion removed here, state is passed from parent (useAppConfig)
   
   const updaters = useConfigUpdaters(props);
+
+  // Listen for scroll events triggered by hotkeys
+  React.useEffect(() => {
+      const handleScroll = (e: CustomEvent) => {
+          const sectionId = e.detail;
+          // Delay to allow expansion animation/state update
+          setTimeout(() => {
+              const el = document.getElementById(`section-header-${sectionId}`);
+              if (el && scrollContainerRef.current) {
+                  // Sometimes scrollTo is more reliable in custom containers than scrollIntoView
+                  const top = el.offsetTop;
+                  scrollContainerRef.current.scrollTo({ top, behavior: 'smooth' });
+              }
+          }, 100);
+      };
+      
+      window.addEventListener('neon-toggle-section', handleScroll as EventListener);
+      return () => window.removeEventListener('neon-toggle-section', handleScroll as EventListener);
+  }, []);
 
   // Constants / Options
   const themeOptions = [
@@ -242,6 +265,7 @@ const SettingsPanel: React.FC<SettingsPanelProps> = (props) => {
                 currentTheme={currentTheme} setTheme={setTheme} cursorStyle={props.cursorStyle} setCursorStyle={props.setCursorStyle} retroScreenCursorStyle={props.retroScreenCursorStyle} setRetroScreenCursorStyle={props.setRetroScreenCursorStyle} controlStyle={controlStyle} setControlStyle={setControlStyle}
                 watermarkConfig={props.watermarkConfig} setWatermarkConfig={props.setWatermarkConfig}
                 debugConfig={props.effectsConfig.debugConsole} updateDebugConfig={updaters.updateDebugConfig}
+                youTubeConfig={props.youTubeConfig} setYouTubeConfig={props.setYouTubeConfig}
                 themeOptions={themeOptions} cursorOptions={cursorOptions} controlStyleOptions={controlStyleOptions}
                 isAdvancedMode={props.isAdvancedMode}
             />

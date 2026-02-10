@@ -29,6 +29,7 @@ export const panel = {
   cursor_ocean: "OCEAN",
   cursor_crosshair: "CROSSHAIR",
   cursor_rounded: "ROUNDED",
+  cursor_sound_wave: "SOUND WAVE",
   cursor_system: "SYSTEM",
   
   // Control Styles
@@ -40,4 +41,15 @@ export const panel = {
   cat_backgrounds: "BACKGROUNDS",
   cat_sound_effects: "SOUND EFFECTS",
   cat_screen_effects: "SCREEN EFFECTS",
+  
+  // YouTube Auth
+  youtube_auth: "YOUTUBE LIVE",
+  yt_connect_title: "CONNECT ACCOUNT",
+  yt_client_id: "CLIENT ID",
+  yt_connect_btn: "CONNECT",
+  yt_disconnect_btn: "DISCONNECT",
+  yt_status: "STATUS",
+  yt_connected: "CONNECTED",
+  yt_disconnected: "DISCONNECTED",
+  yt_channel: "CHANNEL",
 };

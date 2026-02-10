@@ -239,6 +239,7 @@ const CustomCursor: React.FC<CustomCursorProps> = ({ style = 'default', retroScr
 
           let activeStyle = (isScreenHover) ? retroScreenStyle : style;
           if (style === 'music-flow') activeStyle = 'music-flow';
+          if (style === 'sound-wave') activeStyle = 'sound-wave';
           if (isDosForced) activeStyle = 'dos-terminal';
 
           if (activeStyle === 'system') {
@@ -249,8 +250,42 @@ const CustomCursor: React.FC<CustomCursorProps> = ({ style = 'default', retroScr
               return;
           }
 
+          // --- SOUND WAVE MODE ---
+          if (activeStyle === 'sound-wave' && ctx && canvas) {
+              if (cursorRef.current) cursorRef.current.style.opacity = '0';
+              if (dosCursorRef.current) dosCursorRef.current.style.opacity = '0';
+
+              ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+              if (!shouldHide && x > 0 && !isResizingH && !isResizingV) {
+                  const barWidth = 4;
+                  const gap = 3;
+                  const maxH = 40;
+                  const baseH = 6;
+
+                  // Dynamic height based on audio
+                  const hCenter = baseH + (audioLevel * maxH);
+                  const hSide = baseH + (audioLevel * maxH * 0.5);
+
+                  ctx.fillStyle = colors.primary; 
+                  ctx.shadowBlur = 10;
+                  ctx.shadowColor = colors.primary;
+
+                  // Center Bar
+                  ctx.fillRect(x - barWidth/2, y - hCenter/2, barWidth, hCenter);
+
+                  // Left Bar
+                  ctx.fillRect(x - barWidth/2 - barWidth - gap, y - hSide/2, barWidth, hSide);
+
+                  // Right Bar
+                  ctx.fillRect(x + barWidth/2 + gap, y - hSide/2, barWidth, hSide);
+
+                  ctx.shadowBlur = 0;
+              }
+          }
+
           // --- MUSIC FLOW MODE ---
-          if (activeStyle === 'music-flow' && ctx && canvas) {
+          else if (activeStyle === 'music-flow' && ctx && canvas) {
               if (dosCursorRef.current) dosCursorRef.current.style.opacity = '0';
               if (cursorRef.current) {
                   const scale = isClicked ? 0.9 : 1;
@@ -553,7 +588,7 @@ const CustomCursor: React.FC<CustomCursorProps> = ({ style = 'default', retroScr
 
   // --- Determine Colors ---
   const getColorsForStyle = (s: string) => {
-      if (s === 'theme-sync' || s === 'music-flow') return { primary: colors.primary, secondary: colors.secondary };
+      if (s === 'theme-sync' || s === 'music-flow' || s === 'sound-wave') return { primary: colors.primary, secondary: colors.secondary };
       if (s === 'classic-blue') return { primary: '#00f3ff', secondary: '#4d79ff' };
       if (s === 'classic-warm') return { primary: '#ffd700', secondary: '#ff8c00' };
       if (s === 'classic-ocean') return { primary: '#70C6D6', secondary: '#4B8CA8' };
@@ -576,7 +611,7 @@ const CustomCursor: React.FC<CustomCursorProps> = ({ style = 'default', retroScr
           const { isScreenHover } = mouseState;
           const activeStyle = isScreenHover ? retroScreenStyle : style;
           
-          if (activeStyle !== 'default' && activeStyle !== 'dos-terminal' && activeStyle !== 'system' && cursorRef.current) {
+          if (activeStyle !== 'default' && activeStyle !== 'dos-terminal' && activeStyle !== 'sound-wave' && activeStyle !== 'system' && cursorRef.current) {
               
               if (activeStyle === 'music-flow') {
                   // Special override for music flow crosshair to remain white

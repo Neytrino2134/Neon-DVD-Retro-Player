@@ -1,10 +1,11 @@
 
 import React from 'react';
-import { Type, Disc, Sun, CloudRain, MessageSquare, Bot, Tv, Terminal, AlertTriangle } from 'lucide-react';
+import { Type, Disc, Sun, CloudRain, MessageSquare, Bot, Tv, Terminal, AlertTriangle, Youtube } from 'lucide-react';
 import ModuleWrapper from '../ModuleWrapper';
 import MarqueeSettings from '../modules/MarqueeSettings';
 import HologramSettings from '../modules/HologramSettings';
 import GeminiSettings from '../modules/GeminiSettings';
+import YouTubeChatSettings from '../modules/YouTubeChatSettings'; // NEW
 import RainSettings from '../modules/RainSettings';
 import { DvdSettings, ScanlineSettings, CyberSettings, GlitchSettings, LightLeaksSettings } from '../modules/EffectModules';
 import { NumberedLabel } from '../SettingsSection';
@@ -53,13 +54,19 @@ const ModulesSection: React.FC<ModulesSectionProps> = ({
         <ModuleWrapper id="gemini" label={<NumberedLabel num="06" k="gemini_chat" />} icon={Bot} isEnabled={effectsConfig.geminiChat.enabled} isExpanded={expandedState['gemini']} onToggleExpand={(e) => toggleExpand('gemini', e.shiftKey)} onToggleEnable={() => safeAction(() => { if (!effectsConfig.geminiChat.enabled) toggleExpand('gemini', false, true); updateEffect('geminiChat', { ...effectsConfig.geminiChat, enabled: !effectsConfig.geminiChat.enabled }); })}>
             <GeminiSettings config={effectsConfig.geminiChat} update={(v) => updateEffect('geminiChat', v)} apiKey={apiKey} setApiKey={setApiKey} />
         </ModuleWrapper>
-        <ModuleWrapper id="scan" label={<NumberedLabel num="07" k="scanlines" />} icon={Tv} isEnabled={effectsConfig.scanlineEnabled} isExpanded={expandedState['scan']} onToggleExpand={(e) => toggleExpand('scan', e.shiftKey)} onToggleEnable={() => safeAction(() => { if (!effectsConfig.scanlineEnabled) toggleExpand('scan', false, true); updateEffect('scanlineEnabled', !effectsConfig.scanlineEnabled); })}>
+        
+        {/* NEW: YouTube Chat Module */}
+        <ModuleWrapper id="youtube_chat" label={<NumberedLabel num="07" k="youtube_chat" />} icon={Youtube} isEnabled={effectsConfig.youtubeChat.enabled} isExpanded={expandedState['youtube_chat']} onToggleExpand={(e) => toggleExpand('youtube_chat', e.shiftKey)} onToggleEnable={() => safeAction(() => { if (!effectsConfig.youtubeChat.enabled) toggleExpand('youtube_chat', false, true); updateEffect('youtubeChat', { ...effectsConfig.youtubeChat, enabled: !effectsConfig.youtubeChat.enabled }); })}>
+            <YouTubeChatSettings config={effectsConfig.youtubeChat} update={(v) => updateEffect('youtubeChat', v)} />
+        </ModuleWrapper>
+
+        <ModuleWrapper id="scan" label={<NumberedLabel num="08" k="scanlines" />} icon={Tv} isEnabled={effectsConfig.scanlineEnabled} isExpanded={expandedState['scan']} onToggleExpand={(e) => toggleExpand('scan', e.shiftKey)} onToggleEnable={() => safeAction(() => { if (!effectsConfig.scanlineEnabled) toggleExpand('scan', false, true); updateEffect('scanlineEnabled', !effectsConfig.scanlineEnabled); })}>
             <ScanlineSettings config={effectsConfig} update={updateEffect} />
         </ModuleWrapper>
-        <ModuleWrapper id="cyber" label={<NumberedLabel num="08" k="cyber_hack" />} icon={Terminal} isEnabled={effectsConfig.cyberHack.enabled} isExpanded={expandedState['cyber']} onToggleExpand={(e) => toggleExpand('cyber', e.shiftKey)} onToggleEnable={() => safeAction(() => { if (!effectsConfig.cyberHack.enabled) toggleExpand('cyber', false, true); updateEffect('cyberHack', { ...effectsConfig.cyberHack, enabled: !effectsConfig.cyberHack.enabled }); })}>
+        <ModuleWrapper id="cyber" label={<NumberedLabel num="09" k="cyber_hack" />} icon={Terminal} isEnabled={effectsConfig.cyberHack.enabled} isExpanded={expandedState['cyber']} onToggleExpand={(e) => toggleExpand('cyber', e.shiftKey)} onToggleEnable={() => safeAction(() => { if (!effectsConfig.cyberHack.enabled) toggleExpand('cyber', false, true); updateEffect('cyberHack', { ...effectsConfig.cyberHack, enabled: !effectsConfig.cyberHack.enabled }); })}>
             <CyberSettings config={effectsConfig.cyberHack} update={(v) => updateEffect('cyberHack', v)} />
         </ModuleWrapper>
-        <ModuleWrapper id="glitch" label={<NumberedLabel num="09" k="digital_glitch" />} icon={AlertTriangle} isEnabled={effectsConfig.glitch.enabled} isExpanded={expandedState['glitch']} onToggleExpand={(e) => toggleExpand('glitch', e.shiftKey)} onToggleEnable={() => safeAction(() => { if (!effectsConfig.glitch.enabled) toggleExpand('glitch', false, true); updateEffect('glitch', { ...effectsConfig.glitch, enabled: !effectsConfig.glitch.enabled }); })}>
+        <ModuleWrapper id="glitch" label={<NumberedLabel num="10" k="digital_glitch" />} icon={AlertTriangle} isEnabled={effectsConfig.glitch.enabled} isExpanded={expandedState['glitch']} onToggleExpand={(e) => toggleExpand('glitch', e.shiftKey)} onToggleEnable={() => safeAction(() => { if (!effectsConfig.glitch.enabled) toggleExpand('glitch', false, true); updateEffect('glitch', { ...effectsConfig.glitch, enabled: !effectsConfig.glitch.enabled }); })}>
             <GlitchSettings config={effectsConfig.glitch} update={(v) => updateEffect('glitch', v)} />
         </ModuleWrapper>
     </div>

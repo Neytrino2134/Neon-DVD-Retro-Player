@@ -32,7 +32,7 @@ export const useMediaTransition = ({
   const [transitionPhase, setTransitionPhase] = useState<'idle' | 'out' | 'in'>('idle');
   const [bgTransition, setBgTransition] = useState<BgTransitionType>('glitch');
   
-  const leaksCleanupRef = useRef<number | null>(null);
+  const transitionTimerRef = useRef<number | null>(null);
 
   // Sync transition type from storage
   useEffect(() => {
@@ -62,10 +62,8 @@ export const useMediaTransition = ({
 
     const currentTarget = overlayMedia || baseMedia;
     
-    // URL Check
+    // URL Check to prevent transitioning to same media
     if (effectiveMedia?.url === currentTarget?.url) {
-        // CRITICAL FIX: If URL is same but hotspots changed, update baseMedia immediately (no transition needed)
-        // This ensures interactive spots appear/move without glitching the background
         const currentHotspots = JSON.stringify(currentTarget?.hotspots || []);
         const newHotspots = JSON.stringify(effectiveMedia?.hotspots || []);
         
@@ -80,38 +78,76 @@ export const useMediaTransition = ({
     const currentTransitionType = stored ? JSON.parse(stored) as BgTransitionType : 'glitch';
     setBgTransition(currentTransitionType);
 
+    // Clear previous timers
+    if (transitionTimerRef.current) {
+        clearTimeout(transitionTimerRef.current);
+        transitionTimerRef.current = null;
+    }
+
     if (currentTransitionType === 'leaks') {
         // --- LEAKS TRANSITION ---
-        if (leaksCleanupRef.current) {
-            clearTimeout(leaksCleanupRef.current);
-            leaksCleanupRef.current = null;
-        }
-
         setOverlayMedia(effectiveMedia);
         
-        requestAnimationFrame(() => {
-             requestAnimationFrame(() => {
-                 setIsCrossfading(true);
-             });
-        });
+        // CRITICAL FIX: Give video element 150ms to mount and start playing before fading in.
+        // This prevents the "jerk" or black frame on video switch.
+        transitionTimerRef.current = window.setTimeout(() => {
+             setIsCrossfading(true);
+             
+             // Swap after fade is mostly done
+             window.setTimeout(() => {
+                setBaseMedia(effectiveMedia);
+                
+                // Cleanup overlay after swap
+                window.setTimeout(() => {
+                    setOverlayMedia(null);
+                    setIsCrossfading(false);
+                }, 800);
+                
+             }, 1200);
+             
+        }, 150); 
 
-        // Reduced from 2000ms to 1200ms to match physics speed
-        const timeout = setTimeout(() => {
-            setBaseMedia(effectiveMedia);
-            
-            // Immediately trigger exit phase after swap
-            leaksCleanupRef.current = window.setTimeout(() => {
+    } else if (currentTransitionType === 'crossfade') {
+        // --- CROSSFADE TRANSITION ---
+        // 1. Set overlay to new media (opacity 0 initially)
+        setOverlayMedia(effectiveMedia);
+        
+        // 2. Trigger opacity fade to 1 after buffering delay
+        transitionTimerRef.current = window.setTimeout(() => {
+             setIsCrossfading(true);
+             
+             // 3. Swap after fade duration (standard 2s for smoothness)
+             window.setTimeout(() => {
+                setBaseMedia(effectiveMedia);
                 setOverlayMedia(null);
-                setIsCrossfading(false);
-                leaksCleanupRef.current = null;
-            }, 50); 
+                setIsCrossfading(false); // Reset crossfade trigger
+             }, 2000);
+             
+        }, 150); // 150ms pre-buffer delay
 
-        }, 1200); 
+    } else if (currentTransitionType === 'black' || currentTransitionType === 'blur') {
+        // --- BLACK / BLUR TRANSITIONS (Sequential) ---
+        // 1. Fade OUT existing media (handled by CSS in RetroScreen based on phase)
+        setTransitionPhase('out');
 
-        return () => {
-            clearTimeout(timeout);
-            if (leaksCleanupRef.current) clearTimeout(leaksCleanupRef.current);
-        };
+        // 2. Wait for fade out
+        transitionTimerRef.current = window.setTimeout(() => {
+            // Swap source while invisible/blurred
+            setBaseMedia(effectiveMedia); 
+            
+            // Give the new media a moment to load while hidden
+            window.setTimeout(() => {
+                // 3. Fade IN new media
+                setTransitionPhase('in'); 
+                
+                // 4. Reset to Idle
+                window.setTimeout(() => {
+                    setTransitionPhase('idle');
+                }, 1000);
+                
+            }, 200); // Buffer while hidden
+
+        }, 1000); 
 
     } else if (currentTransitionType === 'none') {
         // --- NO TRANSITION ---
@@ -123,30 +159,31 @@ export const useMediaTransition = ({
         setOverlayMedia(effectiveMedia); 
         setTransitionPhase('out'); 
         
+        // Slight delay for glitch overlay to initialize
         requestAnimationFrame(() => {
              requestAnimationFrame(() => {
                  setIsCrossfading(true);
              });
         });
 
-        const PHASE_DURATION = 1200; // Equal time for In and Out phases
+        const PHASE_DURATION = 1200; 
 
-        const t1 = setTimeout(() => {
+        transitionTimerRef.current = window.setTimeout(() => {
             setBaseMedia(effectiveMedia); 
             setTransitionPhase('in'); 
+            
+            window.setTimeout(() => {
+                setOverlayMedia(null);
+                setIsCrossfading(false);
+                setTransitionPhase('idle');
+            }, PHASE_DURATION);
+            
         }, PHASE_DURATION); 
-
-        const t2 = setTimeout(() => {
-            setOverlayMedia(null);
-            setIsCrossfading(false);
-            setTransitionPhase('idle');
-        }, PHASE_DURATION * 2); // 2400ms total
-
-        return () => {
-            clearTimeout(t1);
-            clearTimeout(t2);
-        };
     }
+    
+    return () => {
+        if (transitionTimerRef.current) clearTimeout(transitionTimerRef.current);
+    };
   }, [effectiveMedia, videoStream, streamMode]);
 
   return {

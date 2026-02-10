@@ -14,6 +14,9 @@ export const useAudioPlayer = () => {
       return saved ? parseFloat(saved) : 0.75;
   });
   
+  // Ref to store volume before muting
+  const lastVolumeRef = useRef(0.75);
+  
   const audio = useWebAudio(volume); // Logic for AudioContext
 
   // --- PLAYBACK STATE ---
@@ -218,6 +221,15 @@ export const useAudioPlayer = () => {
       setVolumeState(vol);
       localStorage.setItem('neon_main_volume', vol.toString());
       // Actual gain update handled by useEffect in useWebAudio
+  };
+
+  const toggleMute = () => {
+      if (volume > 0) {
+          lastVolumeRef.current = volume;
+          setVolume(0);
+      } else {
+          setVolume(lastVolumeRef.current > 0 ? lastVolumeRef.current : 0.5);
+      }
   };
 
   const setEqBand = (index: number, value: number) => {
@@ -489,11 +501,13 @@ export const useAudioPlayer = () => {
   };
 
   const handleTimeUpdate = (e: React.SyntheticEvent<HTMLAudioElement>, isWaitingReboot: boolean) => {
-      if (isWaitingReboot) return;
       const el = e.currentTarget;
       setCurrentTime(el.currentTime);
       setDuration(el.duration);
       
+      // If waiting for reboot, update visual time but prevent auto-mix logic
+      if (isWaitingReboot) return;
+
       if (isPlaying && crossfadeDuration > 0 && !hasTriggeredAutoMixRef.current) {
           const timeLeft = el.duration - el.currentTime;
           if (timeLeft <= crossfadeDuration && timeLeft > 0) {
@@ -535,7 +549,7 @@ export const useAudioPlayer = () => {
     contextId: audio.contextId, // Pass contextId to force key updates in UI
     // Controls
     setVolume, seek, togglePlay, stop, nextTrack, prevTrack, selectTrack, setIsPlaying,
-    setEqBand, setEqPreset, toggleEq, 
+    setEqBand, setEqPreset, toggleEq, toggleMute,
     // Library Actions
     insertAudioFiles, 
     clearPlaylist: lib.actions.clearPlaylist, 
