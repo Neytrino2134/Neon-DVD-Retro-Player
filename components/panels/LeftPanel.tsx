@@ -38,9 +38,11 @@ const LeftPanel: React.FC<LeftPanelProps> = (props) => {
   const handleResetDefault = () => {
     const defaults = config.resetDefaultPreset();
     // Batch reset logic... (simplified to call config setters)
+    if (defaults.globalWaveformConfig) config.setGlobalWaveformConfig(defaults.globalWaveformConfig);
     config.setVisualizerConfig(defaults.visualizerConfig);
     if (defaults.reactorConfig) config.setReactorConfig(defaults.reactorConfig);
     if (defaults.sineWaveConfig) config.setSineWaveConfig(defaults.sineWaveConfig);
+    if (defaults.terrainConfig) config.setTerrainConfig(defaults.terrainConfig); // Reset Terrain
     config.setDvdConfig(defaults.dvdConfig);
     config.setEffectsConfig(defaults.effectsConfig);
     config.setMarqueeConfig(defaults.marqueeConfig);
@@ -52,6 +54,7 @@ const LeftPanel: React.FC<LeftPanelProps> = (props) => {
     config.setShowVisualizer(defaults.showVisualizer);
     if (defaults.showVisualizer3D !== undefined) config.setShowVisualizer3D(defaults.showVisualizer3D);
     if (defaults.showSineWave !== undefined) config.setShowSineWave(defaults.showSineWave);
+    if (defaults.showVisualizerTerrain !== undefined) config.setShowVisualizerTerrain(defaults.showVisualizerTerrain); // Reset Terrain Toggle
     config.setShowDvd(defaults.showDvd);
     config.setBgAutoplayInterval(defaults.bgAutoplayInterval);
     if (defaults.cursorStyle) config.setCursorStyle(defaults.cursorStyle);
@@ -87,14 +90,17 @@ const LeftPanel: React.FC<LeftPanelProps> = (props) => {
         ) : (
           <SettingsPanel
             // Mapping extensive props...
+            globalWaveformConfig={config.globalWaveformConfig} setGlobalWaveformConfig={config.setGlobalWaveformConfig}
             showVisualizer={config.showVisualizer} setShowVisualizer={config.setShowVisualizer}
             showVisualizer3D={config.showVisualizer3D} setShowVisualizer3D={config.setShowVisualizer3D}
             showSineWave={config.showSineWave} setShowSineWave={config.setShowSineWave}
+            showVisualizerTerrain={config.showVisualizerTerrain} setShowVisualizerTerrain={config.setShowVisualizerTerrain} // NEW
             showDvd={config.showDvd} setShowDvd={config.setShowDvd}
             marqueeConfig={config.marqueeConfig} setMarqueeConfig={config.setMarqueeConfig}
             visualizerConfig={config.visualizerConfig} setVisualizerConfig={config.setVisualizerConfig}
             reactorConfig={config.reactorConfig} setReactorConfig={config.setReactorConfig}
             sineWaveConfig={config.sineWaveConfig} setSineWaveConfig={config.setSineWaveConfig}
+            terrainConfig={config.terrainConfig} setTerrainConfig={config.setTerrainConfig} // NEW
             dvdConfig={config.dvdConfig} setDvdConfig={config.setDvdConfig}
             effectsConfig={config.effectsConfig} setEffectsConfig={config.setEffectsConfig}
             watermarkConfig={config.watermarkConfig} setWatermarkConfig={config.setWatermarkConfig}
@@ -191,6 +197,9 @@ const LeftPanel: React.FC<LeftPanelProps> = (props) => {
             setScreenFitMode={config.setScreenFitMode}
             screenAlignment={config.screenAlignment}
             setScreenAlignment={config.setScreenAlignment}
+            // Sync BG
+            syncBgWithTrack={config.syncBgWithTrack}
+            setSyncBgWithTrack={config.setSyncBgWithTrack}
             // YouTube Auth
             youTubeConfig={config.youTubeConfig}
             setYouTubeConfig={config.setYouTubeConfig}

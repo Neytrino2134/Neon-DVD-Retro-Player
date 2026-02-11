@@ -192,7 +192,7 @@ export const tv = {
   auto_timer: "AUTO TIMER",
   use_album_art: "USE ALBUM ART",
   capture_audio: "CAPTURE AUDIO",
-  stop_screen: "STOP SCREEN",
+  stop_screen: "СТОП SCREEN",
   start_screen: "START SCREEN",
   fit_mode: "FIT MODE",
   fit_cover: "COVER (CROP)",
@@ -220,4 +220,6 @@ export const tv = {
   equalizer: "EQUALIZER",
   eq_enable: "ENABLE EQ",
   eq_preset: "PRESET",
+  
+  sync_bg_track: "SYNC WITH TRACK", // NEW
 };

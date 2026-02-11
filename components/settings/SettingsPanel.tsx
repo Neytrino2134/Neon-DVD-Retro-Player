@@ -1,6 +1,6 @@
 
 import React, { useState } from 'react';
-import { VisualizerConfig, EffectsConfig, DvdConfig, MarqueeConfig, PatternConfig, BackgroundMedia, AppPreset, CursorStyle, WatermarkConfig, ThemeType, ControlStyle, BgTransitionType, AmbienceFile, AmbienceConfig, BgAnimationType, BackgroundPlaylist, BgHotspot, EqualizerConfig, FitMode, ScreenAlignment, YouTubeAuthConfig } from '../../types';
+import { VisualizerConfig, EffectsConfig, DvdConfig, MarqueeConfig, PatternConfig, BackgroundMedia, AppPreset, CursorStyle, WatermarkConfig, ThemeType, ControlStyle, BgTransitionType, AmbienceFile, AmbienceConfig, BgAnimationType, BackgroundPlaylist, BgHotspot, EqualizerConfig, FitMode, ScreenAlignment, YouTubeAuthConfig, TerrainConfig } from '../../types';
 import { useNotification } from '../../contexts/NotificationContext';
 import { useTheme } from '../../contexts/ThemeContext';
 import { useLanguage } from '../../contexts/LanguageContext';
@@ -25,12 +25,19 @@ import GameSection from './sections/GameSection';
 import PostProcessingSection from './sections/PostProcessingSection';
 
 interface SettingsPanelProps {
+  // NEW: Global Waveform Config
+  globalWaveformConfig?: VisualizerConfig;
+  setGlobalWaveformConfig?: (c: VisualizerConfig) => void;
+
   showVisualizer: boolean;
   setShowVisualizer: (v: boolean) => void;
   showVisualizer3D?: boolean;
   setShowVisualizer3D?: (v: boolean) => void;
   showSineWave?: boolean; 
   setShowSineWave?: (v: boolean) => void;
+  showVisualizerTerrain?: boolean; // NEW: 4D Terrain Toggle
+  setShowVisualizerTerrain?: (v: boolean) => void; // NEW
+  
   showDvd: boolean;
   setShowDvd: (v: boolean) => void;
   marqueeConfig: MarqueeConfig;
@@ -42,6 +49,8 @@ interface SettingsPanelProps {
   setReactorConfig?: (config: VisualizerConfig) => void; 
   sineWaveConfig?: VisualizerConfig; 
   setSineWaveConfig?: (config: VisualizerConfig) => void; 
+  terrainConfig?: TerrainConfig; // NEW: 4D Terrain Config
+  setTerrainConfig?: (config: TerrainConfig) => void; // NEW
 
   dvdConfig: DvdConfig;
   setDvdConfig: (config: DvdConfig) => void;
@@ -77,6 +86,8 @@ interface SettingsPanelProps {
   onExportConfig: () => void;
   bgAutoplayInterval: number;
   setBgAutoplayInterval: (val: number) => void;
+  syncBgWithTrack: boolean; // NEW
+  setSyncBgWithTrack: (v: boolean) => void; // NEW
   onScheduleReload: () => void;
   onGoHome: () => void;
   crossfadeDuration: number;
@@ -173,8 +184,6 @@ const SettingsPanel: React.FC<SettingsPanelProps> = (props) => {
 
   // --- CUSTOM HOOKS FOR LOGIC SEPARATION ---
   const { scrollContainerRef, handleMouseDown, safeAction } = useSettingsScroll();
-  
-  // NOTE: useSettingsExpansion removed here, state is passed from parent (useAppConfig)
   
   const updaters = useConfigUpdaters(props);
 
@@ -288,6 +297,7 @@ const SettingsPanel: React.FC<SettingsPanelProps> = (props) => {
                 bgPlaylists={props.bgPlaylists} activeBgPlaylistId={props.activeBgPlaylistId} playingBgPlaylistId={props.playingBgPlaylistId} setActiveBgPlaylistId={props.setActiveBgPlaylistId} setPlayingBgPlaylistId={props.setPlayingBgPlaylistId} addBgPlaylist={props.addBgPlaylist} removeBgPlaylist={props.removeBgPlaylist} renameBgPlaylist={props.renameBgPlaylist}
                 screenFitMode={props.screenFitMode} setScreenFitMode={props.setScreenFitMode}
                 screenAlignment={props.screenAlignment} setScreenAlignment={props.setScreenAlignment}
+                syncBgWithTrack={props.syncBgWithTrack} setSyncBgWithTrack={props.setSyncBgWithTrack}
             />
         </SettingsSection>
 
@@ -316,9 +326,14 @@ const SettingsPanel: React.FC<SettingsPanelProps> = (props) => {
         >
             <WaveformSection 
                 expandedState={props.settingsExpandedState} toggleExpand={safeToggleExpand} safeAction={safeAction}
+                // Global Config
+                globalWaveformConfig={props.globalWaveformConfig} updateGlobalWaveform={updaters.updateGlobalAndApply} applyGlobalToAll={updaters.applyGlobalToAll}
+                // Specific Configs
                 showVisualizer={props.showVisualizer} setShowVisualizer={props.setShowVisualizer} visualizerConfig={props.visualizerConfig} updateVisualizer={updaters.updateVisualizer}
                 showVisualizer3D={props.showVisualizer3D} setShowVisualizer3D={props.setShowVisualizer3D} reactorConfig={props.reactorConfig} updateReactor={updaters.updateReactor}
                 showSineWave={props.showSineWave} setShowSineWave={props.setShowSineWave} sineWaveConfig={props.sineWaveConfig} updateSineWave={updaters.updateSineWave}
+                // Terrain
+                showVisualizerTerrain={props.showVisualizerTerrain} setShowVisualizerTerrain={props.setShowVisualizerTerrain} terrainConfig={props.terrainConfig} updateTerrain={updaters.updateTerrain}
             />
         </SettingsSection>
 

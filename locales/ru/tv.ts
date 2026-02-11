@@ -219,4 +219,6 @@ export const tv = {
   equalizer: "ЭКВАЛАЙЗЕР",
   eq_enable: "ВКЛ. ЭКВАЛАЙЗЕР",
   eq_preset: "ПРЕСЕТ",
+  
+  sync_bg_track: "СИНХРОНИЗАЦИЯ С ТРЕКОМ", // NEW
 };

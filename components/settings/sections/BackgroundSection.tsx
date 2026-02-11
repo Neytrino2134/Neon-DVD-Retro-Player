@@ -53,6 +53,8 @@ interface BackgroundSectionProps {
   setScreenFitMode?: (m: FitMode) => void;
   screenAlignment?: ScreenAlignment; // NEW
   setScreenAlignment?: (a: ScreenAlignment) => void; // NEW
+  syncBgWithTrack: boolean; // NEW
+  setSyncBgWithTrack: (v: boolean) => void; // NEW
 }
 
 const BackgroundSection: React.FC<BackgroundSectionProps> = ({
@@ -63,7 +65,8 @@ const BackgroundSection: React.FC<BackgroundSectionProps> = ({
   currentBgIndex, onRemoveBg, onMoveBg, onSelectBg, onClearBgMedia, shuffleBgList, onBgMediaUpload, onUpdateBg, onUpdateMetadata,
   bgAutoplayInterval, setBgAutoplayInterval, useAlbumArtAsBackground, setUseAlbumArtAsBackground,
   bgColor, setBgColor, bgPattern, setBgPattern, bgPatternConfig, setBgPatternConfig, onDeselectBg,
-  isVideoActive, toggleVideo, streamMode, setStreamMode, screenFitMode, setScreenFitMode, screenAlignment, setScreenAlignment
+  isVideoActive, toggleVideo, streamMode, setStreamMode, screenFitMode, setScreenFitMode, screenAlignment, setScreenAlignment,
+  syncBgWithTrack, setSyncBgWithTrack
 }) => {
   return (
     <>
@@ -105,6 +108,8 @@ const BackgroundSection: React.FC<BackgroundSectionProps> = ({
                 setBgAutoplayInterval={setBgAutoplayInterval}
                 useAlbumArtAsBackground={useAlbumArtAsBackground}
                 setUseAlbumArtAsBackground={setUseAlbumArtAsBackground || (() => {})}
+                syncBgWithTrack={syncBgWithTrack}
+                setSyncBgWithTrack={setSyncBgWithTrack}
             />
         </ModuleWrapper>
 

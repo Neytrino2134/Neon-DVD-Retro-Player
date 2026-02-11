@@ -252,7 +252,7 @@ export const NEON_COLORS = [
 export type VisualizerStyle = 'retro' | 'blue' | 'pink' | 'matrix' | 'inferno' | 'warm' | 'gray' | 'ocean' | 'theme-blue' | 'theme-sync' | 'neon-gradient';
 export type VisualizerPosition = 'center' | 'top' | 'bottom' | 'circle';
 export type TipColor = 'white' | 'blue' | 'pink' | 'green' | 'purple' | 'yellow' | 'red';
-export type CursorStyle = 'default' | 'music-flow' | 'classic-blue' | 'classic-warm' | 'classic-white' | 'classic-ocean' | 'theme-sync' | 'dos-terminal' | 'system' | 'crosshair' | 'rounded' | 'sound-wave';
+export type CursorStyle = 'default' | 'music-flow' | 'classic-blue' | 'classic-warm' | 'classic-white' | 'classic-ocean' | 'theme-sync' | 'dos-terminal' | 'system' | 'crosshair' | 'rounded' | 'sound-wave' | 'sound-wave-trail';
 
 export type ThemeType = 'neon-retro' | 'neon-blue' | 'neon-pink' | 'warm-cozy' | 'neutral-gray' | 'neutral-ocean';
 export type ControlStyle = 'default' | 'round' | 'circle';
@@ -289,6 +289,19 @@ export interface VisualizerConfig {
   highlightLastBrick: boolean; // NEW: Highlight the top-most brick
   barGravity: number; // NEW: Gravity/Decay for the bars themselves
   threeDMode?: 'reactor' | 'spectrum'; // NEW: Specific for 3D Visualizer
+}
+
+export interface TerrainConfig {
+  gridSize: number; // Resolution (e.g., 64)
+  speed: number; // How fast waves move forward
+  heightMultiplier: number; // Amplitude
+  wireframe: boolean;
+  colorMode: 'theme' | 'rainbow' | 'matrix';
+  opacity: number;
+  lineThickness: number;
+  glow: boolean;
+  mirror?: boolean; // NEW
+  invertMirror?: boolean; // NEW
 }
 
 export interface DvdConfig {
@@ -360,9 +373,11 @@ export interface AppPreset {
   name: string;
   createdAt: number;
   config: {
+    globalWaveformConfig?: VisualizerConfig; // NEW: Master waveform config
     visualizerConfig: VisualizerConfig;
     reactorConfig?: VisualizerConfig; // NEW: Independent 3D Reactor config
     sineWaveConfig?: VisualizerConfig; // NEW: Sine Wave config
+    terrainConfig?: TerrainConfig; // NEW: 4D Landscape config
     dvdConfig: DvdConfig;
     effectsConfig: EffectsConfig;
     marqueeConfig: MarqueeConfig;
@@ -373,8 +388,10 @@ export interface AppPreset {
     showVisualizer: boolean;
     showVisualizer3D?: boolean; // NEW: Independent toggle
     showSineWave?: boolean; // NEW: Sine Wave Toggle
+    showVisualizerTerrain?: boolean; // NEW: Terrain Toggle
     showDvd: boolean;
     bgAutoplayInterval: number;
+    syncBgWithTrack?: boolean; // NEW: Sync background changes with audio tracks
     cursorStyle?: CursorStyle;
     retroScreenCursorStyle?: CursorStyle; // NEW
     theme?: ThemeType;

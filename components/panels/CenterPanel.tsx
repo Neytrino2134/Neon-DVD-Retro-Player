@@ -4,6 +4,7 @@ import MusicEditor from '../editor/MusicEditor';
 import TagEditor from '../tags/TagEditor';
 import RetroScreen from '../RetroScreen';
 import { AudioTrack, TagMetadata } from '../../types';
+import { useConfigUpdaters } from '../../hooks/useConfigUpdaters';
 
 interface CenterPanelProps {
   view: any;
@@ -26,6 +27,9 @@ const CenterPanel: React.FC<CenterPanelProps> = ({
   const handleUpdateTrackTags = (_id: string, _updates: Partial<AudioTrack> & { tags?: TagMetadata }) => {
     addNotification("Track Updated (Visual)", "success");
   };
+
+  // Instantiate updaters to get the Master Control logic
+  const updaters = useConfigUpdaters(config);
 
   return (
     <div className={view.screenContainerClass} style={view.screenContainerStyle}>
@@ -60,15 +64,21 @@ const CenterPanel: React.FC<CenterPanelProps> = ({
           screenFitMode={config.screenFitMode}
           screenAlignment={config.screenAlignment}
 
+          // Pass Global Config for Master HUD
+          globalWaveformConfig={config.globalWaveformConfig}
+          setGlobalWaveformConfig={updaters.updateGlobalAndApply}
+
           visualizerConfig={config.visualizerConfig}
           setVisualizerConfig={config.setVisualizerConfig}
           reactorConfig={config.reactorConfig}
           setReactorConfig={config.setReactorConfig}
           sineWaveConfig={config.sineWaveConfig}
+          terrainConfig={config.terrainConfig}
 
           showVisualizer={config.showVisualizer}
           showVisualizer3D={config.showVisualizer3D}
           showSineWave={config.showSineWave}
+          showVisualizerTerrain={config.showVisualizerTerrain}
 
           dvdConfig={config.dvdConfig}
           showDvd={config.showDvd}
@@ -105,6 +115,9 @@ const CenterPanel: React.FC<CenterPanelProps> = ({
           
           isResizing={view.isResizing}
           isPlaylistLocked={appState.isPlaylistLocked}
+          
+          // Explicitly pass cursor style for the screen
+          retroScreenCursorStyle={config.retroScreenCursorStyle}
         />
       )}
     </div>

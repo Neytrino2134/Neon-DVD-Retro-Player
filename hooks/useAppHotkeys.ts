@@ -32,13 +32,13 @@ interface UseAppHotkeysProps {
 
 // Map of Section Key (1-7) -> Sub-key (1-9) -> Module ID (to be expanded)
 const COMBO_MAP: Record<string, Record<string, string>> = {
-    '1': { '1': 'files', '2': 'presets', '3': 'themes', '4': 'debug' }, // System
+    '1': { '1': 'files', '2': 'presets', '3': 'themes', '4': 'youtube_auth', '5': 'debug' }, // System
     '2': { '1': 'bg-settings', '2': 'bg-resources', '3': 'bg-colors', '4': 'screen-share' }, // Background
-    '3': { '1': 'mixer', '2': 'ambience', '3': 'sysaudio' }, // Sound
-    '4': { '1': 'wave', '2': 'reactor', '3': 'sine' }, // Waves
-    '5': { '1': 'marquee', '2': 'dvd', '3': 'leaks', '4': 'rain', '5': 'hologram', '6': 'gemini', '7': 'scan', '8': 'cyber', '9': 'glitch' }, // Modules
+    '3': { '1': 'mixer', '2': 'eq', '3': 'ambience', '4': 'sysaudio' }, // Sound
+    '4': { '1': 'wave', '2': 'reactor', '3': 'terrain', '4': 'sine' }, // Waves (Updated Order)
+    '5': { '1': 'marquee', '2': 'dvd', '3': 'leaks', '4': 'rain', '5': 'hologram', '6': 'gemini', '7': 'youtube_chat', '8': 'scan', '9': 'cyber' }, // Modules
     '6': { '1': 'tron' }, // Game
-    '7': { '1': 'fps', '2': 'signal', '3': 'chromatic', '4': 'vignette', '5': 'flicker' } // Post
+    '7': { '1': 'fps', '2': 'signal', '3': 'chromatic', '4': 'vignette', '5': 'flicker', '6': 'video' } // Post
 };
 
 const COMBO_TIMEOUT = 1000; // ms to wait for second key

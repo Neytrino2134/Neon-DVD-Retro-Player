@@ -1,6 +1,6 @@
 
 import React from 'react';
-import { Play, Pause, Square, SkipBack, SkipForward, Shuffle, ArrowRight } from 'lucide-react';
+import { Play, Pause, Square, SkipBack, SkipForward, Shuffle, ArrowRight, ArrowRightToLine } from 'lucide-react';
 import { Tooltip } from '../ui/Tooltip';
 import { NeonButton } from './NeonButton';
 import { WaveformScrubber } from './WaveformScrubber';
@@ -24,6 +24,8 @@ interface TransportControlsProps {
   setIsShuffle?: (v: boolean) => void;
   isAutoNextPlaylist?: boolean;
   setIsAutoNextPlaylist?: (v: boolean) => void;
+  isSolo?: boolean;
+  setIsSolo?: (v: boolean) => void;
 }
 
 const formatTime = (seconds: number) => {
@@ -36,7 +38,8 @@ const formatTime = (seconds: number) => {
 export const TransportControls: React.FC<TransportControlsProps> = ({
   isPlaying, onPlay, onPause, onStop, onNext, onPrev,
   currentTime, duration, onSeek, trackId, isLocked,
-  isShuffle, setIsShuffle, isAutoNextPlaylist, setIsAutoNextPlaylist
+  isShuffle, setIsShuffle, isAutoNextPlaylist, setIsAutoNextPlaylist,
+  isSolo, setIsSolo
 }) => {
   const { t } = useLanguage();
   const remainingTime = Math.max(0, duration - currentTime);
@@ -58,6 +61,11 @@ export const TransportControls: React.FC<TransportControlsProps> = ({
   const handleToggleAuto = () => {
       if (isLocked) return;
       if (setIsAutoNextPlaylist && isAutoNextPlaylist !== undefined) setIsAutoNextPlaylist(!isAutoNextPlaylist);
+  };
+
+  const handleToggleSolo = () => {
+      if (isLocked) return;
+      if (setIsSolo && isSolo !== undefined) setIsSolo(!isSolo);
   };
 
   return (
@@ -163,8 +171,25 @@ export const TransportControls: React.FC<TransportControlsProps> = ({
                     </NeonButton>
                 </Tooltip>
 
-                {/* Auto Playlist Toggle */}
-                <div className="absolute right-0">
+                {/* Right Side Toggles */}
+                <div className="absolute right-0 flex gap-1">
+                    {/* Solo Mode Toggle */}
+                    {setIsSolo && (
+                        <Tooltip content={isLocked ? "LOCKED" : t('mode_solo')} position="bottom">
+                            <button
+                                onClick={handleToggleSolo}
+                                disabled={isLocked}
+                                className={`p-2 rounded-full transition-all 
+                                    ${isSolo ? 'text-theme-secondary bg-theme-secondary/10 shadow-[0_0_10px_var(--color-secondary)]' : 'text-theme-muted opacity-50 hover:opacity-100'}
+                                    ${isLocked ? 'cursor-not-allowed opacity-30 hover:opacity-30' : ''}
+                                `}
+                            >
+                                <ArrowRightToLine size={14} />
+                            </button>
+                        </Tooltip>
+                    )}
+
+                    {/* Auto Playlist Toggle */}
                     {setIsAutoNextPlaylist && (
                         <Tooltip content={isLocked ? "LOCKED" : t('mode_continue')} position="bottom">
                             <button

@@ -1,6 +1,6 @@
 
 import React, { useRef, useEffect, forwardRef, useState } from 'react';
-import { AudioTrack, VisualizerConfig, EffectsConfig, DvdConfig, MarqueeConfig, PatternConfig, WatermarkConfig, BgAnimationType, FitMode, ScreenAlignment } from '../types';
+import { AudioTrack, VisualizerConfig, EffectsConfig, DvdConfig, MarqueeConfig, PatternConfig, WatermarkConfig, BgAnimationType, FitMode, ScreenAlignment, TerrainConfig, CursorStyle } from '../types';
 import { useNotification } from '../contexts/NotificationContext';
 import { useGestures } from '../hooks/useGestures';
 import { useTheme } from '../contexts/ThemeContext';
@@ -13,6 +13,7 @@ import DvdLogo from './DvdLogo';
 import Visualizer from './Visualizer';
 import Visualizer3D from './Visualizer3D'; 
 import VisualizerSpectrum3D from './VisualizerSpectrum3D'; 
+import VisualizerTerrain3D from './VisualizerTerrain3D'; // NEW
 import SineWave from './SineWave'; 
 import MediaRenderer from './MediaRenderer';
 import NoiseOverlay from './NoiseOverlay';
@@ -57,20 +58,26 @@ interface RetroScreenProps {
   
   videoStream?: MediaStream | null; 
   isSystemAudioActive?: boolean;
-  isMicActive?: boolean; // NEW: Added mic active prop
+  isMicActive?: boolean; 
   streamMode?: 'bg' | 'window';
   screenFitMode?: FitMode; 
-  screenAlignment?: ScreenAlignment; // NEW
+  screenAlignment?: ScreenAlignment; 
+
+  // Global Config for HUD
+  globalWaveformConfig?: VisualizerConfig;
+  setGlobalWaveformConfig?: (key: keyof VisualizerConfig, val: any) => void;
 
   visualizerConfig: VisualizerConfig;
   setVisualizerConfig?: (c: VisualizerConfig) => void; 
   reactorConfig?: VisualizerConfig; 
   setReactorConfig?: (c: VisualizerConfig) => void; 
   sineWaveConfig?: VisualizerConfig; 
+  terrainConfig?: TerrainConfig; // NEW
   
   showVisualizer: boolean;
   showVisualizer3D?: boolean; 
   showSineWave?: boolean; 
+  showVisualizerTerrain?: boolean; // NEW
   
   dvdConfig: DvdConfig;
   showDvd: boolean;
@@ -96,7 +103,7 @@ interface RetroScreenProps {
 
   onPlaySfx?: (name: string) => void;
   volume: number; 
-  onVolumeChange?: (vol: number) => void; // Added onVolumeChange prop
+  onVolumeChange?: (vol: number) => void; 
   apiKey?: string; 
   useAlbumArtAsBackground?: boolean;
   bgAnimation?: BgAnimationType;
@@ -111,12 +118,14 @@ interface RetroScreenProps {
 
   // Lock State
   isPlaylistLocked?: boolean;
+
+  // Cursor
+  retroScreenCursorStyle?: CursorStyle;
 }
 
 // Internal Component for Volume OSD
 const VolumeOSD: React.FC<{ volume: number; visible: boolean }> = ({ volume, visible }) => {
     const isMuted = volume === 0;
-    // Only show if visible OR if muted (persistent mute icon)
     if (!visible && !isMuted) return null;
 
     const percent = Math.round(volume * 100);
@@ -128,8 +137,6 @@ const VolumeOSD: React.FC<{ volume: number; visible: boolean }> = ({ volume, vis
         <div className={`absolute top-20 right-4 z-50 flex items-center gap-3 transition-opacity duration-300 ${visible || isMuted ? 'opacity-100' : 'opacity-0'}`}>
             <div className={`flex items-center gap-2 px-3 py-1.5 rounded border backdrop-blur-md shadow-lg ${borderColor} ${bgClass} ${color}`}>
                 {isMuted ? <VolumeX size={16} /> : <Volume2 size={16} />}
-                
-                {/* Show text only if not muted, or if OSD is active even when muted */}
                 {(visible || !isMuted) && (
                     <span className="font-mono text-xs font-bold tracking-widest min-w-[30px] text-right">
                         {isMuted ? 'MUTE' : `${percent}%`}
@@ -144,7 +151,8 @@ const RetroScreen = forwardRef<HTMLDivElement, RetroScreenProps>((props, externa
   const {
     analyser, isPlaying, currentTrack, tracks, onTrackSelect, bgMedia, bgColor, bgPattern = 'none', bgPatternConfig,
     videoStream, isSystemAudioActive, isMicActive, streamMode = 'bg', screenFitMode = 'cover', screenAlignment = 'center',
-    visualizerConfig, setVisualizerConfig, reactorConfig, sineWaveConfig, showVisualizer, showVisualizer3D, showSineWave, dvdConfig, showDvd, effectsConfig, marqueeConfig, watermarkConfig,
+    globalWaveformConfig, setGlobalWaveformConfig,
+    visualizerConfig, setVisualizerConfig, reactorConfig, sineWaveConfig, terrainConfig, showVisualizer, showVisualizer3D, showSineWave, showVisualizerTerrain, dvdConfig, showDvd, effectsConfig, marqueeConfig, watermarkConfig,
     progress = 0, currentTime, duration,
     focusMode, setFocusMode, isDragging,
     onDragOver, onDragEnter, onDragLeave, onDrop,
@@ -154,16 +162,16 @@ const RetroScreen = forwardRef<HTMLDivElement, RetroScreenProps>((props, externa
     bgAnimation = 'none',
     isRecording, onStartRecording, onStopRecording,
     isResizing = false,
-    isPlaylistLocked = false
+    isPlaylistLocked = false,
+    retroScreenCursorStyle
   } = props;
   
-  const { notifications, addNotification } = useNotification();
+  const { notifications } = useNotification();
   const { colors } = useTheme();
   
   const [showPlaylist, setShowPlaylist] = useState(false);
   const [showHelp, setShowHelp] = useState(false); 
   
-  // Volume OSD State
   const [isVolOSDVisible, setIsVolOSDVisible] = useState(false);
   const volOSDTimerRef = useRef<number | null>(null);
 
@@ -173,17 +181,28 @@ const RetroScreen = forwardRef<HTMLDivElement, RetroScreenProps>((props, externa
   const imageLayerRef = useRef<HTMLDivElement>(null); 
   const shakeRef = useRef<HTMLDivElement>(null);
   
-  // --- HOOKS ---
   const { activePanel, setActivePanel, panelPos, handleMouseMove } = useScreenHotkeys({
       containerRef,
-      visualizerConfig,
-      setVisualizerConfig,
+      // Use Global Config for hotkeys logic if available, otherwise fallback to local
+      visualizerConfig: globalWaveformConfig || visualizerConfig,
+      setVisualizerConfig: (c) => {
+          // Shim to map full object update to key-value updater
+          if (setGlobalWaveformConfig && globalWaveformConfig) {
+             // Find changed keys
+             Object.keys(c).forEach(k => {
+                 const key = k as keyof VisualizerConfig;
+                 if (c[key] !== globalWaveformConfig[key]) {
+                     setGlobalWaveformConfig(key, c[key]);
+                 }
+             })
+          } else if (setVisualizerConfig) {
+              setVisualizerConfig(c);
+          }
+      },
       setShowHelp
   });
 
-  // Mouse Wheel Volume Control
   const handleWheel = (e: React.WheelEvent) => {
-      // Avoid conflict with internal scrollable elements (like playlist or logs)
       if ((e.target as HTMLElement).closest('.custom-scrollbar')) return;
 
       if (onVolumeChange) {
@@ -192,7 +211,6 @@ const RetroScreen = forwardRef<HTMLDivElement, RetroScreenProps>((props, externa
           const newVol = Math.max(0, Math.min(1, volume + (step * direction)));
           onVolumeChange(newVol);
           
-          // Trigger OSD
           setIsVolOSDVisible(true);
           if (volOSDTimerRef.current) clearTimeout(volOSDTimerRef.current);
           volOSDTimerRef.current = window.setTimeout(() => {
@@ -221,11 +239,8 @@ const RetroScreen = forwardRef<HTMLDivElement, RetroScreenProps>((props, externa
   const effectiveVhsJitter = isSignalEnabled ? effectsConfig.vhsJitter : 0;
   const effectiveChromatic = isChromaticEnabled ? (effectsConfig.chromaticAberration || 0) : 0;
 
-  // Combine play state with external audio capture states to drive visualizers
-  // If system audio or mic is captured, we want visualizers to run even if music player is paused.
   const isAudioProcessing = isPlaying || isSystemAudioActive || isMicActive || false;
 
-  // Screen Shake Loop
   useEffect(() => {
     let aid: number;
     const loop = () => {
@@ -249,25 +264,22 @@ const RetroScreen = forwardRef<HTMLDivElement, RetroScreenProps>((props, externa
     return () => cancelAnimationFrame(aid);
   }, [effectiveVhsJitter, transitionPhase, bgTransition]);
 
-  // --- PLAYLIST HOTKEY (L) ---
   useEffect(() => {
       const handleKeyDown = (e: KeyboardEvent) => {
-          if (e.code === 'KeyL' && !e.ctrlKey && !e.altKey && !e.metaKey && !e.shiftKey) { // Ensure shift is not pressed (Shift+L is lock)
+          if (e.code === 'KeyL' && !e.ctrlKey && !e.altKey && !e.metaKey && !e.shiftKey) { 
               const target = e.target as HTMLElement;
               if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA') return;
               
               setShowPlaylist(prev => {
                   const newState = !prev;
-                  addNotification(`PLAYLIST: ${newState ? 'VISIBLE' : 'HIDDEN'}`, "info");
                   return newState;
               });
           }
       };
       window.addEventListener('keydown', handleKeyDown);
       return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [addNotification]);
+  }, []);
 
-  // --- DERIVED VALUES ---
   const resolvedBgColor = bgColor === 'theme-sync' ? colors.bg : bgColor;
   const hasNotifications = notifications.length > 0;
 
@@ -330,7 +342,7 @@ const RetroScreen = forwardRef<HTMLDivElement, RetroScreenProps>((props, externa
   let transitionDuration = '2.0s';
   if (bgTransition === 'leaks') transitionDuration = '1.0s'; 
   else if (bgTransition === 'glitch') transitionDuration = '1.2s';
-  else if (bgTransition === 'crossfade') transitionDuration = '2.0s'; // Slow smooth mix
+  else if (bgTransition === 'crossfade') transitionDuration = '2.0s'; 
 
   const overlayTransitionStyle = `opacity ${transitionDuration} ease-in-out`;
 
@@ -345,8 +357,6 @@ const RetroScreen = forwardRef<HTMLDivElement, RetroScreenProps>((props, externa
       backgroundColor: `color-mix(in srgb, ${marqueeColor}, transparent 90%)`
   } : {};
 
-  // --- TRANSITION STYLE LOGIC ---
-  // Apply opacity/filter to Base Layer for sequential transitions (Black/Blur)
   let baseLayerStyle: React.CSSProperties = { opacity: 1, zIndex: 0, transition: 'opacity 1s ease-in-out, filter 1s ease-in-out' };
   
   if (bgTransition === 'black' && transitionPhase === 'out') {
@@ -361,6 +371,10 @@ const RetroScreen = forwardRef<HTMLDivElement, RetroScreenProps>((props, externa
       }
   }
 
+  // Force hide system cursor unless 'system' style is selected
+  // We use inline style for maximum specificity
+  const shouldHideCursor = retroScreenCursorStyle !== 'system';
+
   return (
     <div className={`flex-grow flex items-center justify-center relative bg-gray-950 transition-all duration-500 ${focusMode ? 'p-0' : 'p-1 md:p-3'}`}>
       <div 
@@ -368,9 +382,11 @@ const RetroScreen = forwardRef<HTMLDivElement, RetroScreenProps>((props, externa
         ref={shakeRef}
         onDoubleClick={() => setFocusMode(!focusMode)} 
         onMouseMove={handleMouseMove}
-        onWheel={handleWheel} // Added wheel handler
+        onWheel={handleWheel} 
         {...gestureHandlers} 
-        className={`cursor-hide-center cursor-target-screen relative w-full h-full bg-gray-900 ${isResizing ? 'transition-none' : 'transition-all duration-700'} ${focusMode ? 'rounded-none border-0' : 'rounded-xl border-2'} ${isDragging ? 'border-neon-blue shadow-[0_0_30px_#00f3ff]' : 'border-theme-border shadow-md'} overflow-hidden group touch-action-manipulation`}
+        className={`cursor-hide-center cursor-target-screen relative w-full h-full bg-gray-900 ${isResizing ? 'transition-none' : 'transition-all duration-700'} ${focusMode ? 'rounded-none border-0' : 'rounded-xl border-2'} ${isDragging ? 'border-neon-blue shadow-[0_0_30px_#00f3ff]' : 'border-theme-border shadow-md'} overflow-hidden group touch-action-manipulation ${shouldHideCursor ? 'cursor-none' : ''}`}
+        // Explicit inline style to enforce cursor hiding
+        style={shouldHideCursor ? { cursor: 'none' } : undefined}
         onDragOver={onDragOver}
         onDragEnter={onDragEnter}
         onDragLeave={onDragLeave}
@@ -414,7 +430,6 @@ const RetroScreen = forwardRef<HTMLDivElement, RetroScreenProps>((props, externa
                     {/* MEDIA LAYERS */}
                     <div className={`absolute inset-0 w-full h-full ${animClass}`}>
                         <div className="absolute inset-0 w-full h-full" style={baseLayerStyle}>
-                            {/* Keep Media Rendering even during resize to prevent white flash */}
                             {(activeStream || baseMedia) && (
                                 <MediaRenderer type={baseMedia ? baseMedia.type : 'video'} url={baseMedia?.url} stream={activeStream} bgColor={'transparent'} effects={mediaEffectsConfig} fitMode={screenFitMode} alignment={screenAlignment} />
                             )}
@@ -427,22 +442,18 @@ const RetroScreen = forwardRef<HTMLDivElement, RetroScreenProps>((props, externa
                     </div>
                 </div>
                 
-                {/* 
-                    EFFECTS LAYER
-                    Rendering unconditionally to ensure visibility in all modes.
-                */}
                 <PatternOverlay pattern={bgPattern} config={bgPatternConfig} />
                 <TransitionEffect phase={transitionPhase} mode={bgTransition} />
                 <RainEffect config={effectsConfig.rain} />
                 <TronEffect 
                     config={effectsConfig.tron} 
                     analyser={analyser} 
-                    isPlaying={isAudioProcessing} // Use combined active flag
+                    isPlaying={isAudioProcessing} 
                     visualizerConfig={visualizerConfig} 
                     volume={volume}
                     currentTime={currentTime}
                     duration={duration}
-                    isResizing={isResizing} // PASS RESIZE STATE FOR STABILITY
+                    isResizing={isResizing} 
                 />
                 
                 <LightLeaksEffect config={effectsConfig.lightLeaks} />
@@ -458,6 +469,10 @@ const RetroScreen = forwardRef<HTMLDivElement, RetroScreenProps>((props, externa
                     ) : (
                         <Visualizer3D analyser={analyser} isPlaying={isAudioProcessing} config={reactorConfig} volume={volume} />
                     )
+                )}
+
+                {showVisualizerTerrain && terrainConfig && (
+                    <VisualizerTerrain3D analyser={analyser} isPlaying={isAudioProcessing} config={terrainConfig} volume={volume} />
                 )}
 
                 {showSineWave && sineWaveConfig && (
@@ -484,24 +499,6 @@ const RetroScreen = forwardRef<HTMLDivElement, RetroScreenProps>((props, externa
                    </div>
                 )}
 
-                <ScreenPlaylist 
-                    visible={showPlaylist}
-                    tracks={tracks}
-                    currentTrack={currentTrack}
-                    onTrackSelect={onTrackSelect}
-                    onClose={() => setShowPlaylist(false)}
-                    marqueeColor={marqueeColor}
-                    isLocked={isPlaylistLocked}
-                />
-
-                <ScreenQuickSettings 
-                    activePanel={activePanel}
-                    panelPos={panelPos}
-                    onClose={() => setActivePanel(null)}
-                    visualizerConfig={visualizerConfig}
-                    setVisualizerConfig={setVisualizerConfig}
-                />
-
                 <GlitchEffect effects={effectsConfig} />
                 <CyberHackEffect effects={effectsConfig} />
                 <HologramEffect effects={effectsConfig} bgMedia={baseMedia} />
@@ -511,6 +508,26 @@ const RetroScreen = forwardRef<HTMLDivElement, RetroScreenProps>((props, externa
                 <VignetteEffect config={effectsConfig.vignette} />
             </div>
             
+            {/* UI PANELS - MOVED OUTSIDE SIGNAL LAYER TO PREVENT LAYOUT SHIFTS AND FILTER ARTIFACTS */}
+            <ScreenPlaylist 
+                visible={showPlaylist}
+                tracks={tracks}
+                currentTrack={currentTrack}
+                onTrackSelect={onTrackSelect}
+                onClose={() => setShowPlaylist(false)}
+                marqueeColor={marqueeColor}
+                isLocked={isPlaylistLocked}
+            />
+
+            <ScreenQuickSettings 
+                activePanel={activePanel}
+                panelPos={panelPos}
+                onClose={() => setActivePanel(null)}
+                // Pass the GLOBAL config props if available (from parent)
+                visualizerConfig={globalWaveformConfig || visualizerConfig}
+                setVisualizerConfig={setGlobalWaveformConfig}
+            />
+
             <DebugConsoleEffect effects={effectsConfig} />
             <NoiseOverlay opacity={effectiveNoise} pixelation={effectivePixelation} />
             <ScanlineEffect config={effectsConfig} />

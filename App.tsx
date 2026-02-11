@@ -35,6 +35,7 @@ function AppContent() {
   // --- REFS ---
   const appContainerRef = useRef<HTMLDivElement>(null);
   const autoLaunchRef = useRef(false);
+  const lastTrackIdRef = useRef<string | null>(null);
 
   // --- CONTEXTS ---
   const { addNotification } = useNotification();
@@ -85,6 +86,17 @@ function AppContent() {
     }
   }, [system.introState, view, player]);
 
+  // Sync BG with Track Logic
+  useEffect(() => {
+      const currentId = player.currentTrack?.id;
+      // Only switch if we have a valid previous track (meaning it's a change, not initial load)
+      // And if the ID actually changed
+      if (config.syncBgWithTrack && currentId && lastTrackIdRef.current && currentId !== lastTrackIdRef.current) {
+          config.nextBg();
+      }
+      lastTrackIdRef.current = currentId || null;
+  }, [player.currentTrack, config.syncBgWithTrack, config.nextBg]);
+
   // Hotkeys Hook
   useAppHotkeys({
     player,
@@ -119,6 +131,18 @@ function AppContent() {
           document.documentElement.requestFullscreen().catch(err => console.error(err));
       } else {
           document.exitFullscreen();
+      }
+  };
+
+  // --- TRACK END HANDLER ---
+  const handleTrackEnd = () => {
+      if (system.rebootPhase === 'waiting') { 
+          player.setIsPlaying(false); 
+          system.setRebootPhase('active'); 
+      } else if (player.isSolo) {
+          player.stop();
+      } else { 
+          player.nextTrack(true); 
       }
   };
 
@@ -201,8 +225,24 @@ function AppContent() {
             This forces React to completely destroy and recreate the <audio> elements when the Audio Engine resets (new context).
             Without this, the browser throws an error when trying to create a MediaElementSource on a recycled element.
         */}
-        <audio key={`deck-a-${player.contextId}`} ref={player.audioRefA} onEnded={player.activeDeck === 'A' ? () => { if (system.rebootPhase === 'waiting') { player.setIsPlaying(false); system.setRebootPhase('active'); } else { player.nextTrack(true); } } : undefined} onTimeUpdate={player.activeDeck === 'A' ? (e) => player.handleTimeUpdate(e, system.rebootPhase === 'waiting') : undefined} onLoadedMetadata={player.activeDeck === 'A' ? (e) => player.handleTimeUpdate(e, system.rebootPhase === 'waiting') : undefined} onPlay={player.onAudioPlay} onPause={player.onAudioPause} />
-        <audio key={`deck-b-${player.contextId}`} ref={player.audioRefB} onEnded={player.activeDeck === 'B' ? () => { if (system.rebootPhase === 'waiting') { player.setIsPlaying(false); system.setRebootPhase('active'); } else { player.nextTrack(true); } } : undefined} onTimeUpdate={player.activeDeck === 'B' ? (e) => player.handleTimeUpdate(e, system.rebootPhase === 'waiting') : undefined} onLoadedMetadata={player.activeDeck === 'B' ? (e) => player.handleTimeUpdate(e, system.rebootPhase === 'waiting') : undefined} onPlay={player.onAudioPlay} onPause={player.onAudioPause} />
+        <audio 
+            key={`deck-a-${player.contextId}`} 
+            ref={player.audioRefA} 
+            onEnded={player.activeDeck === 'A' ? handleTrackEnd : undefined} 
+            onTimeUpdate={player.activeDeck === 'A' ? (e) => player.handleTimeUpdate(e, system.rebootPhase === 'waiting') : undefined} 
+            onLoadedMetadata={player.activeDeck === 'A' ? (e) => player.handleTimeUpdate(e, system.rebootPhase === 'waiting') : undefined} 
+            onPlay={player.onAudioPlay} 
+            onPause={player.onAudioPause} 
+        />
+        <audio 
+            key={`deck-b-${player.contextId}`} 
+            ref={player.audioRefB} 
+            onEnded={player.activeDeck === 'B' ? handleTrackEnd : undefined} 
+            onTimeUpdate={player.activeDeck === 'B' ? (e) => player.handleTimeUpdate(e, system.rebootPhase === 'waiting') : undefined} 
+            onLoadedMetadata={player.activeDeck === 'B' ? (e) => player.handleTimeUpdate(e, system.rebootPhase === 'waiting') : undefined} 
+            onPlay={player.onAudioPlay} 
+            onPause={player.onAudioPause} 
+        />
 
         {/* --- LEFT PANEL --- */}
         {view.viewMode !== 'mini' && view.viewMode !== 'player-focus' && (
@@ -290,12 +330,15 @@ function AppContent() {
               setIsShuffle={player.setIsShuffle}
               isAutoNextPlaylist={player.isAutoNextPlaylist}
               setIsAutoNextPlaylist={player.setIsAutoNextPlaylist}
+              isSolo={player.isSolo}
+              setIsSolo={player.setIsSolo}
               onRateTrack={player.rateTrack}
               onSortByRating={() => { player.sortByRating(); addNotification("Sorted by Rating", "info"); }}
               onTogglePlayerFocus={() => view.setViewMode(view.viewMode === 'player-focus' ? 'default' : 'player-focus')}
               isPlayerFocus={view.viewMode === 'player-focus'}
               onToggleFullscreen={handleToggleFullscreen}
               isFullscreen={!!document.fullscreenElement}
+              onToggleMute={player.toggleMute}
             />
           </div>
         </div>

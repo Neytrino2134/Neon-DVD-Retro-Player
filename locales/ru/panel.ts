@@ -30,6 +30,7 @@ export const panel = {
   cursor_crosshair: "ПРИЦЕЛ",
   cursor_rounded: "ОКРУГЛЫЙ",
   cursor_sound_wave: "ЗВУКОВАЯ ВОЛНА",
+  cursor_sound_wave_trail: "ЗВУКОВАЯ ВОЛНА (СЛЕД)",
   cursor_system: "СИСТЕМНЫЙ",
   
   // Control Styles

@@ -206,18 +206,35 @@ const MediaRenderer: React.FC<MediaRendererProps> = ({ type, url, stream, bgColo
 
       // --- RENDER LOGIC ---
 
+      // CRITICAL FIX: Only clear the canvas if we are about to draw something or if it's not a video waiting to load.
+      // If we are swapping video sources, 'fileVideoRefA.current' might exist but have readyState < 2.
+      // In that case, we want to KEEP the previous frame on the canvas to prevent a black flash.
+      let shouldClear = true;
+      if (type === 'video' && fileVideoRefA.current) {
+          const activeRef = activeVideoRef.current;
+          const activeV = activeRef === 'A' ? fileVideoRefA.current : fileVideoRefB.current;
+          // If video isn't ready to play, DON'T clear canvas. Leave the last frame from previous render (or previous component cycle)
+          if (!activeV || activeV.readyState < 2) {
+              shouldClear = false;
+          }
+      }
+
+      if (shouldClear) {
+          ctx.clearRect(0, 0, drawW, drawH);
+      }
+
       if (stream && streamVideoRef.current) {
           // --- LIVE STREAM ---
-          if (fitMode === 'contain') ctx.clearRect(0, 0, drawW, drawH);
           const v = streamVideoRef.current;
           if (v.readyState >= 2) {
+              // Always clear for streams to avoid trails if transparent
+              ctx.clearRect(0, 0, drawW, drawH);
               drawContent(v.videoWidth, v.videoHeight, v);
           }
 
       } else if (type === 'video' && fileVideoRefA.current && fileVideoRefB.current) {
           // --- SEAMLESS LOOPING VIDEO ---
-          if (fitMode === 'contain') ctx.clearRect(0, 0, drawW, drawH);
-
+          
           const activeRef = activeVideoRef.current; // 'A' or 'B'
           const activeV = activeRef === 'A' ? fileVideoRefA.current : fileVideoRefB.current;
           const nextV = activeRef === 'A' ? fileVideoRefB.current : fileVideoRefA.current;
@@ -228,6 +245,9 @@ const MediaRenderer: React.FC<MediaRendererProps> = ({ type, url, stream, bgColo
               const timeLeft = duration - currentTime;
 
               // 1. Draw Active Video
+              // Only clear rect if contained, to avoid trails. If covering, drawing over is enough (and faster/safer).
+              if (fitMode === 'contain' && shouldClear) ctx.clearRect(0, 0, drawW, drawH);
+              
               drawContent(activeV.videoWidth, activeV.videoHeight, activeV);
 
               // 2. Check for Crossfade
@@ -268,6 +288,7 @@ const MediaRenderer: React.FC<MediaRendererProps> = ({ type, url, stream, bgColo
 
       } else {
           // --- IMAGE / COLOR ---
+          // Always clear for images
           ctx.clearRect(0, 0, w, h);
           ctx.fillStyle = bgColor;
           ctx.fillRect(0, 0, w, h);

@@ -2,6 +2,7 @@
 export const player = {
   mode_shuffle: "SHUFFLE PLAYBACK",
   mode_continue: "AUTO-NEXT PLAYLIST",
+  mode_solo: "SOLO MODE (STOP AFTER TRACK)",
   shuffle: "SHUFFLE",
   clear_playlist: "CLEAR PLAYLIST",
   sort_az: "SORT A-Z",

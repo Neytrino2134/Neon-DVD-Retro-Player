@@ -1,6 +1,6 @@
 
 import React, { useState, useRef, useMemo, useEffect } from 'react';
-import { List, ChevronDown, ChevronUp, Timer, Trash2, RefreshCw, Disc, Upload, Power, Shuffle, Plus, X, Play, Image as ImageIcon, Video, Wand2 } from 'lucide-react';
+import { List, ChevronDown, ChevronUp, Timer, Trash2, RefreshCw, Disc, Upload, Power, Shuffle, Plus, X, Play, Image as ImageIcon, Video, Wand2, Repeat } from 'lucide-react';
 import { BackgroundMedia, PatternConfig, BgTransitionType, BgAnimationType, BackgroundPlaylist, BgHotspot, FitMode, ScreenAlignment } from '../../types';
 import RangeControl from './RangeControl';
 import CustomSelect from './CustomSelect';
@@ -157,6 +157,8 @@ interface BgResourceModuleProps {
   setBgAutoplayInterval: (val: number) => void;
   useAlbumArtAsBackground: boolean;
   setUseAlbumArtAsBackground: (v: boolean) => void;
+  syncBgWithTrack: boolean; // NEW
+  setSyncBgWithTrack: (v: boolean) => void; // NEW
 }
 
 export const BgResourceModule: React.FC<BgResourceModuleProps> = ({
@@ -165,7 +167,8 @@ export const BgResourceModule: React.FC<BgResourceModuleProps> = ({
   currentBgIndex, onRemoveBg, onMoveBg, onSelectBg,
   onClearBgMedia, onShuffleBg, onBgMediaUpload, onUpdateBg, onUpdateMetadata,
   bgAutoplayInterval, setBgAutoplayInterval,
-  useAlbumArtAsBackground, setUseAlbumArtAsBackground
+  useAlbumArtAsBackground, setUseAlbumArtAsBackground,
+  syncBgWithTrack, setSyncBgWithTrack
 }) => {
   const { t } = useLanguage();
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -323,13 +326,28 @@ export const BgResourceModule: React.FC<BgResourceModuleProps> = ({
                       </button>
                   </div>
 
-                  {/* Timer Control */}
+                  {/* Timer Control & Sync Toggle */}
                   <div className="flex items-center justify-between px-3 py-2 border-b border-theme-border bg-theme-panel/50">
                       <div className="flex items-center gap-2 text-theme-muted">
                           <Timer size={12} />
                           <span className="text-[10px] font-mono tracking-wider">{t('auto_timer')}</span>
                       </div>
-                      <div className="flex items-center gap-3">
+                      
+                      <div className="flex items-center gap-2">
+                          
+                          {/* Sync Button */}
+                          <Tooltip content={t('sync_bg_track')} position="top">
+                               <button 
+                                   onClick={() => setSyncBgWithTrack(!syncBgWithTrack)}
+                                   className={`p-1 rounded border transition-all ${syncBgWithTrack ? 'text-theme-accent border-theme-accent/50 bg-theme-accent/10' : 'text-theme-muted border-gray-700 bg-gray-800 hover:text-white'}`}
+                               >
+                                   <Repeat size={14} />
+                               </button>
+                          </Tooltip>
+
+                          <div className="w-px h-4 bg-theme-border mx-1"></div>
+
+                          {/* Timer Inputs */}
                           <div className={`flex items-center gap-2 bg-black rounded border border-theme-border px-1 transition-opacity ${!isTimerOn ? 'opacity-50 pointer-events-none' : 'opacity-100'}`}>
                               <button 
                                   onClick={() => setBgAutoplayInterval(Math.max(0, bgAutoplayInterval - 1))}
@@ -348,6 +366,7 @@ export const BgResourceModule: React.FC<BgResourceModuleProps> = ({
                               </button>
                           </div>
                           
+                          {/* Timer Power Toggle */}
                           <Tooltip content={isTimerOn ? "DISABLE TIMER" : "ENABLE TIMER"} position="top">
                               <button 
                                   onClick={toggleTimer}

@@ -32,7 +32,19 @@ export const useMediaTransition = ({
   const [transitionPhase, setTransitionPhase] = useState<'idle' | 'out' | 'in'>('idle');
   const [bgTransition, setBgTransition] = useState<BgTransitionType>('glitch');
   
-  const transitionTimerRef = useRef<number | null>(null);
+  // Store multiple timeout IDs to clear complex sequences
+  const timeoutsRef = useRef<number[]>([]);
+
+  const addTimeout = (fn: () => void, ms: number) => {
+      const id = window.setTimeout(fn, ms);
+      timeoutsRef.current.push(id);
+      return id;
+  };
+
+  const clearTimeouts = () => {
+      timeoutsRef.current.forEach(window.clearTimeout);
+      timeoutsRef.current = [];
+  };
 
   // Sync transition type from storage
   useEffect(() => {
@@ -78,74 +90,82 @@ export const useMediaTransition = ({
     const currentTransitionType = stored ? JSON.parse(stored) as BgTransitionType : 'glitch';
     setBgTransition(currentTransitionType);
 
-    // Clear previous timers
-    if (transitionTimerRef.current) {
-        clearTimeout(transitionTimerRef.current);
-        transitionTimerRef.current = null;
-    }
+    // Clear previous sequences
+    clearTimeouts();
 
     if (currentTransitionType === 'leaks') {
         // --- LEAKS TRANSITION ---
         setOverlayMedia(effectiveMedia);
         
-        // CRITICAL FIX: Give video element 150ms to mount and start playing before fading in.
-        // This prevents the "jerk" or black frame on video switch.
-        transitionTimerRef.current = window.setTimeout(() => {
+        // 1. Wait for Overlay to buffer
+        addTimeout(() => {
              setIsCrossfading(true);
              
-             // Swap after fade is mostly done
-             window.setTimeout(() => {
+             // 2. Wait for Fade In to mostly complete
+             addTimeout(() => {
                 setBaseMedia(effectiveMedia);
                 
-                // Cleanup overlay after swap
-                window.setTimeout(() => {
-                    setOverlayMedia(null);
+                // 3. Wait for Base to buffer (Extended to prevent flash)
+                addTimeout(() => {
+                    // Fade out overlay
                     setIsCrossfading(false);
-                }, 800);
+                    
+                    // 4. Remove overlay after fade out
+                    addTimeout(() => {
+                        setOverlayMedia(null);
+                    }, 1000); // 1s fade out duration
+                    
+                }, 1500); 
                 
              }, 1200);
              
         }, 150); 
 
     } else if (currentTransitionType === 'crossfade') {
-        // --- CROSSFADE TRANSITION ---
-        // 1. Set overlay to new media (opacity 0 initially)
+        // --- CROSSFADE TRANSITION (SMOOTH) ---
         setOverlayMedia(effectiveMedia);
         
-        // 2. Trigger opacity fade to 1 after buffering delay
-        transitionTimerRef.current = window.setTimeout(() => {
+        // 1. Buffer & Start Fade In
+        addTimeout(() => {
              setIsCrossfading(true);
              
-             // 3. Swap after fade duration (standard 2s for smoothness)
-             window.setTimeout(() => {
+             // 2. Wait for Fade In (2s)
+             addTimeout(() => {
                 setBaseMedia(effectiveMedia);
-                setOverlayMedia(null);
-                setIsCrossfading(false); // Reset crossfade trigger
+                
+                // 3. Wait for Base to buffer (Extended)
+                // Keeping overlay opaque covering the base update
+                addTimeout(() => {
+                    // 4. Start Fade Out of Overlay (Reveal Base)
+                    setIsCrossfading(false);
+                    
+                    // 5. Cleanup Overlay after fade out
+                    addTimeout(() => {
+                        setOverlayMedia(null);
+                    }, 2000); // Matches CSS transition time
+                    
+                }, 1500); 
+                
              }, 2000);
              
-        }, 150); // 150ms pre-buffer delay
+        }, 600); 
 
     } else if (currentTransitionType === 'black' || currentTransitionType === 'blur') {
         // --- BLACK / BLUR TRANSITIONS (Sequential) ---
-        // 1. Fade OUT existing media (handled by CSS in RetroScreen based on phase)
         setTransitionPhase('out');
 
-        // 2. Wait for fade out
-        transitionTimerRef.current = window.setTimeout(() => {
-            // Swap source while invisible/blurred
+        addTimeout(() => {
             setBaseMedia(effectiveMedia); 
             
-            // Give the new media a moment to load while hidden
-            window.setTimeout(() => {
-                // 3. Fade IN new media
+            // Buffer while hidden
+            addTimeout(() => {
                 setTransitionPhase('in'); 
                 
-                // 4. Reset to Idle
-                window.setTimeout(() => {
+                addTimeout(() => {
                     setTransitionPhase('idle');
                 }, 1000);
                 
-            }, 200); // Buffer while hidden
+            }, 500); // Increased buffer
 
         }, 1000); 
 
@@ -159,7 +179,6 @@ export const useMediaTransition = ({
         setOverlayMedia(effectiveMedia); 
         setTransitionPhase('out'); 
         
-        // Slight delay for glitch overlay to initialize
         requestAnimationFrame(() => {
              requestAnimationFrame(() => {
                  setIsCrossfading(true);
@@ -168,11 +187,14 @@ export const useMediaTransition = ({
 
         const PHASE_DURATION = 1200; 
 
-        transitionTimerRef.current = window.setTimeout(() => {
+        addTimeout(() => {
             setBaseMedia(effectiveMedia); 
             setTransitionPhase('in'); 
             
-            window.setTimeout(() => {
+            // Wait for Base to load before removing Overlay
+            // Glitch overlay is messy so exact frame sync is less critical, 
+            // but holding it longer is safer.
+            addTimeout(() => {
                 setOverlayMedia(null);
                 setIsCrossfading(false);
                 setTransitionPhase('idle');
@@ -181,9 +203,7 @@ export const useMediaTransition = ({
         }, PHASE_DURATION); 
     }
     
-    return () => {
-        if (transitionTimerRef.current) clearTimeout(transitionTimerRef.current);
-    };
+    return () => clearTimeouts();
   }, [effectiveMedia, videoStream, streamMode]);
 
   return {

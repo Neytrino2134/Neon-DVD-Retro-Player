@@ -49,6 +49,9 @@ export const useAudioPlayer = () => {
   const [isAutoNextPlaylist, setIsAutoNextPlaylist] = useState(() => {
       return localStorage.getItem('neon_auto_next_playlist') === 'true';
   });
+  const [isSolo, setIsSolo] = useState(() => {
+      return localStorage.getItem('neon_is_solo') === 'true';
+  });
 
   // EQ State
   const [eqConfig, setEqConfig] = useState<EqualizerConfig>(() => {
@@ -109,6 +112,10 @@ export const useAudioPlayer = () => {
   useEffect(() => {
       localStorage.setItem('neon_auto_next_playlist', String(isAutoNextPlaylist));
   }, [isAutoNextPlaylist]);
+
+  useEffect(() => {
+      localStorage.setItem('neon_is_solo', String(isSolo));
+  }, [isSolo]);
 
   useEffect(() => {
       localStorage.setItem('neon_equalizer_config', JSON.stringify(eqConfig));
@@ -508,7 +515,8 @@ export const useAudioPlayer = () => {
       // If waiting for reboot, update visual time but prevent auto-mix logic
       if (isWaitingReboot) return;
 
-      if (isPlaying && crossfadeDuration > 0 && !hasTriggeredAutoMixRef.current) {
+      // If Solo Mode is active, we do NOT auto-mix/crossfade early. We just let it finish naturally.
+      if (!isSolo && isPlaying && crossfadeDuration > 0 && !hasTriggeredAutoMixRef.current) {
           const timeLeft = el.duration - el.currentTime;
           if (timeLeft <= crossfadeDuration && timeLeft > 0) {
               hasTriggeredAutoMixRef.current = true;
@@ -572,6 +580,7 @@ export const useAudioPlayer = () => {
     // Settings
     crossfadeDuration, setCrossfadeDuration, smoothStart, setSmoothStart,
     isShuffle, setIsShuffle, isAutoNextPlaylist, setIsAutoNextPlaylist,
+    isSolo, setIsSolo, // EXPOSED SOLO STATE
     // Events
     handleTimeUpdate, onAudioPlay, onAudioPause,
     // Audio Context & Capture Routing

@@ -64,18 +64,6 @@ const SystemSection: React.FC<SystemSectionProps> = ({
   const [expandWatermark, setExpandWatermark] = useState(false);
   const innerWrapperRadius = controlStyle === 'round' || controlStyle === 'circle' ? 'rounded-lg' : 'rounded';
 
-  // We override the cursorOptions here to include the new one, since parent might not pass it yet or dynamic update is easier here
-  // Actually, let's just append it to the options list if not present, or redefine. 
-  // For safety and consistency with other files, redefining locally using the props as base structure but ensuring 'sound-wave' is there.
-  // Actually, easiest is to just inject it into the array passed to CustomSelect if it's not dynamic.
-  // The SettingsPanel passes standard options. Let's assume we modify the list here or the parent.
-  // Let's modify the list passed to CustomSelect.
-  
-  // Actually, SystemSection receives options from SettingsPanel.tsx. I should probably just add it there? 
-  // Wait, I am editing SystemSection.tsx. It's cleaner to just define the extended options here if I can use the hook t().
-  // But wait, SettingsPanel.tsx defines them. 
-  // Let's redefine cursorOptions here to include sound-wave, ignoring the prop for cursorOptions to be safe.
-  
   const { t } = useLanguage();
 
   const localCursorOptions = [
@@ -83,7 +71,8 @@ const SystemSection: React.FC<SystemSectionProps> = ({
     { value: 'default', label: t('cursor_default'), color: '#00f3ff' },
     { value: 'music-flow', label: t('cursor_music'), color: '#ff00ff' }, 
     { value: 'dos-terminal', label: t('cursor_dos'), color: '#00ff00' }, 
-    { value: 'sound-wave', label: t('cursor_sound_wave'), color: 'theme' }, // NEW
+    { value: 'sound-wave', label: t('cursor_sound_wave'), color: 'theme' },
+    { value: 'sound-wave-trail', label: t('cursor_sound_wave_trail'), color: 'theme' }, // NEW
     { value: 'classic-blue', label: t('cursor_classic'), color: '#00f3ff' },
     { value: 'classic-warm', label: t('cursor_warm'), color: '#ff8c00' },
     { value: 'classic-white', label: t('cursor_white'), color: '#ffffff' },

@@ -1,10 +1,11 @@
 
-import React, { useRef, useMemo } from 'react';
+import React, { useRef, useMemo, useState, useEffect } from 'react';
 import { Canvas, useFrame } from '@react-three/fiber';
 import { Icosahedron, Torus, Stars } from '@react-three/drei';
 import * as THREE from 'three';
 import { VisualizerConfig, NEON_COLORS } from '../types';
 import { useTheme } from '../contexts/ThemeContext';
+import CameraController from './CameraController';
 
 interface Visualizer3DProps {
   analyser: AnalyserNode | null;
@@ -125,13 +126,29 @@ const Scene: React.FC<{ analyser: AnalyserNode | null; isPlaying: boolean; confi
 
       {/* Particles / Stars */}
       <Stars radius={50} depth={20} count={2000} factor={4} saturation={0} fade speed={1} />
+      
+      <CameraController />
     </>
   );
 };
 
 const Visualizer3D: React.FC<Visualizer3DProps> = (props) => {
+  const [isInteractive, setIsInteractive] = useState(false);
+
+  useEffect(() => {
+    const handleKey = (e: KeyboardEvent) => {
+        setIsInteractive(e.altKey);
+    };
+    window.addEventListener('keydown', handleKey);
+    window.addEventListener('keyup', handleKey);
+    return () => {
+        window.removeEventListener('keydown', handleKey);
+        window.removeEventListener('keyup', handleKey);
+    }
+  }, []);
+
   return (
-    <div className="absolute inset-0 w-full h-full z-10 pointer-events-none">
+    <div className={`absolute inset-0 w-full h-full z-10 ${isInteractive ? 'pointer-events-auto' : 'pointer-events-none'}`}>
         <Canvas camera={{ position: [0, 0, 8], fov: 45 }} gl={{ alpha: true, antialias: true }}>
             <Scene {...props} />
         </Canvas>

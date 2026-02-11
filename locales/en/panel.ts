@@ -30,6 +30,7 @@ export const panel = {
   cursor_crosshair: "CROSSHAIR",
   cursor_rounded: "ROUNDED",
   cursor_sound_wave: "SOUND WAVE",
+  cursor_sound_wave_trail: "SOUND WAVE (TRAILS)",
   cursor_system: "SYSTEM",
   
   // Control Styles

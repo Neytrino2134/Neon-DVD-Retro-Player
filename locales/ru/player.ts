@@ -2,6 +2,7 @@
 export const player = {
   mode_shuffle: "СЛУЧАЙНЫЙ ПОРЯДОК",
   mode_continue: "АВТО-ПЕРЕХОД ПЛЕЙЛИСТОВ",
+  mode_solo: "СОЛО РЕЖИМ (СТОП ПОСЛЕ ТРЕКА)",
   shuffle: "ПЕРЕМЕШАТЬ",
   clear_playlist: "ОЧИСТИТЬ ПЛЕЙЛИСТ",
   sort_az: "СОРТИРОВКА А-Я",

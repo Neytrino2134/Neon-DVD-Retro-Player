@@ -66,6 +66,14 @@ interface Particle {
   rotationSpeed?: number;
 }
 
+interface WaveTrail {
+    x: number;
+    y: number;
+    level: number;
+    life: number;
+    color: string;
+}
+
 interface CustomCursorProps {
   style?: CursorStyle;
   retroScreenStyle?: CursorStyle; // New Prop
@@ -90,6 +98,7 @@ const CustomCursor: React.FC<CustomCursorProps> = ({ style = 'default', retroScr
   
   // Refs for Canvas particle state
   const particlesRef = useRef<Particle[]>([]);
+  const waveTrailsRef = useRef<WaveTrail[]>([]); // NEW: For sound-wave-trail
   const frameRef = useRef(0);
   const lastMousePos = useRef({ x: 0, y: 0 });
   
@@ -240,6 +249,7 @@ const CustomCursor: React.FC<CustomCursorProps> = ({ style = 'default', retroScr
           let activeStyle = (isScreenHover) ? retroScreenStyle : style;
           if (style === 'music-flow') activeStyle = 'music-flow';
           if (style === 'sound-wave') activeStyle = 'sound-wave';
+          if (style === 'sound-wave-trail') activeStyle = 'sound-wave-trail';
           if (isDosForced) activeStyle = 'dos-terminal';
 
           if (activeStyle === 'system') {
@@ -250,7 +260,7 @@ const CustomCursor: React.FC<CustomCursorProps> = ({ style = 'default', retroScr
               return;
           }
 
-          // --- SOUND WAVE MODE ---
+          // --- SOUND WAVE MODE (STANDARD) ---
           if (activeStyle === 'sound-wave' && ctx && canvas) {
               if (cursorRef.current) cursorRef.current.style.opacity = '0';
               if (dosCursorRef.current) dosCursorRef.current.style.opacity = '0';
@@ -282,6 +292,64 @@ const CustomCursor: React.FC<CustomCursorProps> = ({ style = 'default', retroScr
 
                   ctx.shadowBlur = 0;
               }
+          }
+
+          // --- SOUND WAVE TRAIL MODE (NEW) ---
+          else if (activeStyle === 'sound-wave-trail' && ctx && canvas) {
+              if (cursorRef.current) cursorRef.current.style.opacity = '0';
+              if (dosCursorRef.current) dosCursorRef.current.style.opacity = '0';
+
+              ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+              // Spawn new trail piece if moving
+              if (!shouldHide && x > 0 && !isResizingH && !isResizingV) {
+                  // Only spawn if moved or if audio is high enough to show 'life'
+                  // Actually, spawn every frame for smooth trail, but limit count in processing
+                  waveTrailsRef.current.push({
+                      x: x,
+                      y: y,
+                      level: audioLevel,
+                      life: 1.0,
+                      color: colors.primary
+                  });
+              }
+
+              // Render Trails
+              for (let i = waveTrailsRef.current.length - 1; i >= 0; i--) {
+                  const wave = waveTrailsRef.current[i];
+                  wave.life -= 0.05; // Fade speed (adjust for trail length)
+
+                  if (wave.life <= 0) {
+                      waveTrailsRef.current.splice(i, 1);
+                      continue;
+                  }
+
+                  const barWidth = 4;
+                  const gap = 3;
+                  const maxH = 40;
+                  const baseH = 6;
+
+                  const hCenter = baseH + (wave.level * maxH);
+                  const hSide = baseH + (wave.level * maxH * 0.5);
+
+                  ctx.fillStyle = wave.color;
+                  ctx.globalAlpha = wave.life;
+                  ctx.shadowBlur = 10 * wave.life;
+                  ctx.shadowColor = wave.color;
+
+                  // Center Bar
+                  ctx.fillRect(wave.x - barWidth/2, wave.y - hCenter/2, barWidth, hCenter);
+
+                  // Left Bar
+                  ctx.fillRect(wave.x - barWidth/2 - barWidth - gap, wave.y - hSide/2, barWidth, hSide);
+
+                  // Right Bar
+                  ctx.fillRect(wave.x + barWidth/2 + gap, wave.y - hSide/2, barWidth, hSide);
+              }
+              
+              // Reset global alpha
+              ctx.globalAlpha = 1.0;
+              ctx.shadowBlur = 0;
           }
 
           // --- MUSIC FLOW MODE ---
@@ -588,7 +656,7 @@ const CustomCursor: React.FC<CustomCursorProps> = ({ style = 'default', retroScr
 
   // --- Determine Colors ---
   const getColorsForStyle = (s: string) => {
-      if (s === 'theme-sync' || s === 'music-flow' || s === 'sound-wave') return { primary: colors.primary, secondary: colors.secondary };
+      if (s === 'theme-sync' || s === 'music-flow' || s === 'sound-wave' || s === 'sound-wave-trail') return { primary: colors.primary, secondary: colors.secondary };
       if (s === 'classic-blue') return { primary: '#00f3ff', secondary: '#4d79ff' };
       if (s === 'classic-warm') return { primary: '#ffd700', secondary: '#ff8c00' };
       if (s === 'classic-ocean') return { primary: '#70C6D6', secondary: '#4B8CA8' };
@@ -611,7 +679,7 @@ const CustomCursor: React.FC<CustomCursorProps> = ({ style = 'default', retroScr
           const { isScreenHover } = mouseState;
           const activeStyle = isScreenHover ? retroScreenStyle : style;
           
-          if (activeStyle !== 'default' && activeStyle !== 'dos-terminal' && activeStyle !== 'sound-wave' && activeStyle !== 'system' && cursorRef.current) {
+          if (activeStyle !== 'default' && activeStyle !== 'dos-terminal' && activeStyle !== 'sound-wave' && activeStyle !== 'sound-wave-trail' && activeStyle !== 'system' && cursorRef.current) {
               
               if (activeStyle === 'music-flow') {
                   // Special override for music flow crosshair to remain white

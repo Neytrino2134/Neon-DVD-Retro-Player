@@ -1,7 +1,7 @@
 
 import React, { useState } from 'react';
-import { Maximize, Split, Square, Minus, Grid, ChevronDown, Zap } from 'lucide-react';
-import { VisualizerConfig, VisualizerPosition } from '../../types';
+import { Maximize, Split, Minus, Grid, ChevronDown, Zap } from 'lucide-react';
+import { VisualizerConfig } from '../../types';
 import RangeControl from './RangeControl';
 import ToggleSwitch from './ToggleSwitch';
 import CustomSelect from './CustomSelect';
@@ -24,8 +24,6 @@ const VisualizerSettings: React.FC<VisualizerSettingsProps> = ({ config, update,
   
   // Fine Tuning groups state
   const [expandQty, setExpandQty] = useState(false);
-  const [expandPower, setExpandPower] = useState(false);
-  const [expandFreq, setExpandFreq] = useState(false);
   const [expandOpacity, setExpandOpacity] = useState(false);
 
   const styleOptions = [
@@ -75,28 +73,18 @@ const VisualizerSettings: React.FC<VisualizerSettingsProps> = ({ config, update,
   return (
     <div className="p-4 border-t border-theme-border space-y-8">
       
-      {/* Position Section - Hidden for Reactor since it's centered 3D */}
+      {/* Position Section - Hidden for Reactor since it's centered 3D. 
+          NOTE: Positioning is now handled by Master Control, but user can override here if needed,
+          or we can hide it. The request said "delete duplicate settings". 
+          Assuming POSITION is one of them as Master Control has it. 
+      */}
+      {/* 
       {mode === 'waveform' && (
       <div className="section-block">
-         <label className="text-theme-text font-mono text-xs block mb-3 tracking-widest uppercase opacity-70">{t('position')}</label>
-         <div className="grid grid-cols-3 gap-2">
-            {(['top', 'center', 'bottom', 'circle'] as VisualizerPosition[]).map((pos) => (
-              <button 
-                id={`tutorial-vis-pos-${pos}`}
-                key={pos} 
-                onClick={() => update('position', pos)} 
-                className={`px-2 py-2 text-xs font-mono border ${wrapperRadius} capitalize transition-all ${
-                  config.position === pos 
-                    ? 'border-theme-secondary text-theme-secondary bg-theme-secondary/20 shadow-[0_0_8px_var(--color-secondary)]' 
-                    : 'border-theme-border text-theme-muted hover:text-theme-text hover:border-theme-primary'
-                }`}
-              >
-                {t(`pos_${pos}` as any)}
-              </button>
-            ))}
-         </div>
+         ... Position Toggles ...
       </div>
       )}
+      */}
 
       {/* Style Section */}
       <div className="section-block">
@@ -255,14 +243,13 @@ const VisualizerSettings: React.FC<VisualizerSettingsProps> = ({ config, update,
              </div>
          </div>
 
-         <ToggleSwitch label={t('normalize')} icon={Maximize} value={config.normalize} onChange={(v: boolean) => update('normalize', v)} />
-         <ToggleSwitch label={t('ignore_volume')} icon={Maximize} value={config.preventVolumeScaling || false} onChange={(v: boolean) => update('preventVolumeScaling', v)} />
-         <ToggleSwitch label={t('mirror')} icon={Split} value={config.mirror} onChange={(v: boolean) => update('mirror', v)} />
-         <ToggleSwitch label={t('stroke')} icon={Square} value={config.strokeEnabled} onChange={(v: boolean) => update('strokeEnabled', v)} />
+         {/* DUPLICATE SETTINGS REMOVED FOR WAVEFORM MODE AS REQUESTED */}
+         {/* Normalize, Mirror, Ignore Volume, Stroke are handled by Master Control for the standard visualizer */}
+         {/* If specific override is needed, re-add them here. Currently removed per user instruction. */}
       </div>
       )}
 
-      {/* REACTOR SPECIFIC TOGGLES */}
+      {/* REACTOR SPECIFIC TOGGLES - KEEPING THESE as Reactor might need unique overrides */}
       {mode === 'reactor' && (
           <div className="space-y-3">
               <ToggleSwitch label={t('ignore_volume')} icon={Maximize} value={config.preventVolumeScaling || false} onChange={(v: boolean) => update('preventVolumeScaling', v)} />
@@ -278,7 +265,7 @@ const VisualizerSettings: React.FC<VisualizerSettingsProps> = ({ config, update,
         <label className="text-theme-text font-mono text-xs block mb-2 tracking-widest uppercase opacity-70 border-b border-theme-border pb-2">{t('fine_tuning')}</label>
         
         {/* BAR QUANTITY - Waveform OR 3D Spectrum */}
-        {(mode === 'waveform' || (mode === 'reactor' && config.threeDMode === 'spectrum')) && (
+        {(mode === 'reactor' && config.threeDMode === 'spectrum') && (
         <div className={`bg-theme-panel/40 ${wrapperRadius} overflow-hidden transition-all duration-300 border border-theme-border hover:border-theme-primary hover:shadow-[0_0_5px_var(--color-primary)]`}>
             <div 
                 className="flex items-center justify-between p-3 cursor-pointer select-none bg-black/20 border-b border-theme-border"
@@ -311,84 +298,14 @@ const VisualizerSettings: React.FC<VisualizerSettingsProps> = ({ config, update,
         </div>
         )}
 
-        {/* POWER & GRAVITY - Both */}
-        <div className={`bg-theme-panel/40 ${wrapperRadius} overflow-hidden transition-all duration-300 border border-theme-border hover:border-theme-primary hover:shadow-[0_0_5px_var(--color-primary)]`}>
-            <div 
-                className="flex items-center justify-between p-3 cursor-pointer select-none bg-black/20 border-b border-theme-border"
-                onClick={() => setExpandPower(!expandPower)}
-            >
-                <span className="font-mono text-[10px] text-theme-primary font-bold tracking-widest uppercase">{t('group_power_gravity')}</span>
-                <ChevronDown size={14} className={`text-theme-primary opacity-70 transition-transform duration-300 ${expandPower ? 'rotate-180' : ''}`} />
-            </div>
-            
-            <div className={`grid transition-[grid-template-rows,padding,opacity] duration-300 ease-in-out ${expandPower ? 'grid-rows-[1fr] opacity-100' : 'grid-rows-[0fr] opacity-0'}`}>
-                <div className="overflow-hidden">
-                    <div className="p-3 pt-2 flex flex-col gap-4">
-                        <RangeControl 
-                            label={t('amplitude')} 
-                            value={config.sensitivity} 
-                            min={0.1} max={3.0} step={0.1} 
-                            onChange={(v: number) => update('sensitivity', v)} 
-                            className="mb-0"
-                        />
-                        {(mode === 'waveform' || (mode === 'reactor' && config.threeDMode === 'spectrum')) && (
-                        <RangeControl 
-                            label={t('bar_gravity')} 
-                            value={config.barGravity ?? 5} 
-                            min={0} max={10} step={0.5} 
-                            onChange={(v: number) => update('barGravity', v)} 
-                            className="mb-0"
-                        />
-                        )}
-                    </div>
-                </div>
-            </div>
-        </div>
+        {/* POWER & GRAVITY REMOVED - NOW IN MASTER CONTROL */}
 
-        {/* FREQ CUTOFF - Waveform Only (Reactor is auto-tuned) */}
-        {mode === 'waveform' && (
-        <div className={`bg-theme-panel/40 ${wrapperRadius} overflow-hidden transition-all duration-300 border border-theme-border hover:border-theme-primary hover:shadow-[0_0_5px_var(--color-primary)]`}>
-            <div 
-                className="flex items-center justify-between p-3 cursor-pointer select-none bg-black/20 border-b border-theme-border"
-                onClick={() => setExpandFreq(!expandFreq)}
-            >
-                <span className="font-mono text-[10px] text-theme-primary font-bold tracking-widest uppercase">{t('group_cutoff')}</span>
-                <ChevronDown size={14} className={`text-theme-primary opacity-70 transition-transform duration-300 ${expandFreq ? 'rotate-180' : ''}`} />
-            </div>
-            
-            <div className={`grid transition-[grid-template-rows,padding,opacity] duration-300 ease-in-out ${expandFreq ? 'grid-rows-[1fr] opacity-100' : 'grid-rows-[0fr] opacity-0'}`}>
-                <div className="overflow-hidden">
-                    <div className="p-3 pt-2 flex flex-col gap-4">
-                        <RangeControl 
-                            label={t('min_freq')} 
-                            value={config.minFrequency} 
-                            min={0} 
-                            max={99} 
-                            step={1} 
-                            onChange={(v: number) => {
-                                if (v <= config.maxFrequency - 1) update('minFrequency', v);
-                            }} 
-                            className="mb-0"
-                        />
-                        <RangeControl 
-                            label={t('max_freq')} 
-                            value={config.maxFrequency} 
-                            min={1} 
-                            max={100} 
-                            step={1} 
-                            onChange={(v: number) => {
-                                if (v >= config.minFrequency + 1) update('maxFrequency', v);
-                            }} 
-                            className="mb-0"
-                        />
-                    </div>
-                </div>
-            </div>
-        </div>
-        )}
-
-        {/* OPACITY - Waveform Only (Reactor has internal opacity) */}
-        {mode === 'waveform' && (
+        {/* FREQ CUTOFF - Removed for Waveform (handled by Master) */}
+        
+        {/* OPACITY - Removed for Waveform (handled by Master) */}
+        {/* Only showing opacity settings here for Reactor if needed, but Reactor typically uses simple opacity sliders or inherits */}
+        
+        {mode === 'reactor' && (
         <div className={`bg-theme-panel/40 ${wrapperRadius} overflow-hidden transition-all duration-300 border border-theme-border hover:border-theme-primary hover:shadow-[0_0_5px_var(--color-primary)]`}>
             <div 
                 className="flex items-center justify-between p-3 cursor-pointer select-none bg-black/20 border-b border-theme-border"
@@ -408,21 +325,12 @@ const VisualizerSettings: React.FC<VisualizerSettingsProps> = ({ config, update,
                             onChange={(v: number) => update('fillOpacity', v)} 
                             className="mb-0"
                         />
-                        
-                        {config.strokeEnabled && (
-                        <RangeControl 
-                            label={t('stroke_opacity')} 
-                            value={config.strokeOpacity} 
-                            min={0} max={1} step={0.1} 
-                            onChange={(v: number) => update('strokeOpacity', v)} 
-                            className="mb-0"
-                        />
-                        )}
                     </div>
                 </div>
             </div>
         </div>
         )}
+
       </div>
     </div>
   );

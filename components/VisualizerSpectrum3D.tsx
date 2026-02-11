@@ -1,9 +1,10 @@
 
-import React, { useRef, useMemo, useEffect } from 'react';
+import React, { useRef, useMemo, useEffect, useState } from 'react';
 import { Canvas, useFrame, useThree } from '@react-three/fiber';
 import * as THREE from 'three';
 import { VisualizerConfig, NEON_COLORS } from '../types';
 import { useTheme } from '../contexts/ThemeContext';
+import CameraController from './CameraController';
 
 interface VisualizerSpectrum3DProps {
   analyser: AnalyserNode | null;
@@ -310,11 +311,6 @@ const SpectrumScene: React.FC<{ analyser: AnalyserNode | null; isPlaying: boolea
 
   const totalInstances = config.mirror ? config.barCount * 2 : config.barCount;
 
-  useFrame((state) => {
-      state.camera.position.x = Math.sin(state.clock.elapsedTime * 0.2) * 1;
-      state.camera.lookAt(0, 0, 0);
-  });
-
   return (
     <>
       <ambientLight intensity={0.5} />
@@ -354,13 +350,29 @@ const SpectrumScene: React.FC<{ analyser: AnalyserNode | null; isPlaying: boolea
             />
           </instancedMesh>
       )}
+      
+      <CameraController />
     </>
   );
 };
 
 const VisualizerSpectrum3D: React.FC<VisualizerSpectrum3DProps> = (props) => {
+  const [isInteractive, setIsInteractive] = useState(false);
+
+  useEffect(() => {
+    const handleKey = (e: KeyboardEvent) => {
+        setIsInteractive(e.altKey);
+    };
+    window.addEventListener('keydown', handleKey);
+    window.addEventListener('keyup', handleKey);
+    return () => {
+        window.removeEventListener('keydown', handleKey);
+        window.removeEventListener('keyup', handleKey);
+    }
+  }, []);
+
   return (
-    <div className="absolute inset-0 w-full h-full z-10 pointer-events-none">
+    <div className={`absolute inset-0 w-full h-full z-10 ${isInteractive ? 'pointer-events-auto' : 'pointer-events-none'}`}>
         <Canvas 
             camera={{ position: [0, 2, 8], fov: 50 }} 
             gl={{ alpha: true, antialias: true }}

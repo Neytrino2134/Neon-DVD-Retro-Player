@@ -72,6 +72,8 @@ interface ControlsProps {
   setIsShuffle?: (v: boolean) => void;
   isAutoNextPlaylist?: boolean;
   setIsAutoNextPlaylist?: (v: boolean) => void;
+  isSolo?: boolean;
+  setIsSolo?: (v: boolean) => void;
 
   // New View Controls
   onTogglePlayerFocus?: () => void;
@@ -130,6 +132,8 @@ const Controls: React.FC<ControlsProps> = ({
   setIsShuffle,
   isAutoNextPlaylist,
   setIsAutoNextPlaylist,
+  isSolo,
+  setIsSolo,
   onTogglePlayerFocus,
   isPlayerFocus,
   onToggleFullscreen,
@@ -502,6 +506,8 @@ const Controls: React.FC<ControlsProps> = ({
                 setIsShuffle={setIsShuffle}
                 isAutoNextPlaylist={isAutoNextPlaylist}
                 setIsAutoNextPlaylist={setIsAutoNextPlaylist}
+                isSolo={isSolo}
+                setIsSolo={setIsSolo}
             />
         </div>
 
