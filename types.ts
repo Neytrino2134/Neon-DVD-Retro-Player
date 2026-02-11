@@ -258,7 +258,7 @@ export type ThemeType = 'neon-retro' | 'neon-blue' | 'neon-pink' | 'warm-cozy' |
 export type ControlStyle = 'default' | 'round' | 'circle';
 export type BgTransitionType = 'glitch' | 'leaks' | 'none' | 'crossfade' | 'black' | 'blur'; // UPDATED
 export type BgAnimationType = 'none' | 'zoom' | 'sway' | 'handheld' | 'cinematic' | 'chaos'; // NEW
-export type FitMode = 'cover' | 'contain' | 'stretch'; // NEW: Background/Screen fit mode
+export type FitMode = 'cover' | 'contain' | 'stretch' | 'contain-blur'; // NEW: Background/Screen fit mode with blur
 export type ScreenAlignment = 'center' | 'left' | 'right'; // NEW: Alignment for crop mode
 
 // NEW: View Mode for Application Layout
@@ -302,6 +302,7 @@ export interface TerrainConfig {
   glow: boolean;
   mirror?: boolean; // NEW
   invertMirror?: boolean; // NEW
+  preventVolumeScaling?: boolean; // NEW: Ignore volume
 }
 
 export interface DvdConfig {

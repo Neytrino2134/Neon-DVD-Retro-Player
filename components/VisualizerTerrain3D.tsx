@@ -92,7 +92,9 @@ const TerrainScene: React.FC<{ analyser: AnalyserNode | null; isPlaying: boolean
                 // 2. Sensitivity Scaling
                 val *= (config.heightMultiplier * 1.2); 
                 // 3. Volume Scaling
-                val *= volume;
+                if (!config.preventVolumeScaling) {
+                    val *= volume;
+                }
                 
                 // 4. Frequency Boost (Highs usually lower amplitude, give them a kick)
                 // Linear boost across spectrum

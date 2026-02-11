@@ -198,10 +198,12 @@ export const tv = {
   fit_cover: "COVER (CROP)",
   fit_contain: "CONTAIN (FIT)",
   fit_stretch: "STRETCH (FILL)",
+  fit_contain_blur: "CONTAIN (BLUR BG)", // NEW
   screen_align: "ALIGNMENT",
   align_left: "LEFT",
   align_center: "CENTER",
   align_right: "RIGHT",
+  blur_bg: "BLURRED BACKGROUND", // NEW Toggle Label
   
   mixer_deck: "MIXER DECK",
   crossfade_duration: "CROSSFADE DURATION",

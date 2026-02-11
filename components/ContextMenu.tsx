@@ -22,11 +22,29 @@ const ContextMenu: React.FC<ContextMenuProps> = ({
   const [position, setPosition] = useState({ x: 0, y: 0 });
   const { t } = useLanguage();
   const menuRef = useRef<HTMLDivElement>(null);
+  
+  // Store coordinates of where the right click started to detect dragging
+  const startClickRef = useRef({ x: 0, y: 0 });
 
   useEffect(() => {
+    const handleMouseDown = (e: MouseEvent) => {
+        // 2 is Right Click
+        if (e.button === 2) {
+            startClickRef.current = { x: e.clientX, y: e.clientY };
+        }
+    };
+
     const handleContextMenu = (e: MouseEvent) => {
       e.preventDefault(); // Block default browser menu
       
+      // Calculate distance moved
+      const dx = Math.abs(e.clientX - startClickRef.current.x);
+      const dy = Math.abs(e.clientY - startClickRef.current.y);
+      const distance = Math.sqrt(dx * dx + dy * dy);
+
+      // If moved more than 5 pixels, treat as a drag operation (e.g. camera pan) and do not show menu
+      if (distance > 5) return;
+
       let x = e.clientX;
       let y = e.clientY;
       
@@ -53,6 +71,7 @@ const ContextMenu: React.FC<ContextMenuProps> = ({
     };
 
     // Attach to document to cover everything
+    document.addEventListener('mousedown', handleMouseDown);
     document.addEventListener('contextmenu', handleContextMenu);
     document.addEventListener('click', handleClick);
     document.addEventListener('keydown', handleKeyDown);
@@ -60,6 +79,7 @@ const ContextMenu: React.FC<ContextMenuProps> = ({
     document.addEventListener('scroll', () => setVisible(false), true);
 
     return () => {
+      document.removeEventListener('mousedown', handleMouseDown);
       document.removeEventListener('contextmenu', handleContextMenu);
       document.removeEventListener('click', handleClick);
       document.removeEventListener('keydown', handleKeyDown);

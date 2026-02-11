@@ -334,9 +334,8 @@ const CustomCursor: React.FC<CustomCursorProps> = ({ style = 'default', retroScr
 
                   ctx.fillStyle = wave.color;
                   ctx.globalAlpha = wave.life;
-                  ctx.shadowBlur = 10 * wave.life;
-                  ctx.shadowColor = wave.color;
-
+                  ctx.shadowBlur = 0; // Removed glow as requested
+                  
                   // Center Bar
                   ctx.fillRect(wave.x - barWidth/2, wave.y - hCenter/2, barWidth, hCenter);
 

@@ -158,17 +158,54 @@ const MediaRenderer: React.FC<MediaRendererProps> = ({ type, url, stream, bgColo
 
       // --- DRAW HELPER ---
       const drawContent = (srcW: number, srcH: number, drawable: CanvasImageSource) => {
+          // --- SPECIAL MODE: CONTAIN BLUR (BACKGROUND PASS) ---
+          if (fitMode === 'contain-blur') {
+              const srcRatio = srcW / srcH;
+              const dstRatio = drawW / drawH;
+              let bgW, bgH, bgX, bgY;
+
+              // Cover Logic for background
+              if (dstRatio > srcRatio) {
+                  bgW = drawW;
+                  bgH = drawW / srcRatio;
+                  bgX = 0;
+                  bgY = (drawH - bgH) / 2;
+              } else {
+                  bgH = drawH;
+                  bgW = drawH * srcRatio;
+                  bgY = 0;
+                  bgX = (drawW - bgW) / 2;
+              }
+
+              ctx.save();
+              // Apply strong blur and slight dimming for background
+              // Note: If other filters are active via global grading (lines 142-147), this filter string appends/overrides
+              // but since we want the blur ON TOP of color grading, we just set it here.
+              // To preserve color grading, we might need to compose string, but ctx.filter applies to draw operations.
+              // If we set a new filter string here, it replaces the previous one for this draw call.
+              // So we should ideally combine them, or just accept that the background might look different.
+              // For simplicity and performance, we just set blur. The visual distinction is good.
+              ctx.filter = `blur(30px) brightness(0.5) saturate(1.2)`; 
+              
+              // Draw slightly larger to avoid edge artifacts from blur
+              ctx.drawImage(drawable, bgX - 20, bgY - 20, bgW + 40, bgH + 40);
+              ctx.restore();
+          }
+
+          // --- MAIN PASS ---
           let renderX = 0, renderY = 0, renderW = drawW, renderH = drawH;
+          // Treat 'contain-blur' as 'contain' for the foreground image
+          const effectiveFitMode = fitMode === 'contain-blur' ? 'contain' : fitMode;
 
           // 1. Calculate Target Dimensions based on Fit Mode
-          if (fitMode === 'stretch') {
+          if (effectiveFitMode === 'stretch') {
               renderW = drawW;
               renderH = drawH;
           } else {
               const srcRatio = srcW / srcH;
               const dstRatio = drawW / drawH;
               
-              if (fitMode === 'contain') {
+              if (effectiveFitMode === 'contain') {
                   // Contain
                   if (dstRatio > srcRatio) {
                       renderH = drawH;
@@ -246,6 +283,7 @@ const MediaRenderer: React.FC<MediaRendererProps> = ({ type, url, stream, bgColo
 
               // 1. Draw Active Video
               // Only clear rect if contained, to avoid trails. If covering, drawing over is enough (and faster/safer).
+              // Exception: if fitMode is contain-blur, we draw a full bg, so no need to clear.
               if (fitMode === 'contain' && shouldClear) ctx.clearRect(0, 0, drawW, drawH);
               
               drawContent(activeV.videoWidth, activeV.videoHeight, activeV);

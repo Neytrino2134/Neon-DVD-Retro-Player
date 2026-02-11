@@ -62,7 +62,8 @@ export const useConfigUpdaters = ({
               ...terrainConfig,
               opacity: globalWaveformConfig.fillOpacity,
               heightMultiplier: globalWaveformConfig.sensitivity,
-              mirror: globalWaveformConfig.mirror
+              mirror: globalWaveformConfig.mirror,
+              preventVolumeScaling: globalWaveformConfig.preventVolumeScaling
           });
       }
   };
@@ -97,6 +98,7 @@ export const useConfigUpdaters = ({
         if (key === 'fillOpacity') setTerrainConfig({ ...terrainConfig, opacity: value });
         if (key === 'sensitivity') setTerrainConfig({ ...terrainConfig, heightMultiplier: value });
         if (key === 'mirror') setTerrainConfig({ ...terrainConfig, mirror: value });
+        if (key === 'preventVolumeScaling') setTerrainConfig({ ...terrainConfig, preventVolumeScaling: value });
     }
   };
 

@@ -89,7 +89,8 @@ export const DEFAULT_TERRAIN_CONFIG: TerrainConfig = {
   lineThickness: 1.0,
   glow: true,
   mirror: false,
-  invertMirror: false
+  invertMirror: false,
+  preventVolumeScaling: false
 };
 
 export const DEFAULT_DVD_CONFIG: DvdConfig = { 

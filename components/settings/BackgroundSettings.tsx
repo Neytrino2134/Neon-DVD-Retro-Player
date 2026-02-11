@@ -1,6 +1,6 @@
 
 import React, { useState, useRef, useMemo, useEffect } from 'react';
-import { List, ChevronDown, ChevronUp, Timer, Trash2, RefreshCw, Disc, Upload, Power, Shuffle, Plus, X, Play, Image as ImageIcon, Video, Wand2, Repeat } from 'lucide-react';
+import { List, ChevronDown, ChevronUp, Timer, Trash2, RefreshCw, Disc, Upload, Power, Shuffle, Plus, X, Play, Image as ImageIcon, Video, Wand2, Repeat, Layers } from 'lucide-react';
 import { BackgroundMedia, PatternConfig, BgTransitionType, BgAnimationType, BackgroundPlaylist, BgHotspot, FitMode, ScreenAlignment } from '../../types';
 import RangeControl from './RangeControl';
 import CustomSelect from './CustomSelect';
@@ -86,10 +86,15 @@ export const BgConfigModule: React.FC<BgConfigModuleProps> = ({
       { value: 'chaos', label: t('anim_chaos') }
   ];
 
+  // For logic: 'contain-blur' is handled as 'contain' in UI but enables the toggle
+  const displayFitMode = screenFitMode === 'contain-blur' ? 'contain' : screenFitMode;
+  const isContainMode = screenFitMode === 'contain' || screenFitMode === 'contain-blur';
+
   const fitOptions = [
       { value: 'cover', label: t('fit_cover') },
       { value: 'contain', label: t('fit_contain') },
       { value: 'stretch', label: t('fit_stretch') }
+      // contain-blur removed from dropdown to use toggle instead
   ];
 
   const alignOptions = [
@@ -97,6 +102,20 @@ export const BgConfigModule: React.FC<BgConfigModuleProps> = ({
       { value: 'center', label: t('align_center') },
       { value: 'right', label: t('align_right') }
   ];
+
+  const handleFitModeChange = (mode: string) => {
+      // If switching to contain, check if we were previously blur
+      if (mode === 'contain') {
+          // Default to clean contain
+          setScreenFitMode('contain');
+      } else {
+          setScreenFitMode(mode as FitMode);
+      }
+  };
+
+  const toggleBlurBg = (enabled: boolean) => {
+      setScreenFitMode(enabled ? 'contain-blur' : 'contain');
+  };
 
   return (
     <div className="pt-2 space-y-3">
@@ -114,13 +133,26 @@ export const BgConfigModule: React.FC<BgConfigModuleProps> = ({
         />
         <CustomSelect 
             label={t('fit_mode')} 
-            value={screenFitMode || 'cover'} 
+            value={displayFitMode || 'cover'} 
             options={fitOptions} 
-            onChange={(v) => setScreenFitMode(v as FitMode)} 
+            onChange={handleFitModeChange} 
         />
+
+        {/* BLUR BACKGROUND TOGGLE - Only for Contain Mode */}
+        {isContainMode && (
+            <div className="pl-2 border-l-2 border-theme-primary/30 mt-1 mb-3">
+                <ToggleSwitch 
+                    label={t('blur_bg')}
+                    icon={Layers}
+                    value={screenFitMode === 'contain-blur'}
+                    onChange={toggleBlurBg}
+                    color="blue"
+                />
+            </div>
+        )}
         
-        {/* Show alignment for Cover AND Contain */}
-        {(screenFitMode === 'cover' || screenFitMode === 'contain') && (
+        {/* Show alignment for Cover AND Contain variants */}
+        {(screenFitMode === 'cover' || screenFitMode === 'contain' || screenFitMode === 'contain-blur') && (
             <CustomSelect 
                 label={t('screen_align')} 
                 value={screenAlignment || 'center'} 

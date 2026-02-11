@@ -1,28 +1,38 @@
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { OrbitControls } from '@react-three/drei';
 import { useThree } from '@react-three/fiber';
 import * as THREE from 'three';
+import { OrbitControls as OrbitControlsImpl } from 'three-stdlib';
 
 const CameraController: React.FC = () => {
   const { gl } = useThree();
+  const controlsRef = useRef<OrbitControlsImpl>(null);
   
+  // Use -1 as a sentinel for "No Action" since THREE.MOUSE enum values are 0, 1, 2
+  const NO_ACTION = -1 as unknown as THREE.MOUSE;
+
   const [mouseButtons, setMouseButtons] = useState({
-      LEFT: null as unknown as THREE.MOUSE,
+      LEFT: NO_ACTION, 
       MIDDLE: THREE.MOUSE.DOLLY,
       RIGHT: THREE.MOUSE.PAN
   });
 
   useEffect(() => {
     const handleKeyChange = (e: KeyboardEvent) => {
-      const ctrl = e.ctrlKey;
+      const ctrl = e.ctrlKey || e.metaKey;
       const alt = e.altKey;
       const shift = e.shiftKey;
 
-      let leftAction: any = null;
+      let leftAction = NO_ACTION;
       let cursor = 'default';
 
-      // Priority: Ctrl+Alt (Dolly) > Alt+Shift (Pan) > Alt (Rotate)
+      // Priority Logic:
+      // Alt is the "Interaction Key". Without Alt, we don't interact (pass-through).
+      // 1. Alt + Shift -> PAN
+      // 2. Alt + Ctrl -> DOLLY (Zoom)
+      // 3. Alt -> ROTATE
+      
       if (alt) {
           if (shift) {
               leftAction = THREE.MOUSE.PAN;
@@ -37,7 +47,6 @@ const CameraController: React.FC = () => {
       }
 
       setMouseButtons(prev => {
-          // Avoid redundant state updates to prevent re-renders
           if (prev.LEFT !== leftAction) {
               return { ...prev, LEFT: leftAction };
           }
@@ -45,8 +54,8 @@ const CameraController: React.FC = () => {
       });
 
       if (gl.domElement) {
-          // Only override cursor if we have an active override action
-          if (leftAction !== null) {
+          // Apply cursor to canvas
+          if (leftAction !== NO_ACTION) {
              gl.domElement.style.cursor = cursor;
           } else {
              gl.domElement.style.cursor = 'default';
@@ -55,7 +64,7 @@ const CameraController: React.FC = () => {
     };
 
     const handleBlur = () => {
-        setMouseButtons(prev => ({ ...prev, LEFT: null as any }));
+        setMouseButtons(prev => ({ ...prev, LEFT: NO_ACTION }));
         if (gl.domElement) gl.domElement.style.cursor = 'default';
     };
     
@@ -71,14 +80,25 @@ const CameraController: React.FC = () => {
     };
   }, [gl]);
 
+  // Direct sync to controls instance to ensure immediate responsiveness
+  useEffect(() => {
+      if (controlsRef.current) {
+          controlsRef.current.mouseButtons.LEFT = mouseButtons.LEFT;
+          controlsRef.current.update();
+      }
+  }, [mouseButtons]);
+
   return (
     <OrbitControls 
+        ref={controlsRef}
         makeDefault 
         enableDamping={true} 
         dampingFactor={0.1}
         enablePan={true}
         enableRotate={true}
         enableZoom={true}
+        // screenSpacePanning=true allows Up/Down panning on screen plane, which is better for 3D viewers
+        screenSpacePanning={true}
         mouseButtons={mouseButtons}
     />
   );

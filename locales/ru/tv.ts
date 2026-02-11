@@ -197,10 +197,12 @@ export const tv = {
   fit_cover: "ПОКРЫТИЕ (ОБРЕЗКА)",
   fit_contain: "ВПИСАТЬ (ЦЕЛИКОМ)",
   fit_stretch: "РАСТЯНУТЬ (ПОЛНОСТЬЮ)",
+  fit_contain_blur: "ВПИСАТЬ (РАЗМЫТИЕ)", // NEW
   screen_align: "ВЫРАВНИВАНИЕ",
   align_left: "СЛЕВА",
   align_center: "ЦЕНТР",
   align_right: "СПРАВА",
+  blur_bg: "РАЗМЫТЫЙ ФОН", // NEW Toggle Label
   
   mixer_deck: "МИКШЕР",
   crossfade_duration: "ДЛИТЕЛЬНОСТЬ КРОССФЕЙДА",
