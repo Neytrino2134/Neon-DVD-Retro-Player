@@ -360,13 +360,6 @@ body, button, a, input, select, textarea, [role="button"], .cursor-pointer {
   will-change: border-color, box-shadow;
 }
 
-.player-chassis:hover {
-  /* Hover State: Bright Border (Static), Static Strong Glow */
-  border-color: var(--color-primary);
-  /* Static strong glow, NO animation */
-  box-shadow: 0 0 20px color-mix(in srgb, var(--color-primary), transparent 50%);
-}
-
 /* --- BACKGROUND ANIMATIONS --- */
 
 @keyframes bg-zoom {

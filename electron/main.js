@@ -68,6 +68,18 @@ function createWindow() {
     mainWindow.show();
   });
 
+  // --- GLOBAL MEDIA SHORTCUTS (PRIORITY) ---
+  // Registers hardware media keys globally, stealing priority from Chrome/Other apps
+  globalShortcut.register('MediaPlayPause', () => {
+    mainWindow.webContents.send('media-command', 'play-pause');
+  });
+  globalShortcut.register('MediaNextTrack', () => {
+    mainWindow.webContents.send('media-command', 'next');
+  });
+  globalShortcut.register('MediaPreviousTrack', () => {
+    mainWindow.webContents.send('media-command', 'prev');
+  });
+
   // --- IPC HANDLERS FOR CUSTOM TITLE BAR ---
   ipcMain.on('window-minimize', () => {
     mainWindow.minimize();
@@ -128,6 +140,11 @@ function createWindow() {
 }
 
 app.on('ready', createWindow);
+
+app.on('will-quit', () => {
+  // Unregister all shortcuts.
+  globalShortcut.unregisterAll();
+});
 
 app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') {

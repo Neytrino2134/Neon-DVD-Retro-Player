@@ -84,6 +84,26 @@ export const useAppHotkeys = ({
   };
 
   useEffect(() => {
+    // --- ELECTRON GLOBAL SHORTCUT LISTENER ---
+    if ((window as any).require) {
+      const { ipcRenderer } = (window as any).require('electron');
+      const handleMediaCommand = (_event: any, command: string) => {
+          if (command === 'next') player.nextTrack();
+          if (command === 'prev') player.prevTrack();
+          if (command === 'play-pause') player.togglePlay();
+      };
+      
+      // Remove existing to prevent duplicates if hot reload happens
+      ipcRenderer.removeAllListeners('media-command');
+      ipcRenderer.on('media-command', handleMediaCommand);
+      
+      return () => {
+          ipcRenderer.removeListener('media-command', handleMediaCommand);
+      };
+    }
+  }, [player]); // Re-bind if player instance changes (rare, but safe)
+
+  useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       const target = e.target as HTMLElement;
       

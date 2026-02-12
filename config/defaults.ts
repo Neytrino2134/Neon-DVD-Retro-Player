@@ -169,6 +169,15 @@ export const DEFAULT_EFFECTS_CONFIG: EffectsConfig = {
     speedVariance: 0.5,
     roundMode: false 
   },
+  life: {
+    enabled: false,
+    speed: 5,
+    cellSize: 10,
+    fadeSpeed: 0.8,
+    color: '#00f3ff',
+    gridColor: 'rgba(255,255,255,0.1)',
+    triggerToken: 0
+  },
   vignette: { enabled: false, intensity: 0.5, roundness: 0.7 }
 };
 

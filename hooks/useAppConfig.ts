@@ -61,7 +61,7 @@ const SECTION_MODULES: Record<string, string[]> = {
   sfx: ['mixer', 'ambience', 'sysaudio'],
   waves: ['master_wave', 'wave', 'reactor', 'sine', 'terrain'], // Added master_wave
   mod: ['marquee', 'dvd', 'leaks', 'rain', 'hologram', 'gemini', 'youtube_chat', 'scan', 'cyber', 'glitch'], 
-  game: ['tron'],
+  game: ['tron', 'life'], // Added life
   post: ['fps', 'signal', 'chromatic', 'vignette', 'flicker', 'video']
 };
 

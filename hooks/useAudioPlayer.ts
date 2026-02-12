@@ -273,6 +273,9 @@ export const useAudioPlayer = () => {
       if (isPlaying) {
           el.pause();
           setIsPlaying(false);
+          // Media Session: Set state to paused
+          if ('mediaSession' in navigator) navigator.mediaSession.playbackState = "paused";
+          
           // Reset gain to full volume immediately in case we paused during a fade
           if (audio.gainNodeRef.current && audio.audioContextRef.current) {
               try {
@@ -305,6 +308,8 @@ export const useAudioPlayer = () => {
                       await el.play();
                       setIsPlaying(true);
                   }
+                  // Media Session: Set state to playing
+                  if ('mediaSession' in navigator) navigator.mediaSession.playbackState = "playing";
               }
           } catch (e) {
               console.error("Play failed", e);
@@ -319,6 +324,7 @@ export const useAudioPlayer = () => {
           el.currentTime = 0;
       }
       setIsPlaying(false);
+      if ('mediaSession' in navigator) navigator.mediaSession.playbackState = "none";
       setCurrentTime(0);
       // Reset time in storage on stop
       localStorage.setItem('neon_track_time', '0');
@@ -351,6 +357,7 @@ export const useAudioPlayer = () => {
           setCurrentTrackIndex(nextIndex);
           setCurrentTrack(nextTrack);
           setIsPlaying(true);
+          if ('mediaSession' in navigator) navigator.mediaSession.playbackState = "playing";
           if (overridePlaylistId) setPlayingPlaylistId(overridePlaylistId);
           
           hasTriggeredAutoMixRef.current = false;
@@ -507,6 +514,32 @@ export const useAudioPlayer = () => {
       }
   };
 
+  // --- MEDIA SESSION API INTEGRATION (OS Controls) ---
+  useEffect(() => {
+      if ('mediaSession' in navigator && currentTrack) {
+          const title = currentTrack.tags?.title || currentTrack.name;
+          const artist = currentTrack.tags?.artist || 'Unknown Artist';
+          const album = currentTrack.tags?.album || 'Neon Player';
+          const artwork = currentTrack.artworkUrl 
+              ? [{ src: currentTrack.artworkUrl, sizes: '512x512', type: 'image/png' }] 
+              : [];
+
+          navigator.mediaSession.metadata = new MediaMetadata({
+              title,
+              artist,
+              album,
+              artwork
+          });
+
+          // Register Action Handlers
+          navigator.mediaSession.setActionHandler('play', () => togglePlay());
+          navigator.mediaSession.setActionHandler('pause', () => togglePlay());
+          navigator.mediaSession.setActionHandler('stop', () => stop());
+          navigator.mediaSession.setActionHandler('previoustrack', () => prevTrack());
+          navigator.mediaSession.setActionHandler('nexttrack', () => nextTrack());
+      }
+  }, [currentTrack, togglePlay, stop, prevTrack, nextTrack]); // Re-register when dependencies change
+
   const handleTimeUpdate = (e: React.SyntheticEvent<HTMLAudioElement>, isWaitingReboot: boolean) => {
       const el = e.currentTarget;
       setCurrentTime(el.currentTime);
@@ -537,8 +570,33 @@ export const useAudioPlayer = () => {
       if (target === activeAudio) setIsPlaying(false);
   };
 
+  // Wrapper for processAudioFiles to auto-select first track if player is empty
+  const processAudioFiles = async (files: File[]) => {
+      const newTracks = await lib.actions.processAudioFiles(files);
+      
+      // FIX: Auto-load first track if player is empty/stopped to allow immediate playback
+      // This solves the tutorial issue where "Load -> Play" failed if user didn't click a track first.
+      if (!isPlaying && !currentTrack && newTracks.length > 0) {
+          const first = newTracks[0];
+          // Check if we added to the currently active playlist
+          if (first.playlistId === lib.activePlaylistId) {
+              setPlayingPlaylistId(first.playlistId);
+              setCurrentTrack(first);
+              setCurrentTrackIndex(first.order || 0); 
+              
+              const el = activeDeckRef.current === 'A' ? audioRefA.current : audioRefB.current;
+              if (el) {
+                  el.src = first.url;
+                  el.currentTime = 0;
+                  // Don't auto-play, just queue it up so "Play" button works.
+              }
+          }
+      }
+  };
+
   const insertAudioFiles = async (files: File[], _index: number) => {
-      await lib.actions.processAudioFiles(files);
+      // Use the wrapped process function to ensure auto-select logic applies here too
+      await processAudioFiles(files);
   };
 
   return {
@@ -576,7 +634,7 @@ export const useAudioPlayer = () => {
     moveTracksToPlaylist: lib.actions.moveTracksToPlaylist, 
     createPlaylistFromMove: lib.actions.createPlaylistFromMove, 
     createPlaylistFromFiles: lib.actions.createPlaylistFromFiles,
-    processAudioFiles: lib.actions.processAudioFiles,
+    processAudioFiles, // USE WRAPPED FUNCTION
     // Settings
     crossfadeDuration, setCrossfadeDuration, smoothStart, setSmoothStart,
     isShuffle, setIsShuffle, isAutoNextPlaylist, setIsAutoNextPlaylist,

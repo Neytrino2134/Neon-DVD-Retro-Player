@@ -13,7 +13,7 @@ import DvdLogo from './DvdLogo';
 import Visualizer from './Visualizer';
 import Visualizer3D from './Visualizer3D'; 
 import VisualizerSpectrum3D from './VisualizerSpectrum3D'; 
-import VisualizerTerrain3D from './VisualizerTerrain3D'; // NEW
+import VisualizerTerrain3D from './VisualizerTerrain3D'; 
 import SineWave from './SineWave'; 
 import MediaRenderer from './MediaRenderer';
 import NoiseOverlay from './NoiseOverlay';
@@ -36,6 +36,7 @@ import GeminiChatEffect from './effects/GeminiChatEffect';
 import LightLeaksEffect from './effects/LightLeaksEffect';
 import RainEffect from './effects/RainEffect'; 
 import TronEffect from './effects/TronEffect'; 
+import LifeEffect from './effects/LifeEffect'; // NEW
 import VignetteEffect from './effects/VignetteEffect'; 
 import LightFlickerEffect from './effects/LightFlickerEffect'; 
 
@@ -72,12 +73,12 @@ interface RetroScreenProps {
   reactorConfig?: VisualizerConfig; 
   setReactorConfig?: (c: VisualizerConfig) => void; 
   sineWaveConfig?: VisualizerConfig; 
-  terrainConfig?: TerrainConfig; // NEW
+  terrainConfig?: TerrainConfig; 
   
   showVisualizer: boolean;
   showVisualizer3D?: boolean; 
   showSineWave?: boolean; 
-  showVisualizerTerrain?: boolean; // NEW
+  showVisualizerTerrain?: boolean; 
   
   dvdConfig: DvdConfig;
   showDvd: boolean;
@@ -445,6 +446,9 @@ const RetroScreen = forwardRef<HTMLDivElement, RetroScreenProps>((props, externa
                 <PatternOverlay pattern={bgPattern} config={bgPatternConfig} />
                 <TransitionEffect phase={transitionPhase} mode={bgTransition} />
                 <RainEffect config={effectsConfig.rain} />
+                
+                <LifeEffect config={effectsConfig.life} /> {/* NEW: Game of Life */}
+                
                 <TronEffect 
                     config={effectsConfig.tron} 
                     analyser={analyser} 

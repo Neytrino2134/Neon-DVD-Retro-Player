@@ -20,6 +20,7 @@ const GlobalWaveformSettings: React.FC<GlobalWaveformSettingsProps> = ({ config,
   const [expandOpacity, setExpandOpacity] = useState(false);
   const [expandFreq, setExpandFreq] = useState(false);
   const [expandPower, setExpandPower] = useState(true);
+  const [expandQty, setExpandQty] = useState(false);
 
   // Dynamic Radius
   let wrapperRadius = 'rounded';
@@ -55,10 +56,34 @@ const GlobalWaveformSettings: React.FC<GlobalWaveformSettingsProps> = ({ config,
             </div>
         </div>
 
-        {/* Bar Count (Kept separate as it defines resolution) */}
-        <RangeControl label="BAR COUNT" value={config.barCount} min={16} max={256} step={16} onChange={(v) => update('barCount', v)} className="mb-0" />
+        {/* Toggles (Moved Up) */}
+        <div className="space-y-2">
+            <ToggleSwitch label="IGNORE VOLUME" icon={Maximize} value={config.preventVolumeScaling || false} onChange={(v) => update('preventVolumeScaling', v)} color="blue" />
+            <ToggleSwitch label="MIRROR MODE" icon={Split} value={config.mirror} onChange={(v) => update('mirror', v)} color="purple" />
+            <ToggleSwitch label="NORMALIZE INPUT" icon={AlignJustify} value={config.normalize} onChange={(v) => update('normalize', v)} color="green" />
+        </div>
 
-        {/* Collapsible Power & Gravity (Moved from top level) */}
+        {/* Collapsible Quantity & Space */}
+        <div className={`bg-theme-panel/40 ${wrapperRadius} overflow-hidden mb-2 transition-all duration-300 border border-theme-border hover:border-theme-primary hover:shadow-[0_0_5px_var(--color-primary)]`}>
+            <div 
+                className="flex items-center justify-between p-3 cursor-pointer select-none bg-black/20 border-b border-theme-border"
+                onClick={() => setExpandQty(!expandQty)}
+            >
+                <span className="font-mono text-[10px] text-theme-primary font-bold tracking-widest uppercase">{t('group_qty_space')}</span>
+                <ChevronDown size={14} className={`text-theme-primary opacity-70 transition-transform duration-300 ${expandQty ? 'rotate-180' : ''}`} />
+            </div>
+            
+            <div className={`grid transition-[grid-template-rows,padding,opacity] duration-300 ease-in-out ${expandQty ? 'grid-rows-[1fr] opacity-100' : 'grid-rows-[0fr] opacity-0'}`}>
+                <div className="overflow-hidden">
+                    <div className="p-3 pt-2 flex flex-col gap-4">
+                        <RangeControl label="BAR COUNT" value={config.barCount} min={16} max={256} step={16} onChange={(v) => update('barCount', v)} className="mb-0" />
+                        <RangeControl label="BAR GAP" value={config.barGap} min={0} max={20} step={0.5} onChange={(v) => update('barGap', v)} className="mb-0" />
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        {/* Collapsible Power & Gravity */}
         <div className={`bg-theme-panel/40 ${wrapperRadius} overflow-hidden mb-2 transition-all duration-300 border border-theme-border hover:border-theme-primary hover:shadow-[0_0_5px_var(--color-primary)]`}>
             <div 
                 className="flex items-center justify-between p-3 cursor-pointer select-none bg-black/20 border-b border-theme-border"
@@ -76,13 +101,6 @@ const GlobalWaveformSettings: React.FC<GlobalWaveformSettingsProps> = ({ config,
                     </div>
                 </div>
             </div>
-        </div>
-
-        {/* Toggles */}
-        <div className="space-y-2">
-            <ToggleSwitch label="IGNORE VOLUME" icon={Maximize} value={config.preventVolumeScaling || false} onChange={(v) => update('preventVolumeScaling', v)} color="blue" />
-            <ToggleSwitch label="MIRROR MODE" icon={Split} value={config.mirror} onChange={(v) => update('mirror', v)} color="purple" />
-            <ToggleSwitch label="NORMALIZE INPUT" icon={AlignJustify} value={config.normalize} onChange={(v) => update('normalize', v)} color="green" />
         </div>
 
         {/* Collapsible Frequency */}

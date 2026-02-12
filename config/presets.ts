@@ -198,6 +198,15 @@ export const OCEAN_BLUE_PRESET: AppPreset = {
         speedVariance: 0.5,
         roundMode: false
       },
+      life: {
+        enabled: false,
+        speed: 5,
+        cellSize: 10,
+        fadeSpeed: 0.8,
+        color: '#00f3ff',
+        gridColor: 'rgba(255,255,255,0.1)',
+        triggerToken: 0
+      },
       vignette: {
         enabled: true,
         intensity: 0.6,

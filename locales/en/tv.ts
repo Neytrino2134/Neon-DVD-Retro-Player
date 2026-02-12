@@ -118,6 +118,8 @@ export const tv = {
   tron_round_enable: "ROUND MODE",
   tron_round_desc: "Synchronizes game to track length. Includes Sudden Death.",
   
+  game_of_life: "GAME OF LIFE",
+  
   holograms: "HOLOGRAMS",
   cat_system: "SYSTEM",
   cat_interactive: "INTERACTIVE",

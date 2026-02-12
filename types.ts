@@ -20,6 +20,18 @@ export interface TronConfig {
   roundMode?: boolean; // NEW: Enable competitive round mode linked to track time
 }
 
+export interface LifeConfig {
+  enabled: boolean;
+  speed: number; // Simulation tick speed
+  cellSize: number; // Pixel size of cell
+  fadeSpeed: number; // Trail length (0-1)
+  color: string;
+  gridColor: string;
+  // Trigger system for presets
+  triggerAction?: 'random' | 'clear' | 'glider_gun' | 'pulsar';
+  triggerToken?: number; // Increment to fire action
+}
+
 export interface VideoColorConfig {
   enabled: boolean;
   brightness: number; // 0.0 to 3.0 (def 1.0)
@@ -111,6 +123,7 @@ export interface EffectsConfig {
   videoSettings: VideoColorConfig; // NEW: Video Color Grading
   rain: RainConfig; // NEW: Rain Effect
   tron: TronConfig; // NEW: Tron Game
+  life: LifeConfig; // NEW: Game of Life
   vignette: {
     enabled: boolean;
     intensity: number; // Opacity 0-1

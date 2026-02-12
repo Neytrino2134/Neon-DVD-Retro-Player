@@ -117,6 +117,8 @@ export const tv = {
   tron_round_enable: "РЕЖИМ РАУНДА",
   tron_round_desc: "Синхронизирует игру с треком. Включает Sudden Death.",
   
+  game_of_life: "ИГРА В ЖИЗНЬ",
+  
   holograms: "ГОЛОГРАММЫ",
   cat_system: "СИСТЕМА",
   cat_interactive: "ИНТЕРАКТИВ",
