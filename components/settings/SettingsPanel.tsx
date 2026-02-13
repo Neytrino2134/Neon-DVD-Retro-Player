@@ -1,6 +1,6 @@
 
 import React, { useState } from 'react';
-import { VisualizerConfig, EffectsConfig, DvdConfig, MarqueeConfig, PatternConfig, BackgroundMedia, AppPreset, CursorStyle, WatermarkConfig, ThemeType, ControlStyle, BgTransitionType, AmbienceFile, AmbienceConfig, BgAnimationType, BackgroundPlaylist, BgHotspot, EqualizerConfig, FitMode, ScreenAlignment, YouTubeAuthConfig, TerrainConfig } from '../../types';
+import { VisualizerConfig, EffectsConfig, DvdConfig, MarqueeConfig, PatternConfig, BackgroundMedia, AppPreset, CursorStyle, WatermarkConfig, ThemeType, ControlStyle, BgTransitionType, AmbienceFile, AmbienceConfig, BgAnimationType, BackgroundPlaylist, BgHotspot, EqualizerConfig, FitMode, ScreenAlignment, YouTubeAuthConfig, TerrainConfig, RoadConfig } from '../../types';
 import { useNotification } from '../../contexts/NotificationContext';
 import { useTheme } from '../../contexts/ThemeContext';
 import { useLanguage } from '../../contexts/LanguageContext';
@@ -37,6 +37,8 @@ interface SettingsPanelProps {
   setShowSineWave?: (v: boolean) => void;
   showVisualizerTerrain?: boolean; // NEW: 4D Terrain Toggle
   setShowVisualizerTerrain?: (v: boolean) => void; // NEW
+  showRoad?: boolean; // NEW
+  setShowRoad?: (v: boolean) => void; // NEW
   
   showDvd: boolean;
   setShowDvd: (v: boolean) => void;
@@ -49,8 +51,10 @@ interface SettingsPanelProps {
   setReactorConfig?: (config: VisualizerConfig) => void; 
   sineWaveConfig?: VisualizerConfig; 
   setSineWaveConfig?: (config: VisualizerConfig) => void; 
-  terrainConfig?: TerrainConfig; // NEW: 4D Terrain Config
-  setTerrainConfig?: (config: TerrainConfig) => void; // NEW
+  terrainConfig?: TerrainConfig; 
+  setTerrainConfig?: (config: TerrainConfig) => void; 
+  roadConfig?: RoadConfig; // NEW
+  setRoadConfig?: (config: RoadConfig) => void; // NEW
 
   dvdConfig: DvdConfig;
   setDvdConfig: (config: DvdConfig) => void;
@@ -334,6 +338,8 @@ const SettingsPanel: React.FC<SettingsPanelProps> = (props) => {
                 showSineWave={props.showSineWave} setShowSineWave={props.setShowSineWave} sineWaveConfig={props.sineWaveConfig} updateSineWave={updaters.updateSineWave}
                 // Terrain
                 showVisualizerTerrain={props.showVisualizerTerrain} setShowVisualizerTerrain={props.setShowVisualizerTerrain} terrainConfig={props.terrainConfig} updateTerrain={updaters.updateTerrain}
+                // Road (New)
+                showRoad={props.showRoad} setShowRoad={props.setShowRoad} roadConfig={props.roadConfig} updateRoad={updaters.updateRoad}
             />
         </SettingsSection>
 

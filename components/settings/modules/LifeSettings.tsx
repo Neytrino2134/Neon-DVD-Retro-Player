@@ -2,10 +2,10 @@
 import React from 'react';
 import { EffectsConfig } from '../../../types';
 import RangeControl from '../RangeControl';
-import ToggleSwitch from '../ToggleSwitch';
 import CustomSelect from '../CustomSelect';
+import ToggleSwitch from '../ToggleSwitch';
 import { useLanguage } from '../../../contexts/LanguageContext';
-import { Zap, Grid, Trash2 } from 'lucide-react';
+import { Zap, Trash2, Activity } from 'lucide-react';
 
 interface LifeSettingsProps {
   config: EffectsConfig['life'];
@@ -29,17 +29,49 @@ const LifeSettings: React.FC<LifeSettingsProps> = ({ config, update }) => {
       { value: '#ff3333', label: 'RED ALERT' },
   ];
 
+  const modeOptions = [
+      { value: 'solid', label: 'SOLID BAR (CHAOS)' },
+      { value: 'tip', label: 'TIPS ONLY (FALLING)' },
+  ];
+
+  const posOptions = [
+      { value: 'bottom', label: 'BOTTOM' },
+      { value: 'center', label: 'CENTER' },
+      { value: 'top', label: 'TOP' },
+  ];
+
   return (
     <div className="pt-2">
        
-       <div className="mb-4">
+       {/* AUDIO REACTIVE SECTION */}
+       <div className="mb-4 bg-theme-primary/5 p-2 rounded border border-theme-primary/30">
            <ToggleSwitch 
-                label="GAME OF LIFE" 
-                icon={Grid} 
-                value={config.enabled} 
-                onChange={(v) => update({ ...config, enabled: v })} 
+                label="AUDIO REACTIVE" 
+                icon={Activity} 
+                value={config.audioReactive || false} 
+                onChange={(v) => update({ ...config, audioReactive: v })} 
                 color="blue"
            />
+           
+           {config.audioReactive && (
+               <div className="mt-2 space-y-2 animate-in fade-in slide-in-from-top-2">
+                   <div className="text-[9px] text-theme-muted font-mono mb-2">
+                       WAVEFORM SEEDS THE GRID. MASTER CONTROL AFFECTS SENSITIVITY.
+                   </div>
+                   <CustomSelect 
+                      label="INJECTION MODE"
+                      value={config.audioInjectionMode || 'solid'}
+                      options={modeOptions}
+                      onChange={(v) => update({ ...config, audioInjectionMode: v })}
+                   />
+                   <CustomSelect 
+                      label="POSITION"
+                      value={config.audioPosition || 'bottom'}
+                      options={posOptions}
+                      onChange={(v) => update({ ...config, audioPosition: v })}
+                   />
+               </div>
+           )}
        </div>
 
        <div className="grid grid-cols-2 gap-2 mb-4">

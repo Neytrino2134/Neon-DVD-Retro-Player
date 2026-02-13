@@ -1,6 +1,6 @@
 
 import React, { useState } from 'react';
-import { Maximize, Split, Minus, Grid, ChevronDown, Zap } from 'lucide-react';
+import { Maximize, Split, Minus, Grid, ChevronDown, Zap, Lock } from 'lucide-react';
 import { VisualizerConfig } from '../../types';
 import RangeControl from './RangeControl';
 import ToggleSwitch from './ToggleSwitch';
@@ -105,6 +105,18 @@ const VisualizerSettings: React.FC<VisualizerSettingsProps> = ({ config, update,
                 options={threeDModeOptions} 
                 onChange={(v: any) => update('threeDMode', v)} 
              />
+             
+             {/* LOCK VIEW TOGGLE */}
+             <div className="pt-2 border-t border-theme-border/30">
+                 <ToggleSwitch 
+                    label="LOCK VIEW" 
+                    icon={Lock} 
+                    value={config.lockView || false} 
+                    onChange={(v: boolean) => update('lockView', v)} 
+                    color="red"
+                 />
+                 <p className="text-[9px] text-theme-muted/70 pl-2">Prevents camera movement (Alt+Drag)</p>
+             </div>
           </div>
       )}
 

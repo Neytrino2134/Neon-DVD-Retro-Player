@@ -92,6 +92,12 @@ export const OCEAN_BLUE_PRESET: AppPreset = {
       scanlineEnabled: true,
       scanlineIntensity: 0.2,
       scanlineThickness: 4,
+      bloom: {
+        enabled: true,
+        strength: 1.5,
+        radius: 15,
+        threshold: 0.1
+      },
       glitch: {
         enabled: false,
         intensity: 0.5,
@@ -205,7 +211,10 @@ export const OCEAN_BLUE_PRESET: AppPreset = {
         fadeSpeed: 0.8,
         color: '#00f3ff',
         gridColor: 'rgba(255,255,255,0.1)',
-        triggerToken: 0
+        triggerToken: 0,
+        audioReactive: false,
+        audioInjectionMode: 'solid',
+        audioPosition: 'bottom'
       },
       vignette: {
         enabled: true,

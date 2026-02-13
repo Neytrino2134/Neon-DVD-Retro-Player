@@ -7,8 +7,8 @@ interface ToggleSwitchProps {
   icon: any;
   value: boolean;
   onChange: (v: boolean) => void;
-  color?: 'purple' | 'green' | 'blue'; // Kept for API compatibility, but mapped to theme
-  disabled?: boolean; // NEW: Disabled state
+  color?: 'purple' | 'green' | 'blue' | 'red' | 'yellow'; // Extended colors
+  disabled?: boolean;
 }
 
 const ToggleSwitch: React.FC<ToggleSwitchProps> = ({ label, icon: Icon, value, onChange, color: _color = 'purple', disabled = false }) => {

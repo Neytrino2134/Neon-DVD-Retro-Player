@@ -1,6 +1,6 @@
 
 import React, { useRef, useEffect, forwardRef, useState } from 'react';
-import { AudioTrack, VisualizerConfig, EffectsConfig, DvdConfig, MarqueeConfig, PatternConfig, WatermarkConfig, BgAnimationType, FitMode, ScreenAlignment, TerrainConfig, CursorStyle } from '../types';
+import { AudioTrack, VisualizerConfig, EffectsConfig, DvdConfig, MarqueeConfig, PatternConfig, WatermarkConfig, BgAnimationType, FitMode, ScreenAlignment, TerrainConfig, CursorStyle, RoadConfig } from '../types';
 import { useNotification } from '../contexts/NotificationContext';
 import { useGestures } from '../hooks/useGestures';
 import { useTheme } from '../contexts/ThemeContext';
@@ -14,6 +14,7 @@ import Visualizer from './Visualizer';
 import Visualizer3D from './Visualizer3D'; 
 import VisualizerSpectrum3D from './VisualizerSpectrum3D'; 
 import VisualizerTerrain3D from './VisualizerTerrain3D'; 
+import VisualizerRoad3D from './VisualizerRoad3D'; // NEW
 import SineWave from './SineWave'; 
 import MediaRenderer from './MediaRenderer';
 import NoiseOverlay from './NoiseOverlay';
@@ -36,7 +37,7 @@ import GeminiChatEffect from './effects/GeminiChatEffect';
 import LightLeaksEffect from './effects/LightLeaksEffect';
 import RainEffect from './effects/RainEffect'; 
 import TronEffect from './effects/TronEffect'; 
-import LifeEffect from './effects/LifeEffect'; // NEW
+import LifeEffect from './effects/LifeEffect'; 
 import VignetteEffect from './effects/VignetteEffect'; 
 import LightFlickerEffect from './effects/LightFlickerEffect'; 
 
@@ -74,11 +75,13 @@ interface RetroScreenProps {
   setReactorConfig?: (c: VisualizerConfig) => void; 
   sineWaveConfig?: VisualizerConfig; 
   terrainConfig?: TerrainConfig; 
+  roadConfig?: RoadConfig; // NEW
   
   showVisualizer: boolean;
   showVisualizer3D?: boolean; 
   showSineWave?: boolean; 
   showVisualizerTerrain?: boolean; 
+  showRoad?: boolean; // NEW
   
   dvdConfig: DvdConfig;
   showDvd: boolean;
@@ -153,7 +156,7 @@ const RetroScreen = forwardRef<HTMLDivElement, RetroScreenProps>((props, externa
     analyser, isPlaying, currentTrack, tracks, onTrackSelect, bgMedia, bgColor, bgPattern = 'none', bgPatternConfig,
     videoStream, isSystemAudioActive, isMicActive, streamMode = 'bg', screenFitMode = 'cover', screenAlignment = 'center',
     globalWaveformConfig, setGlobalWaveformConfig,
-    visualizerConfig, setVisualizerConfig, reactorConfig, sineWaveConfig, terrainConfig, showVisualizer, showVisualizer3D, showSineWave, showVisualizerTerrain, dvdConfig, showDvd, effectsConfig, marqueeConfig, watermarkConfig,
+    visualizerConfig, setVisualizerConfig, reactorConfig, sineWaveConfig, terrainConfig, roadConfig, showVisualizer, showVisualizer3D, showSineWave, showVisualizerTerrain, showRoad, dvdConfig, showDvd, effectsConfig, marqueeConfig, watermarkConfig,
     progress = 0, currentTime, duration,
     focusMode, setFocusMode, isDragging,
     onDragOver, onDragEnter, onDragLeave, onDrop,
@@ -376,6 +379,36 @@ const RetroScreen = forwardRef<HTMLDivElement, RetroScreenProps>((props, externa
   // We use inline style for maximum specificity
   const shouldHideCursor = retroScreenCursorStyle !== 'system';
 
+  // --- GLOBAL BLOOM STYLE ---
+  // Create a drop-shadow filter string for global glow
+  // This effectively duplicates content with blur, creating "bloom" on non-transparent pixels
+  let globalFilterStyle = {};
+  if (effectsConfig.bloom && effectsConfig.bloom.enabled) {
+      // Use standard white glow if no color specified, but we rely on content colors.
+      // Since drop-shadow uses the element's own color if color is omitted? No, default is text color usually.
+      // But we can't easily guess. A safe bet is a white/theme glow or just brightness boost + drop-shadow.
+      // Actually, drop-shadow(offset-x, offset-y, blur-radius, color) requires color in most browsers or uses 'color' property.
+      // We will use the Primary Theme Color for the global glow tint.
+      const glowColor = colors.primary;
+      const radius = effectsConfig.bloom.radius || 10;
+      const strength = effectsConfig.bloom.strength || 1.0;
+      // We stack drop-shadows to increase intensity if needed
+      // Note: filter applies to everything inside signalLayerRef
+      
+      const shadow = `drop-shadow(0 0 ${radius}px ${glowColor})`;
+      // If strength > 1, repeat the shadow for intensity
+      const filterString = strength > 1.5 ? `${shadow} ${shadow}` : shadow;
+      
+      // Combine with chromatic aberration if active
+      if (effectiveChromatic > 0) {
+           globalFilterStyle = { filter: `url(#chromatic-aberration-filter) ${filterString}` };
+      } else {
+           globalFilterStyle = { filter: filterString };
+      }
+  } else if (effectiveChromatic > 0) {
+      globalFilterStyle = { filter: 'url(#chromatic-aberration-filter)' };
+  }
+
   return (
     <div className={`flex-grow flex items-center justify-center relative bg-gray-950 transition-all duration-500 ${focusMode ? 'p-0' : 'p-1 md:p-3'}`}>
       <div 
@@ -422,7 +455,7 @@ const RetroScreen = forwardRef<HTMLDivElement, RetroScreenProps>((props, externa
             <div 
                 ref={signalLayerRef} 
                 className="absolute inset-0 w-full h-full"
-                style={effectiveChromatic > 0 ? { filter: 'url(#chromatic-aberration-filter)' } : undefined}
+                style={globalFilterStyle}
             >
                 {/* IMAGE LAYER */}
                 <div ref={imageLayerRef} className="absolute inset-0 w-full h-full will-change-transform">
@@ -447,7 +480,13 @@ const RetroScreen = forwardRef<HTMLDivElement, RetroScreenProps>((props, externa
                 <TransitionEffect phase={transitionPhase} mode={bgTransition} />
                 <RainEffect config={effectsConfig.rain} />
                 
-                <LifeEffect config={effectsConfig.life} /> {/* NEW: Game of Life */}
+                <LifeEffect 
+                    config={effectsConfig.life} 
+                    analyser={analyser} 
+                    isPlaying={isAudioProcessing} 
+                    volume={volume}
+                    visualizerConfig={globalWaveformConfig || visualizerConfig}
+                />
                 
                 <TronEffect 
                     config={effectsConfig.tron} 
@@ -477,6 +516,10 @@ const RetroScreen = forwardRef<HTMLDivElement, RetroScreenProps>((props, externa
 
                 {showVisualizerTerrain && terrainConfig && (
                     <VisualizerTerrain3D analyser={analyser} isPlaying={isAudioProcessing} config={terrainConfig} volume={volume} />
+                )}
+
+                {showRoad && roadConfig && (
+                    <VisualizerRoad3D analyser={analyser} isPlaying={isAudioProcessing} config={roadConfig} visualizerConfig={globalWaveformConfig || visualizerConfig} volume={volume} />
                 )}
 
                 {showSineWave && sineWaveConfig && (

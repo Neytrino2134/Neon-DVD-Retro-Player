@@ -1,12 +1,13 @@
 
 import React from 'react';
-import { Activity, Box, Waves, Mountain, Sliders } from 'lucide-react';
+import { Activity, Box, Waves, Mountain, Sliders, ArrowUpCircle } from 'lucide-react';
 import ModuleWrapper from '../ModuleWrapper';
 import VisualizerSettings from '../VisualizerSettings';
 import TerrainSettings from '../modules/TerrainSettings';
-import GlobalWaveformSettings from '../modules/GlobalWaveformSettings'; // NEW
+import GlobalWaveformSettings from '../modules/GlobalWaveformSettings';
+import RoadSettings from '../modules/RoadSettings'; // NEW
 import { NumberedLabel } from '../SettingsSection';
-import { VisualizerConfig, TerrainConfig } from '../../../types';
+import { VisualizerConfig, TerrainConfig, RoadConfig } from '../../../types';
 
 interface WaveformSectionProps {
   expandedState: Record<string, boolean>;
@@ -16,7 +17,7 @@ interface WaveformSectionProps {
   // NEW: Global Props
   globalWaveformConfig?: VisualizerConfig;
   updateGlobalWaveform?: (k: keyof VisualizerConfig, v: any) => void;
-  applyGlobalToAll?: () => void; // Added property
+  applyGlobalToAll?: () => void;
   
   // Props
   showVisualizer: boolean;
@@ -34,10 +35,15 @@ interface WaveformSectionProps {
   sineWaveConfig?: VisualizerConfig;
   updateSineWave: (k: keyof VisualizerConfig, v: any) => void;
 
-  showVisualizerTerrain?: boolean; // NEW
-  setShowVisualizerTerrain?: (v: boolean) => void; // NEW
-  terrainConfig?: TerrainConfig; // NEW
-  updateTerrain?: (k: keyof TerrainConfig, v: any) => void; // NEW
+  showVisualizerTerrain?: boolean;
+  setShowVisualizerTerrain?: (v: boolean) => void;
+  terrainConfig?: TerrainConfig;
+  updateTerrain?: (k: keyof TerrainConfig, v: any) => void;
+
+  showRoad?: boolean; // NEW
+  setShowRoad?: (v: boolean) => void; // NEW
+  roadConfig?: RoadConfig; // NEW
+  updateRoad?: (k: keyof RoadConfig, v: any) => void; // NEW
 }
 
 const WaveformSection: React.FC<WaveformSectionProps> = ({
@@ -46,11 +52,12 @@ const WaveformSection: React.FC<WaveformSectionProps> = ({
   showVisualizer, setShowVisualizer, visualizerConfig, updateVisualizer,
   showVisualizer3D, setShowVisualizer3D, reactorConfig, updateReactor,
   showSineWave, setShowSineWave, sineWaveConfig, updateSineWave,
-  showVisualizerTerrain, setShowVisualizerTerrain, terrainConfig, updateTerrain
+  showVisualizerTerrain, setShowVisualizerTerrain, terrainConfig, updateTerrain,
+  showRoad, setShowRoad, roadConfig, updateRoad
 }) => {
   return (
     <div className="space-y-3">
-        {/* 0. MASTER CONTROL (NEW) */}
+        {/* 0. MASTER CONTROL */}
         {globalWaveformConfig && updateGlobalWaveform && (
             <ModuleWrapper id="master_wave" label={<span className="flex items-center gap-2"><span className="text-theme-muted opacity-50 font-normal">00 //</span> MASTER CONTROL</span>} icon={Sliders} isEnabled={true} isAlwaysOn={true} isExpanded={expandedState['master_wave']} onToggleExpand={(e) => toggleExpand('master_wave', e.shiftKey)} onToggleEnable={() => {}}>
                 <GlobalWaveformSettings config={globalWaveformConfig} update={updateGlobalWaveform} />
@@ -80,6 +87,13 @@ const WaveformSection: React.FC<WaveformSectionProps> = ({
         {setShowSineWave && sineWaveConfig && (
             <ModuleWrapper id="sine" label={<span className="flex items-center gap-2"><span className="text-theme-muted opacity-50 font-normal">04 //</span> SINE WAVE</span>} icon={Waves} isEnabled={showSineWave || false} isExpanded={expandedState['sine']} onToggleExpand={(e) => toggleExpand('sine', e.shiftKey)} onToggleEnable={() => safeAction(() => { if (!showSineWave) toggleExpand('sine', false, true); setShowSineWave(!showSineWave); })}>
                 <VisualizerSettings config={sineWaveConfig} update={updateSineWave} mode="reactor" /> {/* Use 'reactor' mode to hide incompatible bar settings */}
+            </ModuleWrapper>
+        )}
+
+        {/* 5. Neon Road (NEW) */}
+        {setShowRoad && roadConfig && updateRoad && (
+            <ModuleWrapper id="road" label={<span className="flex items-center gap-2"><span className="text-theme-muted opacity-50 font-normal">05 //</span> NEON ROAD</span>} icon={ArrowUpCircle} isEnabled={showRoad || false} isExpanded={expandedState['road']} onToggleExpand={(e) => toggleExpand('road', e.shiftKey)} onToggleEnable={() => safeAction(() => { if (!showRoad) toggleExpand('road', false, true); setShowRoad(!showRoad); })}>
+                <RoadSettings config={roadConfig} update={updateRoad} />
             </ModuleWrapper>
         )}
     </div>

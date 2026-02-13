@@ -74,11 +74,13 @@ const CenterPanel: React.FC<CenterPanelProps> = ({
           setReactorConfig={config.setReactorConfig}
           sineWaveConfig={config.sineWaveConfig}
           terrainConfig={config.terrainConfig}
+          roadConfig={config.roadConfig} // NEW
 
           showVisualizer={config.showVisualizer}
           showVisualizer3D={config.showVisualizer3D}
           showSineWave={config.showSineWave}
           showVisualizerTerrain={config.showVisualizerTerrain}
+          showRoad={config.showRoad} // NEW
 
           dvdConfig={config.dvdConfig}
           showDvd={config.showDvd}

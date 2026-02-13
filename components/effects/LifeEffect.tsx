@@ -1,12 +1,16 @@
 
 import React, { useEffect, useRef } from 'react';
-import { EffectsConfig } from '../../types';
+import { EffectsConfig, VisualizerConfig } from '../../types';
 
 interface LifeEffectProps {
   config: EffectsConfig['life'];
+  analyser?: AnalyserNode | null;
+  isPlaying?: boolean;
+  volume?: number;
+  visualizerConfig?: VisualizerConfig;
 }
 
-const LifeEffect: React.FC<LifeEffectProps> = ({ config }) => {
+const LifeEffect: React.FC<LifeEffectProps> = ({ config, analyser, isPlaying, volume = 1, visualizerConfig }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const animationRef = useRef<number>(0);
   
@@ -14,6 +18,7 @@ const LifeEffect: React.FC<LifeEffectProps> = ({ config }) => {
   const gridRef = useRef<Uint8Array | null>(null);
   const nextGridRef = useRef<Uint8Array | null>(null);
   const trailRef = useRef<Float32Array | null>(null);
+  const dataArrayRef = useRef<Uint8Array | null>(null);
   
   // Dimensions
   const gridDimsRef = useRef({ w: 0, h: 0 });
@@ -21,6 +26,24 @@ const LifeEffect: React.FC<LifeEffectProps> = ({ config }) => {
   
   // Config cache to detect trigger changes
   const lastTriggerTokenRef = useRef(0);
+  
+  // Store config in ref to access latest values inside requestAnimationFrame loop
+  const configRef = useRef(config);
+  const visConfigRef = useRef(visualizerConfig);
+
+  useEffect(() => {
+      configRef.current = config;
+  }, [config]);
+
+  useEffect(() => {
+      visConfigRef.current = visualizerConfig;
+  }, [visualizerConfig]);
+
+  useEffect(() => {
+      if (analyser && !dataArrayRef.current) {
+          dataArrayRef.current = new Uint8Array(analyser.frequencyBinCount);
+      }
+  }, [analyser]);
 
   // Initialize Grids
   const initGrid = (w: number, h: number, cellSize: number) => {
@@ -124,11 +147,14 @@ const LifeEffect: React.FC<LifeEffectProps> = ({ config }) => {
     let w = canvas.width = canvas.offsetWidth;
     let h = canvas.height = canvas.offsetHeight;
     
-    // Initial setup
-    initGrid(w, h, config.cellSize || 10);
+    // Initial setup with current config values
+    initGrid(w, h, configRef.current.cellSize || 10);
 
     const render = (time: number) => {
-        if (!config.enabled) {
+        const cfg = configRef.current; // Access latest config
+        const visCfg = visConfigRef.current;
+
+        if (!cfg.enabled) {
             ctx.clearRect(0, 0, w, h);
             animationRef.current = requestAnimationFrame(render);
             return;
@@ -138,24 +164,27 @@ const LifeEffect: React.FC<LifeEffectProps> = ({ config }) => {
         if (canvas.width !== canvas.offsetWidth || canvas.height !== canvas.offsetHeight) {
             w = canvas.width = canvas.offsetWidth;
             h = canvas.height = canvas.offsetHeight;
-            initGrid(w, h, config.cellSize || 10);
+            initGrid(w, h, cfg.cellSize || 10);
         }
 
-        // Trigger Check
-        if (config.triggerToken !== lastTriggerTokenRef.current) {
+        // Trigger Check (Buttons)
+        if (cfg.triggerToken !== lastTriggerTokenRef.current) {
             const cols = gridDimsRef.current.w;
             const rows = gridDimsRef.current.h;
             
-            if (config.triggerAction === 'clear') clear();
-            else if (config.triggerAction === 'random') randomize(cols, rows);
-            else if (config.triggerAction === 'glider_gun') spawnGliderGun(cols, rows);
-            else if (config.triggerAction === 'pulsar') spawnPulsar(cols, rows);
+            // Ensure grid exists before triggering
+            if (gridRef.current && cols > 0 && rows > 0) {
+                if (cfg.triggerAction === 'clear') clear();
+                else if (cfg.triggerAction === 'random') randomize(cols, rows);
+                else if (cfg.triggerAction === 'glider_gun') spawnGliderGun(cols, rows);
+                else if (cfg.triggerAction === 'pulsar') spawnPulsar(cols, rows);
+            }
             
-            lastTriggerTokenRef.current = config.triggerToken || 0;
+            lastTriggerTokenRef.current = cfg.triggerToken || 0;
         }
 
         // Simulation Update
-        const targetFPS = Math.max(1, config.speed * 6); // Speed 1-10 -> 6-60 FPS
+        const targetFPS = Math.max(1, cfg.speed * 6); // Speed 1-10 -> 6-60 FPS
         const interval = 1000 / targetFPS;
         const delta = time - lastDrawTimeRef.current;
 
@@ -166,6 +195,111 @@ const LifeEffect: React.FC<LifeEffectProps> = ({ config }) => {
         const trail = trailRef.current;
 
         if (grid && nextGrid && trail) {
+            
+            // --- AUDIO INJECTION ---
+            // If audio reactive, seed the grid BEFORE calculating next generation
+            if (cfg.audioReactive && analyser && isPlaying && dataArrayRef.current && visCfg) {
+                analyser.getByteFrequencyData(dataArrayRef.current as any);
+                const bufferLen = dataArrayRef.current.length;
+                const sampleRate = analyser.context.sampleRate;
+                const binSize = sampleRate / 2 / bufferLen;
+                
+                // Frequency Map
+                const minHz = 20 + (visCfg.minFrequency * 40); 
+                const maxHz = minHz + 500 + (visCfg.maxFrequency * 180);
+                const logMin = Math.log10(minHz);
+                const logMax = Math.log10(maxHz);
+
+                // Determine effective columns for mirroring
+                const effectiveCols = visCfg.mirror ? Math.floor(cols / 2) : cols;
+                
+                // Sensitivity from Master Control (fallback to 1.5)
+                const sensitivity = (visCfg.sensitivity || 1.5) * (visCfg.preventVolumeScaling ? 1 : volume);
+
+                const inject = (x: number, hRatio: number) => {
+                    if (x < 0 || x >= cols) return;
+                    
+                    const barHeight = Math.floor(hRatio * rows);
+                    
+                    // Injection Position Logic
+                    let y = 0;
+                    if (cfg.audioPosition === 'top') {
+                        y = barHeight;
+                    } else if (cfg.audioPosition === 'center') {
+                        // Center is tricky for GoL, maybe just offset from center?
+                        // Let's do symmetrical expansion from center line
+                        const mid = Math.floor(rows / 2);
+                        const halfH = Math.floor(barHeight / 2);
+                        // Injecting a strip in center
+                        // For 'tip' mode, we inject at top/bottom of the bar
+                        // For 'solid', we fill the bar
+                        if (cfg.audioInjectionMode === 'tip') {
+                             const y1 = Math.max(0, mid - halfH);
+                             const y2 = Math.min(rows - 1, mid + halfH);
+                             grid[y1 * cols + x] = 1;
+                             grid[y2 * cols + x] = 1;
+                             return;
+                        } else {
+                             const start = Math.max(0, mid - halfH);
+                             const end = Math.min(rows - 1, mid + halfH);
+                             for(let iy = start; iy <= end; iy++) grid[iy * cols + x] = 1;
+                             return;
+                        }
+                    } else {
+                        // Bottom (Default)
+                        y = rows - 1 - barHeight;
+                    }
+
+                    // Clamp
+                    y = Math.max(0, Math.min(rows - 1, y));
+
+                    if (cfg.audioInjectionMode === 'tip') {
+                        grid[y * cols + x] = 1;
+                        // Add a neighbor to ensure survival for 1 tick if isolated
+                        if (y + 1 < rows) grid[(y + 1) * cols + x] = 1;
+                    } else {
+                        // Solid Bar
+                        if (cfg.audioPosition === 'top') {
+                            for(let iy = 0; iy <= y; iy++) grid[iy * cols + x] = 1;
+                        } else {
+                            // Bottom
+                            for(let iy = rows - 1; iy >= y; iy--) grid[iy * cols + x] = 1;
+                        }
+                    }
+                };
+
+                for (let i = 0; i < effectiveCols; i++) {
+                    const t = i / (effectiveCols - 1);
+                    // Use logarithmic mapping similar to Visualizer.tsx
+                    const freq = Math.pow(10, logMin + (t * (logMax - logMin)));
+                    const index = Math.floor(freq / binSize);
+                    
+                    if (index < bufferLen) {
+                        let val = dataArrayRef.current[index] / 255;
+                        
+                        // Apply physics/curves
+                        val = Math.pow(val, 2.5); 
+                        val *= sensitivity;
+                        
+                        // Clamp
+                        val = Math.min(1, val);
+
+                        if (val > 0.05) { // Threshold
+                            if (visCfg.mirror) {
+                                // Left Side
+                                const leftX = Math.floor(cols / 2) - 1 - i;
+                                inject(leftX, val);
+                                // Right Side
+                                const rightX = Math.floor(cols / 2) + i;
+                                inject(rightX, val);
+                            } else {
+                                inject(i, val);
+                            }
+                        }
+                    }
+                }
+            }
+
             // Update logic only if interval passed
             if (delta > interval) {
                 lastDrawTimeRef.current = time - (delta % interval);
@@ -210,14 +344,14 @@ const LifeEffect: React.FC<LifeEffectProps> = ({ config }) => {
             ctx.lineWidth = 1;
             ctx.strokeRect(0, 0, w, h);
 
-            const cs = config.cellSize;
+            const cs = cfg.cellSize;
             const activeGrid = gridRef.current!; // Current active grid
 
             // Iterate to draw and update trails
             // We update trails every frame for smoothness even if sim is slow
-            const fade = Math.max(0.01, (1 - config.fadeSpeed) * 0.2); 
+            const fade = Math.max(0.01, (1 - cfg.fadeSpeed) * 0.2); 
 
-            ctx.fillStyle = config.color;
+            ctx.fillStyle = cfg.color;
             
             for (let i = 0; i < activeGrid.length; i++) {
                 const cell = activeGrid[i];
@@ -247,7 +381,7 @@ const LifeEffect: React.FC<LifeEffectProps> = ({ config }) => {
     animationRef.current = requestAnimationFrame(render);
 
     return () => cancelAnimationFrame(animationRef.current);
-  }, [config.enabled, config.cellSize, config.speed, config.fadeSpeed, config.color]);
+  }, []); // Empty dependency array: we rely on configRef for updates to avoid loop restarts
 
   return (
     <canvas 

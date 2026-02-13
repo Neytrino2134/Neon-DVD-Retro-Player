@@ -5,7 +5,7 @@ import CustomSelect from '../CustomSelect';
 import ToggleSwitch from '../ToggleSwitch';
 import { useLanguage } from '../../../contexts/LanguageContext';
 import { DvdConfig, EffectsConfig, VideoColorConfig } from '../../../types';
-import { Volume2, Power, Play, Timer, Upload, Film, Trash2, Check } from 'lucide-react';
+import { Volume2, Power, Play, Timer, Upload, Film, Trash2, Check, Sun } from 'lucide-react';
 import { saveDvdLogo, getAllDvdLogos, deleteDvdLogo } from '../../../lib/db';
 
 const FPS_OPTIONS = [
@@ -332,7 +332,6 @@ export const ChromaticSettings: React.FC<{ config: EffectsConfig, update: (k: ke
     );
 };
 
-// Updated VignetteSettings
 export const VignetteSettings: React.FC<{ config: EffectsConfig['vignette'], update: (v: EffectsConfig['vignette']) => void }> = ({ config, update }) => {
     const { t } = useLanguage();
     return (
@@ -411,6 +410,29 @@ export const VideoColorSettings: React.FC<{ config: EffectsConfig['videoSettings
                     <RangeControl label={t('vid_hue')} value={config.hueRotate} min={0} max={360} step={10} onChange={v => update({ ...config, hueRotate: v, preset: 'custom' })} className="mb-4" />
                     <RangeControl label={t('vid_warmth')} value={config.warmth} min={-1.0} max={1.0} step={0.05} onChange={v => update({ ...config, warmth: v, preset: 'custom' })} className="mb-0" />
                 </div>
+            </div>
+        </div>
+    );
+};
+
+// NEW: Bloom Settings
+export const BloomSettings: React.FC<{ config: EffectsConfig['bloom'], update: (v: EffectsConfig['bloom']) => void }> = ({ config, update }) => {
+    return (
+        <div className="pt-2">
+            <div className="mb-4">
+                <ToggleSwitch 
+                    label="GLOBAL GLOW" 
+                    icon={Sun} 
+                    value={config.enabled} 
+                    onChange={(v) => update({ ...config, enabled: v })} 
+                    color="purple"
+                />
+            </div>
+            
+            {/* Show controls only if enabled */}
+            <div className={`transition-opacity duration-300 ${config.enabled ? 'opacity-100' : 'opacity-50 pointer-events-none'}`}>
+                 <RangeControl label="INTENSITY" value={config.strength} min={0} max={2.0} step={0.1} onChange={v => update({ ...config, strength: v })} className="mb-4" />
+                 <RangeControl label="RADIUS (BLUR)" value={config.radius} min={0} max={50} step={1} onChange={v => update({ ...config, radius: v })} className="mb-0" />
             </div>
         </div>
     );

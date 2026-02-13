@@ -351,17 +351,17 @@ const SpectrumScene: React.FC<{ analyser: AnalyserNode | null; isPlaying: boolea
           </instancedMesh>
       )}
       
-      <CameraController />
+      <CameraController locked={config.lockView} />
     </>
   );
 };
 
 const VisualizerSpectrum3D: React.FC<VisualizerSpectrum3DProps> = (props) => {
-  const [isInteractive, setIsInteractive] = useState(false);
+  const [altPressed, setAltPressed] = useState(false);
 
   useEffect(() => {
     const handleKey = (e: KeyboardEvent) => {
-        setIsInteractive(e.altKey);
+        setAltPressed(e.altKey);
     };
     window.addEventListener('keydown', handleKey);
     window.addEventListener('keyup', handleKey);
@@ -371,8 +371,10 @@ const VisualizerSpectrum3D: React.FC<VisualizerSpectrum3DProps> = (props) => {
     }
   }, []);
 
+  const isInteractive = altPressed && !props.config.lockView;
+
   return (
-    <div className={`absolute inset-0 w-full h-full z-10 ${isInteractive ? 'pointer-events-auto' : 'pointer-events-none'}`}>
+    <div className={`absolute inset-0 w-full h-full z-[30] ${isInteractive ? 'pointer-events-auto' : 'pointer-events-none'}`}>
         <Canvas 
             camera={{ position: [0, 2, 8], fov: 50 }} 
             gl={{ alpha: true, antialias: true }}
@@ -385,3 +387,4 @@ const VisualizerSpectrum3D: React.FC<VisualizerSpectrum3DProps> = (props) => {
 };
 
 export default VisualizerSpectrum3D;
+    

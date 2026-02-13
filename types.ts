@@ -1,81 +1,192 @@
 
-export interface TronConfig {
+export const NEON_COLORS = ['#00f3ff', '#ff00ff', '#00ff00', '#bc13fe', '#f9f871'];
+
+export interface TagMetadata {
+  title?: string;
+  artist?: string;
+  album?: string;
+  year?: string;
+  genre?: string;
+  trackNumber?: string;
+}
+
+export interface AudioTrack {
+  id: string;
+  playlistId: string;
+  name: string;
+  url: string;
+  file: File;
+  order?: number;
+  tags?: TagMetadata;
+  artworkUrl?: string;
+  rating?: number;
+}
+
+export interface Playlist {
+  id: string;
+  name: string;
+  tracks: AudioTrack[];
+  order: number;
+}
+
+export type ViewMode = 'default' | 'mini' | 'cinema' | 'player-focus';
+
+export interface VisualizerConfig {
+  style: string;
+  strokeEnabled: boolean;
+  showTips: boolean;
+  segmented: boolean;
+  segmentHeight: number;
+  segmentGap: number;
+  tipHeight: number;
+  tipSpeed: number;
+  highlightLastBrick: boolean;
+  tipColor: string;
+  tipGlow: boolean;
+  position: 'top' | 'bottom' | 'center' | 'circle';
+  barCount: number;
+  sensitivity: number;
+  fillOpacity: number;
+  strokeOpacity: number;
+  normalize: boolean;
+  preventVolumeScaling: boolean;
+  minFrequency: number;
+  maxFrequency: number;
+  barGap: number;
+  mirror: boolean;
+  barGravity?: number;
+  invertMirror?: boolean;
+  threeDMode?: 'reactor' | 'spectrum';
+  lockView?: boolean; // NEW: Lock Camera Interaction
+}
+
+export interface TerrainConfig {
+  gridSize: number; 
+  speed: number; 
+  heightMultiplier: number; 
+  renderMode: 'solid' | 'wireframe' | 'dots'; 
+  colorMode: 'theme' | 'rainbow' | 'matrix';
+  opacity: number;
+  lineThickness: number; 
+  glow: boolean;
+  brightness?: number; 
+  mirror?: boolean;
+  invertMirror?: boolean;
+  preventVolumeScaling?: boolean;
+  viewDistance?: number; 
+  terrainLength?: number; 
+  scrollSpeed?: number; 
+  showWaveform?: boolean; 
+  minFrequency?: number; 
+  maxFrequency?: number;
+  barGravity?: number;
+  cameraFov?: number; 
+  showSpaceship?: boolean; 
+  lockView?: boolean; // NEW: Lock Camera Interaction
+}
+
+export interface RoadConfig {
+  enabled: boolean;
+  speed: number;
+  roadWidth: number;
+  buildingHeightScale: number;
+  buildingBrightness: number;
+  showWireframe: boolean;
+  colorMode: 'theme' | 'cyan' | 'magenta' | 'orange';
+  lockView?: boolean; // NEW: Lock Camera Interaction
+}
+
+export interface DvdConfig {
+  size: number;
+  speed: number;
+  opacity: number;
+  enableSfx: boolean;
+  logoType: 'dvd' | 'neon_waves' | 'custom';
+  customLogoUrl?: string;
+  activeDvdLogoId?: string;
+}
+
+export interface MarqueeConfig {
+  enabled: boolean;
+  style: string;
+  showProgress: boolean;
+  progressMode: 'continuous' | 'blocks';
+  progressHeight: number;
+  progressOpacity: number;
+  speed: number;
+  opacity: number;
+  fontSize: number;
+  channelName: string;
+  borderEnabled: boolean;
+}
+
+export type HologramCategory = 'system' | 'interactive' | 'music' | 'motivational' | 'philosophy' | 'space';
+
+export interface HologramConfig {
   enabled: boolean;
   opacity: number;
   speed: number;
-  spawnRate: number; // Frequency of new agents
-  trailLength: number; // NEW: 0.1 (short) to 1.0 (long)
-  size: number; // NEW: Thickness of agent (1-4)
-  maxAgents: number; // NEW: Maximum players on map (4-20)
-  showNames: boolean; // NEW: Show player nicknames
-  showLeaderboard: boolean; // NEW: Show Holographic Leaderboard
-  enableUser: boolean; // NEW: User playable character
-  enableDummies: boolean; // NEW: Spawn stupid bots
-  glowEnabled: boolean; // NEW: Enable glow effect
-  glowIntensity: number; // NEW: Intensity of glow
-  bgEnabled: boolean; // NEW: Background pattern toggle
-  bgPattern: 'grid' | 'iso' | 'hex' | 'dots'; // NEW: Pattern type
-  erasureSpeed?: number; // NEW: Multiplier for line erasure speed
-  speedVariance?: number; // NEW: Random speed difference between agents (0-1)
-  roundMode?: boolean; // NEW: Enable competitive round mode linked to track time
+  interval: number;
+  scale: number;
+  enableIcons: boolean;
+  showHotspots: boolean;
+  categories: Record<HologramCategory, boolean>;
+  color?: string;
+  width?: number;
+  typingSpeed?: number;
 }
 
-export interface LifeConfig {
+export interface GeminiChatConfig {
   enabled: boolean;
-  speed: number; // Simulation tick speed
-  cellSize: number; // Pixel size of cell
-  fadeSpeed: number; // Trail length (0-1)
-  color: string;
-  gridColor: string;
-  // Trigger system for presets
-  triggerAction?: 'random' | 'clear' | 'glider_gun' | 'pulsar';
-  triggerToken?: number; // Increment to fire action
+  opacity: number;
+  scale: number;
+  width: number;
+  typingSpeed: number;
+  categories: Record<HologramCategory, boolean>;
+  color?: string;
 }
 
-export interface VideoColorConfig {
-  enabled: boolean;
-  brightness: number; // 0.0 to 3.0 (def 1.0)
-  contrast: number;   // 0.0 to 3.0 (def 1.0)
-  saturation: number; // 0.0 to 3.0 (def 1.0)
-  grayscale: number;  // 0.0 to 1.0 (def 0)
-  sepia: number;      // 0.0 to 1.0 (def 0)
-  hueRotate: number;  // 0 to 360 (def 0)
-  warmth: number;     // -1.0 (Blue) to 1.0 (Orange) (def 0)
-  preset: string;     // ID of current preset
-}
-
-// NEW: YouTube Authentication Config
-export interface YouTubeAuthConfig {
-  clientId: string;
-  isConnected: boolean;
-  channelName?: string;
-  channelAvatar?: string;
-}
-
-// NEW: YouTube Chat Visual Config
 export interface YouTubeChatConfig {
   enabled: boolean;
   opacity: number;
   scale: number;
   width: number;
-  speed: number; // Scroll speed
+  speed: number;
   color: string;
   showAvatars: boolean;
   maxMessages: number;
 }
 
+export interface VideoColorConfig {
+  enabled: boolean;
+  brightness: number;
+  contrast: number;
+  saturation: number;
+  grayscale: number;
+  sepia: number;
+  hueRotate: number;
+  warmth: number;
+  preset: string;
+}
+
 export interface EffectsConfig {
   fps: number;
-  showFps: boolean; // NEW: Show FPS Counter
-  signalEnabled: boolean; // NEW: Master toggle for signal processor
+  showFps: boolean;
+  signalEnabled: boolean;
   pixelation: number;
   noise: number;
-  chromaticEnabled: boolean; // NEW: Master toggle for chromatic aberration
+  chromaticEnabled: boolean;
   chromaticAberration: number;
   vhsJitter: number;
   scanlineEnabled: boolean;
   scanlineIntensity: number;
   scanlineThickness: number;
+  bloom: {
+    enabled: boolean;
+    strength: number;
+    radius: number;
+    threshold: number;
+  };
   glitch: {
     enabled: boolean;
     intensity: number;
@@ -96,285 +207,70 @@ export interface EffectsConfig {
     opacity: number;
     scale: number;
   };
-  holograms: {
-    enabled: boolean;
-    opacity: number;
-    speed: number; // Typing speed
-    interval: number; // Seconds between messages
-    scale: number;
-    color?: string; // NEW: Specific color for hologram
-    enableIcons: boolean; // NEW: Enable graphical icons
-    showHotspots: boolean; // NEW: Show interactive background hotspots
-    categories: Record<HologramCategory, boolean>;
-  };
-  geminiChat: GeminiChatConfig; // NEW
-  youtubeChat: YouTubeChatConfig; // NEW: YouTube Chat Module
+  holograms: HologramConfig;
+  geminiChat: GeminiChatConfig;
+  youtubeChat: YouTubeChatConfig;
   lightLeaks: {
     enabled: boolean;
-    intensity: number; // Opacity
-    speed: number; // Movement speed
-    number: number; // Amount of blobs
+    intensity: number;
+    speed: number;
+    number: number;
   };
-  lightFlicker: { // NEW: Light Bulb Flicker Effect
+  lightFlicker: {
     enabled: boolean;
-    intensity: number; // How much brightness/darkness changes
-    speed: number; // How erratic the flicker is
+    intensity: number;
+    speed: number;
   };
-  videoSettings: VideoColorConfig; // NEW: Video Color Grading
-  rain: RainConfig; // NEW: Rain Effect
-  tron: TronConfig; // NEW: Tron Game
-  life: LifeConfig; // NEW: Game of Life
+  videoSettings: VideoColorConfig;
+  rain: {
+    enabled: boolean;
+    intensity: number;
+    speed: number;
+    size: number;
+    direction: number;
+    wind: number;
+    gustiness: number;
+    opacity: number;
+    wander: number;
+  };
+  tron: {
+    enabled: boolean;
+    opacity: number;
+    speed: number;
+    spawnRate: number;
+    trailLength: number;
+    size: number;
+    maxAgents: number;
+    showNames: boolean;
+    showLeaderboard: boolean;
+    enableUser: boolean;
+    enableDummies: boolean;
+    glowEnabled: boolean;
+    glowIntensity: number;
+    bgEnabled: boolean;
+    bgPattern: 'grid' | 'iso' | 'hex' | 'dots';
+    erasureSpeed: number;
+    speedVariance: number;
+    roundMode: boolean;
+  };
+  life: {
+    enabled: boolean;
+    speed: number;
+    cellSize: number;
+    fadeSpeed: number;
+    color: string;
+    gridColor: string;
+    triggerToken: number;
+    audioReactive: boolean;
+    audioInjectionMode: 'solid' | 'tip';
+    audioPosition: 'top' | 'bottom' | 'center';
+    triggerAction?: 'random' | 'clear' | 'glider_gun' | 'pulsar';
+  };
   vignette: {
     enabled: boolean;
-    intensity: number; // Opacity 0-1
-    roundness: number; // 0-1 (Size of center hole)
+    intensity: number;
+    roundness: number;
   };
-}
-
-// ... existing types (kept for context, but not modified in this block unless needed) ...
-export interface AudioTrack {
-  id: string;
-  playlistId: string; // New field to link track to a playlist
-  name: string;
-  url: string;
-  file: File;
-  artworkUrl?: string; // NEW: Album art blob URL
-  tags?: TagMetadata; // NEW: ID3 Tags
-  order?: number; // Added order property for sorting
-  rating?: number; // NEW: Track Rating
-}
-
-export interface TagMetadata {
-  title?: string;
-  artist?: string;
-  album?: string;
-  year?: string;
-  genre?: string;
-  trackNumber?: string;
-}
-
-export interface Playlist {
-  id: string;
-  name: string;
-  order: number;
-  tracks: AudioTrack[];
-}
-
-// NEW: Interactive Background Hotspots
-export type HotspotType = 'error' | 'decrypt' | 'target' | 'scan' | 'secure' | 'link';
-
-export interface BgHotspot {
-  id: string;
-  x: number; // Percentage 0-100
-  y: number; // Percentage 0-100
-  type: HotspotType;
-  label?: string; // Optional custom text
-}
-
-export interface BackgroundMedia {
-  id: string;
-  playlistId: string; // NEW: Link to BG Playlist
-  type: 'image' | 'video';
-  url: string;
-  file: File;
-  order?: number;
-  hotspots?: BgHotspot[]; // NEW: Interactive points
-}
-
-export interface BackgroundPlaylist {
-  id: string;
-  name: string;
-  order: number;
-  items: BackgroundMedia[];
-}
-
-// NEW: Ambience File Type
-export interface AmbienceFile {
-  id: string;
-  name: string;
-  url: string;
-  file: File;
-}
-
-// NEW: Ambience Configuration
-export interface AmbienceConfig {
-  activeId: string | null;
-  isPlaying: boolean;
-  volume: number;
-}
-
-// NEW: Equalizer Configuration
-export interface EqualizerConfig {
-  enabled: boolean;
-  bands: number[]; // Array of 10 gain values (-12 to 12)
-  preset: string; // ID of current preset
-}
-
-// NEW: Recorder Configuration
-export interface RecorderConfig {
-  resolution: '1080p' | '720p' | '4k';
-  fps: 30 | 60;
-  videoBitrate: number; // bps
-  audioBitrate: number; // bps
-}
-
-// NEW: System Audio Configuration
-export interface SystemAudioConfig {
-  enabled: boolean;
-  volume: number;
-  monitor: boolean; // Playback to speakers? (Avoid feedback loop)
-}
-
-export interface PlayerState {
-  isPlaying: boolean;
-  currentTrackIndex: number;
-  playlists: Playlist[];
-  activePlaylistId: string;
-}
-
-// --- MUSIC EDITOR TYPES ---
-export type InstrumentType = 'kick' | 'snare' | 'hihat' | 'clap' | 'bass' | 'lead';
-
-export interface EditorInstrument {
-  id: string;
-  name: string;
-  type: InstrumentType;
-  color: string;
-  volume: number; // 0 to 1
-  steps: boolean[]; // Array of 16 steps
-  pitch?: number; // Optional pitch tweak
-}
-
-export interface EditorState {
-  bpm: number;
-  isPlaying: boolean;
-  currentStep: number;
-  instruments: EditorInstrument[];
-}
-// --------------------------
-
-export const NEON_COLORS = [
-  '#00f3ff', // Blue
-  '#ff00ff', // Pink
-  '#00ff00', // Green
-  '#bc13fe', // Purple
-  '#f9f871', // Yellow
-  '#ff3333', // Red
-];
-
-export type VisualizerStyle = 'retro' | 'blue' | 'pink' | 'matrix' | 'inferno' | 'warm' | 'gray' | 'ocean' | 'theme-blue' | 'theme-sync' | 'neon-gradient';
-export type VisualizerPosition = 'center' | 'top' | 'bottom' | 'circle';
-export type TipColor = 'white' | 'blue' | 'pink' | 'green' | 'purple' | 'yellow' | 'red';
-export type CursorStyle = 'default' | 'music-flow' | 'classic-blue' | 'classic-warm' | 'classic-white' | 'classic-ocean' | 'theme-sync' | 'dos-terminal' | 'system' | 'crosshair' | 'rounded' | 'sound-wave' | 'sound-wave-trail';
-
-export type ThemeType = 'neon-retro' | 'neon-blue' | 'neon-pink' | 'warm-cozy' | 'neutral-gray' | 'neutral-ocean';
-export type ControlStyle = 'default' | 'round' | 'circle';
-export type BgTransitionType = 'glitch' | 'leaks' | 'none' | 'crossfade' | 'black' | 'blur'; // UPDATED
-export type BgAnimationType = 'none' | 'zoom' | 'sway' | 'handheld' | 'cinematic' | 'chaos'; // NEW
-export type FitMode = 'cover' | 'contain' | 'stretch' | 'contain-blur'; // NEW: Background/Screen fit mode with blur
-export type ScreenAlignment = 'center' | 'left' | 'right'; // NEW: Alignment for crop mode
-
-// NEW: View Mode for Application Layout
-export type ViewMode = 'default' | 'cinema' | 'mini' | 'player-focus';
-
-export interface VisualizerConfig {
-  style: VisualizerStyle;
-  position: VisualizerPosition;
-  barCount: number;
-  sensitivity: number;
-  fillOpacity: number;
-  strokeEnabled: boolean;
-  strokeOpacity: number;
-  showTips: boolean; 
-  tipHeight: number; // New: Thickness of the tip
-  tipSpeed: number; // New: Falling speed (gravity)
-  tipColor: TipColor; // NEW: Color of the tip
-  tipGlow: boolean; // NEW: Enable glow for tip
-  normalize: boolean;
-  preventVolumeScaling: boolean; // NEW: Ignore volume level for visuals
-  minFrequency: number;
-  maxFrequency: number;
-  barGap: number;
-  mirror: boolean;
-  segmented: boolean;
-  segmentHeight: number; 
-  segmentGap: number; 
-  highlightLastBrick: boolean; // NEW: Highlight the top-most brick
-  barGravity: number; // NEW: Gravity/Decay for the bars themselves
-  threeDMode?: 'reactor' | 'spectrum'; // NEW: Specific for 3D Visualizer
-}
-
-export interface TerrainConfig {
-  gridSize: number; // Resolution (e.g., 64)
-  speed: number; // How fast waves move forward
-  heightMultiplier: number; // Amplitude
-  wireframe: boolean;
-  colorMode: 'theme' | 'rainbow' | 'matrix';
-  opacity: number;
-  lineThickness: number;
-  glow: boolean;
-  mirror?: boolean; // NEW
-  invertMirror?: boolean; // NEW
-  preventVolumeScaling?: boolean; // NEW: Ignore volume
-}
-
-export interface DvdConfig {
-  size: number;
-  speed: number;
-  opacity: number;
-  enableSfx: boolean;
-  logoType: 'dvd' | 'neon_waves' | 'custom';
-  customLogoUrl?: string; // NEW: For user uploaded logo
-  activeDvdLogoId?: string; // NEW: ID of the selected logo in DB to restore on reload
-}
-
-export interface MarqueeConfig {
-  enabled: boolean;
-  style: VisualizerStyle; // New: Visual style for text color
-  showProgress: boolean; 
-  progressMode: 'continuous' | 'blocks'; // New
-  progressHeight: number; // New
-  progressOpacity: number; // New
-  speed: number;
-  opacity: number;
-  fontSize: number;
-  channelName?: string; // NEW: Custom text for "Neon Waves" replacement
-  borderEnabled?: boolean; // NEW: Show frame/border around marquee
-}
-
-export interface WatermarkConfig {
-  scale: number;
-  opacity: number;
-  flashIntensity: number; // 0 to 1
-}
-
-export type HologramCategory = 'system' | 'interactive' | 'music' | 'motivational' | 'philosophy' | 'space';
-
-export interface GeminiChatConfig {
-  enabled: boolean;
-  opacity: number;
-  scale: number; // Deprecated in UI but kept for type safety
-  width?: number; // New: Width in pixels
-  typingSpeed: number; // 1 = Normal
-  color?: string;
-  categories: Record<HologramCategory, boolean>;
-}
-
-export interface RainConfig {
-  enabled: boolean;
-  intensity: number; // 0.1 to 1.0 (Density)
-  speed: number; // Fall speed
-  size: number; // Length/thickness scale
-  direction: number; // Angle in degrees (-45 to 45)
-  wind: number; // Base horizontal wind speed
-  gustiness: number; // Random wind variation
-  opacity: number; // NEW: Rain opacity
-  wander: number; // NEW: Direction randomness
-}
-
-export interface CrossfadeConfig {
-  enabled: boolean;
-  duration: number; // Seconds
 }
 
 export interface PatternConfig {
@@ -382,38 +278,124 @@ export interface PatternConfig {
   scale: number;
 }
 
+export type HotspotType = 'error' | 'decrypt' | 'target' | 'scan' | 'secure' | 'link';
+
+export interface BgHotspot {
+  id: string;
+  x: number;
+  y: number;
+  type: HotspotType;
+}
+
+export interface BackgroundMedia {
+  id: string;
+  playlistId: string;
+  type: 'image' | 'video';
+  url: string;
+  file: File;
+  hotspots?: BgHotspot[];
+}
+
+export interface BackgroundPlaylist {
+  id: string;
+  name: string;
+  items: BackgroundMedia[];
+  order: number;
+}
+
+export interface WatermarkConfig {
+  scale: number;
+  opacity: number;
+  flashIntensity: number;
+}
+
+export type ThemeType = 'neon-retro' | 'neon-blue' | 'neon-pink' | 'warm-cozy' | 'neutral-gray' | 'neutral-ocean';
+export type ControlStyle = 'default' | 'round' | 'circle';
+export type CursorStyle = 'theme-sync' | 'default' | 'music-flow' | 'dos-terminal' | 'sound-wave' | 'sound-wave-trail' | 'classic-blue' | 'classic-warm' | 'classic-white' | 'classic-ocean' | 'crosshair' | 'rounded' | 'system';
+
+export type BgTransitionType = 'glitch' | 'leaks' | 'crossfade' | 'black' | 'blur' | 'none';
+export type BgAnimationType = 'none' | 'zoom' | 'sway' | 'handheld' | 'cinematic' | 'chaos';
+
+export interface AmbienceFile {
+  id: string;
+  name: string;
+  file: File;
+  url: string;
+}
+
+export interface AmbienceConfig {
+  activeId: string | null;
+  isPlaying: boolean;
+  volume: number;
+}
+
+export interface EqualizerConfig {
+  enabled: boolean;
+  bands: number[];
+  preset: string;
+}
+
+export interface YouTubeAuthConfig {
+  clientId: string;
+  isConnected: boolean;
+  channelName?: string;
+}
+
 export interface AppPreset {
   id: string;
   name: string;
   createdAt: number;
   config: {
-    globalWaveformConfig?: VisualizerConfig; // NEW: Master waveform config
+    globalWaveformConfig?: VisualizerConfig;
     visualizerConfig: VisualizerConfig;
-    reactorConfig?: VisualizerConfig; // NEW: Independent 3D Reactor config
-    sineWaveConfig?: VisualizerConfig; // NEW: Sine Wave config
-    terrainConfig?: TerrainConfig; // NEW: 4D Landscape config
+    reactorConfig?: VisualizerConfig;
+    sineWaveConfig?: VisualizerConfig;
+    terrainConfig?: TerrainConfig;
+    roadConfig?: RoadConfig;
     dvdConfig: DvdConfig;
     effectsConfig: EffectsConfig;
     marqueeConfig: MarqueeConfig;
-    watermarkConfig?: WatermarkConfig; // Optional for backward compatibility
+    watermarkConfig?: WatermarkConfig;
+    equalizerConfig?: EqualizerConfig;
+    youtubeAuth?: YouTubeAuthConfig;
     bgColor: string;
     bgPattern: string;
     bgPatternConfig: PatternConfig;
     showVisualizer: boolean;
-    showVisualizer3D?: boolean; // NEW: Independent toggle
-    showSineWave?: boolean; // NEW: Sine Wave Toggle
-    showVisualizerTerrain?: boolean; // NEW: Terrain Toggle
+    showVisualizer3D?: boolean;
+    showSineWave?: boolean;
+    showVisualizerTerrain?: boolean;
+    showRoad?: boolean;
     showDvd: boolean;
     bgAutoplayInterval: number;
-    syncBgWithTrack?: boolean; // NEW: Sync background changes with audio tracks
-    cursorStyle?: CursorStyle;
-    retroScreenCursorStyle?: CursorStyle; // NEW
+    syncBgWithTrack?: boolean;
+    cursorStyle: CursorStyle;
+    retroScreenCursorStyle?: CursorStyle;
     theme?: ThemeType;
     controlStyle?: ControlStyle;
-    bgTransition?: BgTransitionType; // New
-    ambienceConfig?: AmbienceConfig; // NEW
-    equalizerConfig?: EqualizerConfig; // NEW: EQ
-    bgAnimation?: BgAnimationType; // NEW
-    youtubeAuth?: YouTubeAuthConfig; // NEW: Presets can save login state (though tokens shouldn't be shared)
-  }
+    bgTransition?: BgTransitionType;
+    bgAnimation?: BgAnimationType;
+    ambienceConfig?: AmbienceConfig;
+  };
+}
+
+export type FitMode = 'cover' | 'contain' | 'stretch' | 'contain-blur';
+export type ScreenAlignment = 'center' | 'left' | 'right';
+
+export interface RecorderConfig {
+  resolution: '720p' | '1080p' | '4k';
+  fps: 30 | 60;
+  videoBitrate: number;
+  audioBitrate: number;
+}
+
+export type InstrumentType = 'kick' | 'snare' | 'hihat' | 'bass';
+
+export interface EditorInstrument {
+  id: string;
+  name: string;
+  type: InstrumentType;
+  color: string;
+  volume: number;
+  steps: boolean[];
 }

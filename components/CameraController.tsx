@@ -1,11 +1,16 @@
 
 import React, { useEffect, useState, useRef } from 'react';
 import { OrbitControls } from '@react-three/drei';
-import { useThree } from '@react-three/fiber';
+import { useThree, useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 import { OrbitControls as OrbitControlsImpl } from 'three-stdlib';
 
-const CameraController: React.FC = () => {
+interface CameraControllerProps {
+  followTarget?: React.MutableRefObject<THREE.Vector3>;
+  locked?: boolean;
+}
+
+const CameraController: React.FC<CameraControllerProps> = ({ followTarget, locked }) => {
   const { gl } = useThree();
   const controlsRef = useRef<OrbitControlsImpl>(null);
   
@@ -18,8 +23,21 @@ const CameraController: React.FC = () => {
       RIGHT: THREE.MOUSE.PAN
   });
 
+  // Smooth follow logic
+  useFrame(() => {
+      if (controlsRef.current && followTarget && followTarget.current) {
+          // Smoothly interpolate the controls target to the moving object
+          // This allows orbiting AROUND the moving object while it flies
+          controlsRef.current.target.lerp(followTarget.current, 0.1);
+          controlsRef.current.update();
+      }
+  });
+
   useEffect(() => {
     const handleKeyChange = (e: KeyboardEvent) => {
+      // If locked, we ignore key changes and keep LEFT as NO_ACTION
+      if (locked) return;
+
       const ctrl = e.ctrlKey || e.metaKey;
       const alt = e.altKey;
       const shift = e.shiftKey;
@@ -78,7 +96,15 @@ const CameraController: React.FC = () => {
       window.removeEventListener('blur', handleBlur);
       if (gl.domElement) gl.domElement.style.cursor = 'default';
     };
-  }, [gl]);
+  }, [gl, locked]);
+
+  // Reset controls if locked changes
+  useEffect(() => {
+      if (locked) {
+          setMouseButtons(prev => ({ ...prev, LEFT: NO_ACTION }));
+          if (gl.domElement) gl.domElement.style.cursor = 'default';
+      }
+  }, [locked, gl]);
 
   // Direct sync to controls instance to ensure immediate responsiveness
   useEffect(() => {
@@ -87,6 +113,8 @@ const CameraController: React.FC = () => {
           controlsRef.current.update();
       }
   }, [mouseButtons]);
+
+  if (locked) return null;
 
   return (
     <OrbitControls 
@@ -100,6 +128,10 @@ const CameraController: React.FC = () => {
         // screenSpacePanning=true allows Up/Down panning on screen plane, which is better for 3D viewers
         screenSpacePanning={true}
         mouseButtons={mouseButtons}
+        // If we are following a target, limit the polar angle to prevent going under the ground
+        maxPolarAngle={followTarget ? Math.PI / 2 - 0.1 : Math.PI}
+        minDistance={followTarget ? 5 : 0}
+        maxDistance={followTarget ? 50 : Infinity}
     />
   );
 };

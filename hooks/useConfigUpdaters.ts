@@ -1,5 +1,5 @@
 
-import { VisualizerConfig, MarqueeConfig, DvdConfig, EffectsConfig, TerrainConfig } from '../types';
+import { VisualizerConfig, TerrainConfig, RoadConfig, MarqueeConfig, DvdConfig, EffectsConfig } from '../types';
 
 interface UseConfigUpdatersProps {
   globalWaveformConfig?: VisualizerConfig;
@@ -10,32 +10,30 @@ interface UseConfigUpdatersProps {
   setReactorConfig?: (c: VisualizerConfig) => void;
   sineWaveConfig?: VisualizerConfig;
   setSineWaveConfig?: (c: VisualizerConfig) => void;
-  terrainConfig?: TerrainConfig; 
-  setTerrainConfig?: (c: TerrainConfig) => void; 
-  marqueeConfig: MarqueeConfig;
-  setMarqueeConfig: (c: MarqueeConfig) => void;
-  dvdConfig: DvdConfig;
-  setDvdConfig: (c: DvdConfig) => void;
-  effectsConfig: EffectsConfig;
-  setEffectsConfig: (c: EffectsConfig) => void;
+  terrainConfig?: TerrainConfig;
+  setTerrainConfig?: (c: TerrainConfig) => void;
+  roadConfig?: RoadConfig;
+  setRoadConfig?: (c: RoadConfig) => void;
+  marqueeConfig?: MarqueeConfig;
+  setMarqueeConfig?: (c: MarqueeConfig) => void;
+  dvdConfig?: DvdConfig;
+  setDvdConfig?: (c: DvdConfig) => void;
+  effectsConfig?: EffectsConfig;
+  setEffectsConfig?: (c: EffectsConfig) => void;
 }
 
-export const useConfigUpdaters = ({
-  globalWaveformConfig, setGlobalWaveformConfig,
-  visualizerConfig, setVisualizerConfig,
-  reactorConfig, setReactorConfig,
-  sineWaveConfig, setSineWaveConfig,
-  terrainConfig, setTerrainConfig,
-  marqueeConfig, setMarqueeConfig,
-  dvdConfig, setDvdConfig,
-  effectsConfig, setEffectsConfig
-}: UseConfigUpdatersProps) => {
-
-  const updateGlobalWaveform = (key: keyof VisualizerConfig, value: any) => {
-    if (setGlobalWaveformConfig && globalWaveformConfig) {
-        setGlobalWaveformConfig({ ...globalWaveformConfig, [key]: value });
-    }
-  };
+export const useConfigUpdaters = (props: UseConfigUpdatersProps) => {
+  const {
+    globalWaveformConfig, setGlobalWaveformConfig,
+    visualizerConfig, setVisualizerConfig,
+    reactorConfig, setReactorConfig,
+    sineWaveConfig, setSineWaveConfig,
+    terrainConfig, setTerrainConfig,
+    roadConfig, setRoadConfig,
+    marqueeConfig, setMarqueeConfig,
+    dvdConfig, setDvdConfig,
+    effectsConfig, setEffectsConfig
+  } = props;
 
   const applyGlobalToAll = () => {
       if (!globalWaveformConfig) return;
@@ -63,12 +61,17 @@ export const useConfigUpdaters = ({
               opacity: globalWaveformConfig.fillOpacity,
               heightMultiplier: globalWaveformConfig.sensitivity,
               mirror: globalWaveformConfig.mirror,
-              preventVolumeScaling: globalWaveformConfig.preventVolumeScaling
+              preventVolumeScaling: globalWaveformConfig.preventVolumeScaling,
+              minFrequency: globalWaveformConfig.minFrequency,
+              maxFrequency: globalWaveformConfig.maxFrequency,
+              barGravity: globalWaveformConfig.barGravity
           });
+      }
+      if (roadConfig && setRoadConfig) {
+          // No direct map for road currently as it has different params
       }
   };
 
-  // NEW: Updates Global AND Propagates immediately (For Online HUD)
   const updateGlobalAndApply = (key: keyof VisualizerConfig, value: any) => {
     if (!globalWaveformConfig || !setGlobalWaveformConfig) return;
     
@@ -77,81 +80,77 @@ export const useConfigUpdaters = ({
     setGlobalWaveformConfig(newGlobal);
 
     // 2. Propagate to children immediately
-    // We construct the update object based on the single key changing to be efficient, 
-    // or just broadcast the value to the specific keys on children.
-    
-    // 2D Waveform
     setVisualizerConfig({ ...visualizerConfig, [key]: value });
 
-    // Reactor
     if (reactorConfig && setReactorConfig) {
         setReactorConfig({ ...reactorConfig, [key]: value });
     }
 
-    // Sine
     if (sineWaveConfig && setSineWaveConfig) {
         setSineWaveConfig({ ...sineWaveConfig, [key]: value });
     }
 
-    // Terrain (Mapping required)
     if (terrainConfig && setTerrainConfig) {
         if (key === 'fillOpacity') setTerrainConfig({ ...terrainConfig, opacity: value });
         if (key === 'sensitivity') setTerrainConfig({ ...terrainConfig, heightMultiplier: value });
         if (key === 'mirror') setTerrainConfig({ ...terrainConfig, mirror: value });
         if (key === 'preventVolumeScaling') setTerrainConfig({ ...terrainConfig, preventVolumeScaling: value });
+        if (key === 'minFrequency') setTerrainConfig({ ...terrainConfig, minFrequency: value });
+        if (key === 'maxFrequency') setTerrainConfig({ ...terrainConfig, maxFrequency: value });
+        if (key === 'barGravity') setTerrainConfig({ ...terrainConfig, barGravity: value });
     }
   };
 
   const updateVisualizer = (key: keyof VisualizerConfig, value: any) => {
-    setVisualizerConfig({ ...visualizerConfig, [key]: value });
+      setVisualizerConfig({ ...visualizerConfig, [key]: value });
   };
 
   const updateReactor = (key: keyof VisualizerConfig, value: any) => {
-    if (setReactorConfig && reactorConfig) {
-      setReactorConfig({ ...reactorConfig, [key]: value });
-    }
+      if (reactorConfig && setReactorConfig) setReactorConfig({ ...reactorConfig, [key]: value });
   };
 
   const updateSineWave = (key: keyof VisualizerConfig, value: any) => {
-    if (setSineWaveConfig && sineWaveConfig) {
-      setSineWaveConfig({ ...sineWaveConfig, [key]: value });
-    }
+      if (sineWaveConfig && setSineWaveConfig) setSineWaveConfig({ ...sineWaveConfig, [key]: value });
   };
 
   const updateTerrain = (key: keyof TerrainConfig, value: any) => {
-    if (setTerrainConfig && terrainConfig) {
-        setTerrainConfig({ ...terrainConfig, [key]: value });
-    }
+      if (terrainConfig && setTerrainConfig) setTerrainConfig({ ...terrainConfig, [key]: value });
+  };
+
+  const updateRoad = (key: keyof RoadConfig, value: any) => {
+      if (roadConfig && setRoadConfig) setRoadConfig({ ...roadConfig, [key]: value });
   };
 
   const updateMarquee = (key: keyof MarqueeConfig, value: any) => {
-    setMarqueeConfig({ ...marqueeConfig, [key]: value });
+      if (marqueeConfig && setMarqueeConfig) setMarqueeConfig({ ...marqueeConfig, [key]: value });
   };
 
   const updateDvd = (key: keyof DvdConfig | Partial<DvdConfig>, value?: any) => {
-    if (typeof key === 'object' && key !== null) {
-        setDvdConfig({ ...dvdConfig, ...key });
-    } else {
-        setDvdConfig({ ...dvdConfig, [key as keyof DvdConfig]: value });
-    }
+      if (dvdConfig && setDvdConfig) {
+          if (typeof key === 'object') {
+              setDvdConfig({ ...dvdConfig, ...key });
+          } else {
+              setDvdConfig({ ...dvdConfig, [key]: value });
+          }
+      }
   };
 
   const updateEffect = (key: keyof EffectsConfig, value: any) => {
-    setEffectsConfig({ ...effectsConfig, [key]: value });
+      if (effectsConfig && setEffectsConfig) setEffectsConfig({ ...effectsConfig, [key]: value });
   };
 
   const updateDebugConfig = (value: EffectsConfig['debugConsole']) => {
-    setEffectsConfig({ ...effectsConfig, debugConsole: value });
+      if (effectsConfig && setEffectsConfig) setEffectsConfig({ ...effectsConfig, debugConsole: value });
   };
 
   return {
-      updateGlobalWaveform,
       applyGlobalToAll,
-      updateGlobalAndApply, // EXPORTED
+      updateGlobalAndApply,
       updateVisualizer,
       updateReactor,
       updateSineWave,
       updateTerrain,
+      updateRoad,
       updateMarquee,
       updateDvd,
       updateEffect,

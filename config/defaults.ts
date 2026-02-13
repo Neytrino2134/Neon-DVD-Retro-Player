@@ -1,5 +1,5 @@
 
-import { VisualizerConfig, DvdConfig, EffectsConfig, MarqueeConfig, WatermarkConfig, EqualizerConfig, YouTubeAuthConfig, YouTubeChatConfig, TerrainConfig } from '../types';
+import { VisualizerConfig, DvdConfig, EffectsConfig, MarqueeConfig, WatermarkConfig, EqualizerConfig, YouTubeAuthConfig, YouTubeChatConfig, TerrainConfig, RoadConfig } from '../types';
 
 // NEW: Global Master Configuration for all Waveforms
 export const DEFAULT_GLOBAL_WAVEFORM_CONFIG: VisualizerConfig = {
@@ -24,7 +24,8 @@ export const DEFAULT_GLOBAL_WAVEFORM_CONFIG: VisualizerConfig = {
   
   // Placeholders (Not used globally but required by type)
   style: 'blue', strokeEnabled: true, showTips: true, segmented: false, segmentHeight: 4, segmentGap: 2,
-  tipHeight: 2, tipSpeed: 15, highlightLastBrick: false, tipColor: 'white', tipGlow: false
+  tipHeight: 2, tipSpeed: 15, highlightLastBrick: false, tipColor: 'white', tipGlow: false,
+  lockView: false
 };
 
 export const DEFAULT_VISUALIZER_CONFIG: VisualizerConfig = {
@@ -41,7 +42,8 @@ export const DEFAULT_VISUALIZER_CONFIG: VisualizerConfig = {
   tipGlow: false,
   // Inherited from Global (Defaults here for safety/fallback)
   position: 'bottom', barCount: 128, sensitivity: 1.5, fillOpacity: 0.3, strokeOpacity: 0.8,
-  normalize: false, preventVolumeScaling: false, minFrequency: 0, maxFrequency: 100, barGap: 2, mirror: false, barGravity: 5
+  normalize: false, preventVolumeScaling: false, minFrequency: 0, maxFrequency: 100, barGap: 2, mirror: false, barGravity: 5,
+  lockView: false
 };
 
 export const DEFAULT_REACTOR_CONFIG: VisualizerConfig = {
@@ -59,7 +61,8 @@ export const DEFAULT_REACTOR_CONFIG: VisualizerConfig = {
   threeDMode: 'reactor',
   // Inherited/Overridden defaults
   position: 'center', barCount: 64, sensitivity: 1.2, fillOpacity: 0.8, strokeOpacity: 0.5,
-  normalize: false, preventVolumeScaling: false, minFrequency: 0, maxFrequency: 80, barGap: 0, mirror: false, barGravity: 5
+  normalize: false, preventVolumeScaling: false, minFrequency: 0, maxFrequency: 80, barGap: 0, mirror: false, barGravity: 5,
+  lockView: false
 };
 
 export const DEFAULT_SINE_WAVE_CONFIG: VisualizerConfig = {
@@ -76,21 +79,41 @@ export const DEFAULT_SINE_WAVE_CONFIG: VisualizerConfig = {
   tipGlow: false,
   // Inherited/Overridden defaults
   position: 'center', barCount: 128, sensitivity: 2.0, fillOpacity: 0.2, strokeOpacity: 0.8,
-  normalize: false, preventVolumeScaling: false, minFrequency: 0, maxFrequency: 100, barGap: 0, mirror: false, barGravity: 5
+  normalize: false, preventVolumeScaling: false, minFrequency: 0, maxFrequency: 100, barGap: 0, mirror: false, barGravity: 5,
+  lockView: false
 };
 
 export const DEFAULT_TERRAIN_CONFIG: TerrainConfig = {
   gridSize: 64,
-  speed: 1.0,
+  speed: 1.0, // Wave ripple speed
   heightMultiplier: 1.5,
-  wireframe: true,
+  renderMode: 'wireframe', // UPDATED
   colorMode: 'theme',
   opacity: 0.8,
   lineThickness: 1.0,
   glow: true,
+  brightness: 1.5, // NEW: Default brightness boost
   mirror: false,
   invertMirror: false,
-  preventVolumeScaling: false
+  preventVolumeScaling: false,
+  viewDistance: 60,
+  terrainLength: 80,
+  scrollSpeed: 1.0,
+  showWaveform: true,
+  cameraFov: 75,
+  showSpaceship: false,
+  lockView: false
+};
+
+export const DEFAULT_ROAD_CONFIG: RoadConfig = {
+  enabled: false,
+  speed: 1.0,
+  roadWidth: 20,
+  buildingHeightScale: 1.0,
+  buildingBrightness: 1.5,
+  showWireframe: true,
+  colorMode: 'theme',
+  lockView: false
 };
 
 export const DEFAULT_DVD_CONFIG: DvdConfig = { 
@@ -123,6 +146,7 @@ export const DEFAULT_EFFECTS_CONFIG: EffectsConfig = {
   chromaticAberration: 0, 
   vhsJitter: 0, 
   scanlineEnabled: true, scanlineIntensity: 0.2, scanlineThickness: 4,
+  bloom: { enabled: false, strength: 1.0, radius: 10, threshold: 0.5 },
   glitch: { enabled: false, intensity: 0.5, speed: 0.2, opacity: 1.0, variant: 'v1' },
   cyberHack: { enabled: false, speed: 5, opacity: 0.7, density: 0.5, scale: 1.0, backgroundOpacity: 0.4 },
   debugConsole: { enabled: false, opacity: 0.9, scale: 1.0 },
@@ -131,7 +155,11 @@ export const DEFAULT_EFFECTS_CONFIG: EffectsConfig = {
     categories: { system: true, interactive: true, music: true, motivational: true, philosophy: false, space: false }
   },
   geminiChat: {
-    enabled: false, opacity: 0.9, scale: 1.0, width: 350, typingSpeed: 1.0,
+    enabled: false,
+    opacity: 0.9,
+    scale: 1.0,
+    width: 350,
+    typingSpeed: 1.0,
     categories: { system: false, interactive: true, music: true, motivational: true, philosophy: true, space: true }
   },
   youtubeChat: DEFAULT_YOUTUBE_CHAT_CONFIG,
@@ -176,7 +204,10 @@ export const DEFAULT_EFFECTS_CONFIG: EffectsConfig = {
     fadeSpeed: 0.8,
     color: '#00f3ff',
     gridColor: 'rgba(255,255,255,0.1)',
-    triggerToken: 0
+    triggerToken: 0,
+    audioReactive: false,
+    audioInjectionMode: 'solid',
+    audioPosition: 'bottom'
   },
   vignette: { enabled: false, intensity: 0.5, roundness: 0.7 }
 };
