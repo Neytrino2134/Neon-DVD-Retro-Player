@@ -1,6 +1,6 @@
 
 import React, { useRef, useState, useEffect, useMemo } from 'react';
-import { FolderOpen, Lock, Unlock, ArrowDownAZ, Shuffle, Trash2, Upload, Music, Activity, Disc, Hash, Mic2, ThumbsUp, ThumbsDown, Star, ListOrdered, ChevronDown, ChevronRight } from 'lucide-react';
+import { FolderOpen, Lock, Unlock, ArrowDownAZ, Shuffle, Trash2, Upload, Music, Activity, Disc, Hash, Mic2, ThumbsUp, ThumbsDown, Star, ListOrdered, ChevronDown, ChevronRight, XCircle } from 'lucide-react';
 import { Tooltip } from '../ui/Tooltip';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { AudioTrack, VisualizerConfig } from '../../types';
@@ -187,6 +187,19 @@ export const TrackList: React.FC<TrackListProps> = ({
           else next.add(albumName);
           return next;
       });
+  };
+
+  const handleClearAlbum = (e: React.MouseEvent, albumName: string) => {
+      e.stopPropagation();
+      if (isPlaylistLocked) return;
+      
+      const tracksToRemove = tracks
+          .filter(t => ((t.tags?.album || "").trim() || "Unknown Album") === albumName)
+          .map(t => t.id);
+      
+      if (tracksToRemove.length > 0) {
+          removeTracks(activePlaylistId, tracksToRemove);
+      }
   };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -606,7 +619,19 @@ export const TrackList: React.FC<TrackListProps> = ({
                                     </span>
                                 )}
                             </div>
-                            <div className="h-px bg-theme-border/30 w-12 ml-3"></div>
+                            <div className="flex items-center gap-2">
+                                {!isPlaylistLocked && (
+                                    <Tooltip content="DELETE ALBUM" position="top">
+                                        <button 
+                                            onClick={(e) => handleClearAlbum(e, currentAlbumName)}
+                                            className="text-theme-muted hover:text-red-500 transition-colors p-1 opacity-0 group-hover/header:opacity-100"
+                                        >
+                                            <XCircle size={12} />
+                                        </button>
+                                    </Tooltip>
+                                )}
+                                <div className="h-px bg-theme-border/30 w-12 ml-1"></div>
+                            </div>
                         </div>
                     )}
 

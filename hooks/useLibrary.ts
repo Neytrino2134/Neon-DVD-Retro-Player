@@ -138,8 +138,7 @@ export const useLibrary = () => {
           }
       }
 
-      const currentPl = playlists.find(p => p.id === actualPlaylistId);
-      const currentCount = currentPl ? currentPl.tracks.length : 0;
+      // We will calculate order dynamically during merge
       const newTracks: AudioTrack[] = [];
 
       for (let i = 0; i < files.length; i++) {
@@ -158,18 +157,17 @@ export const useLibrary = () => {
           }
 
           const name = (tags as any).title || file.name.replace(/\.[^/.]+$/, "");
-          const order = currentCount + i;
-
+          
           const track: AudioTrack = {
               id, playlistId: actualPlaylistId, name, url: URL.createObjectURL(file),
-              file, order, tags, artworkUrl, rating: 0
+              file, order: 0, // Placeholder, updated later
+              tags, artworkUrl, rating: 0
           };
           
           const trackForDb: StoredTrack = {
-              id, playlistId: actualPlaylistId, name, file, order, tags, rating: 0
+              id, playlistId: actualPlaylistId, name, file, order: 0, tags, rating: 0
           };
           
-          // Try to save to DB, but don't block UI if it fails
           try {
               await saveTrack(trackForDb);
           } catch (e) {
@@ -179,9 +177,66 @@ export const useLibrary = () => {
           newTracks.push(track);
       }
 
-      setPlaylists(prev => prev.map(pl => 
-          pl.id === actualPlaylistId ? { ...pl, tracks: [...pl.tracks, ...newTracks] } : pl
-      ));
+      setPlaylists(prev => prev.map(pl => {
+          if (pl.id === actualPlaylistId) {
+              // --- SMART MERGE LOGIC ---
+              // Instead of just appending, we try to insert tracks next to their existing albums
+              const existingTracks = [...pl.tracks];
+              const tracksToAdd = [...newTracks];
+              
+              // Sort tracksToAdd to ensure internal consistency if multiple files from same album dropped
+              // (Optional: relies on OS drag order which is usually good)
+
+              // Iterate through new tracks and inject them into existing list
+              // To handle batch additions correctly without messing up indices, we rebuild the list
+              
+              let mergedList = [...existingTracks];
+              
+              // We process grouped by album to insert chunks
+              // But simple iteration works if we track insertions
+              
+              for (const newTrack of tracksToAdd) {
+                  const newAlbum = (newTrack.tags?.album || "").trim();
+                  
+                  if (!newAlbum) {
+                      // No album? Append to end.
+                      mergedList.push(newTrack);
+                      continue;
+                  }
+
+                  // Find the LAST index of a track with this album in the CURRENT mergedList
+                  let insertIndex = -1;
+                  for (let j = mergedList.length - 1; j >= 0; j--) {
+                      const existingAlbum = (mergedList[j].tags?.album || "").trim();
+                      if (existingAlbum === newAlbum) {
+                          insertIndex = j;
+                          break;
+                      }
+                  }
+
+                  if (insertIndex !== -1) {
+                      // Insert AFTER the found track
+                      mergedList.splice(insertIndex + 1, 0, newTrack);
+                  } else {
+                      // Album not found in list, append to end
+                      mergedList.push(newTrack);
+                  }
+              }
+
+              // Re-index orders
+              const reindexedTracks = mergedList.map((t, idx) => ({ ...t, order: idx }));
+              
+              // Persist new orders to DB (Async, fire and forget)
+              const tracksForDbUpdate = reindexedTracks.map(t => ({
+                  id: t.id, playlistId: t.playlistId, name: t.name, file: t.file,
+                  order: t.order!, tags: t.tags, rating: t.rating
+              }));
+              saveTracksBulk(tracksForDbUpdate);
+
+              return { ...pl, tracks: reindexedTracks };
+          }
+          return pl;
+      }));
       
       return newTracks;
   };

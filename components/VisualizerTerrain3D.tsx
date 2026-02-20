@@ -190,6 +190,9 @@ const TerrainScene: React.FC<{ analyser: AnalyserNode | null; isPlaying: boolean
   // Shared Mutable Ref for Ship Position
   const shipTargetRef = useRef(new THREE.Vector3(0, 0, 0));
   
+  // Normalization smoothing state
+  const smoothNormRef = useRef({ bass: 1, mid: 1, treb: 1 });
+
   // Camera Update Logic
   const { camera } = useThree();
   useEffect(() => {
@@ -301,6 +304,32 @@ const TerrainScene: React.FC<{ analyser: AnalyserNode | null; isPlaying: boolean
         const baseDecay = Math.max(0.1, 0.98 - (gravityInput * 0.05));
         const decay = Math.pow(baseDecay, fpsRatio);
 
+        // --- NORMALIZATION LOGIC ---
+        // Identify max levels for auto-gain
+        const bassEnd = Math.floor(250 / binSize);   
+        const midEnd = Math.floor(2000 / binSize);
+        let maxBass = 150, maxMid = 100, maxTreb = 80;
+
+        for(let i=0; i<bufferLength; i++) {
+            const val = dataArrayRef.current[i];
+            if(i < bassEnd) maxBass = Math.max(maxBass, val);
+            else if(i < midEnd) maxMid = Math.max(maxMid, val);
+            else maxTreb = Math.max(maxTreb, val);
+        }
+
+        // Smoothed Normalization Targets
+        let targetBassScale = 1, targetMidScale = 1, targetTrebScale = 1;
+        if (config.normalize) {
+            targetBassScale = 255 / Math.max(150, maxBass);
+            targetMidScale = 255 / Math.max(100, maxMid);
+            targetTrebScale = 255 / Math.max(80, maxTreb);
+        }
+        
+        const normLerp = 0.05;
+        smoothNormRef.current.bass += (targetBassScale - smoothNormRef.current.bass) * normLerp;
+        smoothNormRef.current.mid += (targetMidScale - smoothNormRef.current.mid) * normLerp;
+        smoothNormRef.current.treb += (targetTrebScale - smoothNormRef.current.treb) * normLerp;
+
         for (let i = 0; i < effectiveWidth; i++) {
             const t = i / (effectiveWidth - 1);
             const adjustedT = Math.pow(t, 0.6); 
@@ -318,16 +347,33 @@ const TerrainScene: React.FC<{ analyser: AnalyserNode | null; isPlaying: boolean
                 for(let k=0; k<range && (index+k)<bufferLength; k++) {
                     maxInRange = Math.max(maxInRange, dataArrayRef.current[index+k]);
                 }
-                val = maxInRange / 255;
+                
+                // Apply Normalization Scalar
+                let normalizedVal = maxInRange;
+                if (index < bassEnd) normalizedVal *= smoothNormRef.current.bass;
+                else if (index < midEnd) normalizedVal *= smoothNormRef.current.mid;
+                else normalizedVal *= smoothNormRef.current.treb;
+
+                val = normalizedVal / 255;
             }
 
-            val = Math.pow(val, 2.5);
-            val *= (config.heightMultiplier * 1.5); 
+            // Curve Physics (Plateau Fix)
+            // We use a softer power curve and apply tanh BEFORE the multiplier to prevent clipping top.
+            // By scaling *after* tanh, we simply make the hills taller, preserving the shape.
+            
+            val = Math.pow(val, 2.0); // Slightly reduced exponent to keep more data visible
+            
             if (!config.preventVolumeScaling) {
                 val *= volume;
             }
-            val *= (1 + (i / effectiveWidth) * 0.5);
-            val = Math.tanh(val);
+            
+            val *= (1 + (i / effectiveWidth) * 0.5); // High freq boost
+            
+            // Soft Limit the input range to keep it smooth
+            val = Math.tanh(val); 
+            
+            // Apply Amplitude Multiplier LAST to stretch vertically without flattening
+            val *= (config.heightMultiplier * 2.0);
 
             sourceData[i] = val;
         }

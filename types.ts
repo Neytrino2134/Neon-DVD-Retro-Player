@@ -73,6 +73,7 @@ export interface TerrainConfig {
   mirror?: boolean;
   invertMirror?: boolean;
   preventVolumeScaling?: boolean;
+  normalize?: boolean; // NEW: Add normalize support
   viewDistance?: number; 
   terrainLength?: number; 
   scrollSpeed?: number; 

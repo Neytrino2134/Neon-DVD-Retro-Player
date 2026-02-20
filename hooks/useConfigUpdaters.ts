@@ -62,6 +62,7 @@ export const useConfigUpdaters = (props: UseConfigUpdatersProps) => {
               heightMultiplier: globalWaveformConfig.sensitivity,
               mirror: globalWaveformConfig.mirror,
               preventVolumeScaling: globalWaveformConfig.preventVolumeScaling,
+              normalize: globalWaveformConfig.normalize,
               minFrequency: globalWaveformConfig.minFrequency,
               maxFrequency: globalWaveformConfig.maxFrequency,
               barGravity: globalWaveformConfig.barGravity
@@ -95,6 +96,7 @@ export const useConfigUpdaters = (props: UseConfigUpdatersProps) => {
         if (key === 'sensitivity') setTerrainConfig({ ...terrainConfig, heightMultiplier: value });
         if (key === 'mirror') setTerrainConfig({ ...terrainConfig, mirror: value });
         if (key === 'preventVolumeScaling') setTerrainConfig({ ...terrainConfig, preventVolumeScaling: value });
+        if (key === 'normalize') setTerrainConfig({ ...terrainConfig, normalize: value });
         if (key === 'minFrequency') setTerrainConfig({ ...terrainConfig, minFrequency: value });
         if (key === 'maxFrequency') setTerrainConfig({ ...terrainConfig, maxFrequency: value });
         if (key === 'barGravity') setTerrainConfig({ ...terrainConfig, barGravity: value });
